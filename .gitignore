@@ -47,10 +47,8 @@ Thumbs.db
 .next
 out
 
-# 환경변수
+# 환경변수 (루트 .env만 무시, 앱별 .env.local은 커밋)
 .env
-.env.local
-.env.*.local
 
 # Planning
 .planning/
