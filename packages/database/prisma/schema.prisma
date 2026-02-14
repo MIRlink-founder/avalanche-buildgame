@@ -1,0 +1,770 @@
+// prisma/schema.prisma
+// NeonDB PostgreSQL 데이터소스 설정
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================
+// 병원
+// ============================================================
+
+model Hospital {
+  id String @id @default(uuid()) @db.Uuid
+
+  // -------- 병원 계정 등록에 필요한 데이터 --------
+  
+  // 1. 사업자 기본 정보 (Identity)
+  /// 사업자등록번호
+  businessNumber String @unique @db.VarChar(20) @map("business_number")
+  /// 사업자등록증 상의 정확한 명칭
+  officialName String @db.VarChar(200) @map("official_name")
+  /// 서비스 화면 표시용 병원명
+  displayName String? @db.VarChar(100) @map("display_name")
+  /// 대표자 성명
+  ceoName String @db.VarChar(50) @map("ceo_name")
+  /// 대표자 생년월일
+  ceoBirthDate DateTime? @db.Date @map("ceo_birth_date")
+  /// 사업장 소재지 (단말기 설치 위치)
+  businessAddress String @db.VarChar(500) @map("business_address")
+  
+  // 2. 의료기관 인증 정보 (Medical Authority)
+  /// 의료기관 개설 허가증 번호
+  medicalLicenseNumber String? @db.VarChar(50) @map("medical_license_number")
+  /// 요양기관 기호 (심사평가원 8자리)
+  healthcareInstitutionCode String? @db.VarChar(8) @map("healthcare_institution_code")
+
+  // 3. 정산 및 금융 정보 (Settlement)
+  /// 업종: 치과, 피부과 등
+  businessType String? @db.VarChar(50) @map("business_type")
+  /// 정산용 은행
+  accountBank String? @db.VarChar(20) @map("account_bank")
+  /// 정산용 계좌번호
+  accountNumber String? @db.VarChar(50) @map("account_number")
+  /// 예금주 (병원/대표자 명의)
+  accountHolder String? @db.VarChar(50) @map("account_holder")
+  
+  // 4. 담당자 및 운영 정보 (Operations)
+  /// 정산 담당자 성명
+  managerName String? @db.VarChar(50) @map("manager_name")
+  /// 담당자 연락처
+  managerPhone String? @db.VarChar(20) @map("manager_phone")
+  /// 담당자 이메일 (정산 리포트 수신)
+  managerEmail String? @db.VarChar(100) @map("manager_email")
+  /// 기존 사용 중인 VAN사
+  existingVanCompany String? @db.VarChar(50) @map("existing_van_company")
+  /// 기존 단말기 ID
+  existingTerminalId String? @db.VarChar(50) @map("existing_terminal_id")
+  
+  // 5. 시스템 관련 정보
+  /// GENERAL(일반), UNIVERSITY(대학병원)
+  type String @db.VarChar(20)
+  /// PENDING, APPROVED_WAITING, ACTIVE, DISABLED, WITHDRAWN
+  status String @db.VarChar(20)
+
+  // -------- 정산 대상자 상태 변경에 필요한 데이터 --------
+  
+  // 6. 정산 관련
+  // /// 미르링크 카드 수령 여부
+  // cardReceived Boolean @default(false) @map("card_received")
+  // /// 정산 활성화 여부
+  // settlementActive Boolean @default(false) @map("settlement_active")
+  // /// PG사 가맹점 ID (Sub Merchant ID)
+  // subMid String? @db.VarChar(50) @map("sub_mid")
+  // /// 단말기 ID
+  // tid String? @db.VarChar(50)
+  
+  // -------- 기타 --------
+  
+  // 7. 시스템 메타
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  documents HospitalDocument[]
+  registrationRequests RegistrationRequest[]
+  withdrawalRequests WithdrawalRequest[]
+  memos HospitalMemo[]
+  users User[] @relation("HospitalUsers")
+  departments Department[]
+  medicalRecords MedicalRecord[]
+  payments Payment[]
+  testPaymentSessions TestPaymentSession[]
+  settlements Settlement[]
+  nfts NFT[]
+  supplyRequests SupplyRequest[]
+  inquiries Inquiry[]
+  tokens Token[] @relation("HospitalTokens")
+
+  @@index([businessNumber])
+  @@index([status])
+  @@index([type])
+  @@index([healthcareInstitutionCode])
+  @@map("hospitals")
+}
+
+model HospitalDocument {
+  id Int @id @default(autoincrement())
+  hospitalId String @db.Uuid @map("hospital_id")
+  /// BUSINESS_LICENSE(사업자등록증), MEDICAL_LICENSE(의료기관개설허가증), BANK_BOOK(통장사본), ID_CARD(대표자신분증 사본)
+  documentType String @db.VarChar(50) @map("document_type")
+  fileName String @db.VarChar(255) @map("file_name")
+  fileUrl String @db.VarChar(500) @map("file_url")
+  fileSize BigInt? @map("file_size")
+  /// 운영사 검증 완료 여부
+  isVerified Boolean @default(false) @map("is_verified")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  @@index([hospitalId])
+  @@index([documentType])
+  @@map("hospital_documents")
+}
+
+model RegistrationRequest {
+  id Int @id @default(autoincrement())
+  hospitalId String @db.Uuid @map("hospital_id")
+  /// PENDING, APPROVED, REJECTED
+  status String @db.VarChar(20)
+  rejectionReason String? @db.Text @map("rejection_reason")
+  reviewedBy String? @db.Uuid @map("reviewed_by")
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  reviewer User? @relation("RegistrationReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("registration_requests")
+}
+
+model WithdrawalRequest {
+  id Int @id @default(autoincrement())
+  hospitalId String @db.Uuid @map("hospital_id")
+  reason String @db.Text
+  withdrawalDate DateTime @default(now()) @map("withdrawal_date")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  @@map("withdrawal_requests")
+}
+
+model HospitalMemo {
+  id String @id @default(uuid()) @db.Uuid
+  hospitalId String @db.Uuid @map("hospital_id")
+  /// 작성한 운영사 어드민
+  authorId String @db.Uuid @map("author_id")
+  content String @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  author User @relation("HospitalMemoAuthor", fields: [authorId], references: [id])
+
+  @@index([hospitalId])
+  @@map("hospital_memos")
+}
+
+// ============================================================
+// 사용자
+// ============================================================
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  /// 운영사는 NULL
+  hospitalId String? @db.Uuid @map("hospital_id")
+  /// SUB_ADMIN만 해당
+  departmentId Int? @map("department_id")
+  email String @unique @db.VarChar(100)
+  passwordHash String @db.VarChar(255) @map("password_hash")
+  name String @db.VarChar(50)
+  /// SUPER_ADMIN, SUB_ADMIN, MASTER_ADMIN, DEPT_ADMIN
+  role String @db.VarChar(20)
+
+  // 상태 및 관리
+  /// ACTIVE, DISABLED, DELETED, WITHDRAWN
+  status String @db.VarChar(20)
+  statusChangedAt DateTime? @map("status_changed_at")
+  /// 정보를 수정한 마스터 어드민 ID
+  updatedBy String? @db.Uuid @map("updated_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  hospital Hospital? @relation("HospitalUsers", fields: [hospitalId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  updater User? @relation("UserUpdater", fields: [updatedBy], references: [id])
+  
+  // Relations
+  authSessions AuthSession[]
+  medicalRecords MedicalRecord[]
+  registrationReviews RegistrationRequest[] @relation("RegistrationReviewer")
+  hospitalMemos HospitalMemo[] @relation("HospitalMemoAuthor")
+  supplyRequestsCreated SupplyRequest[] @relation("SupplyRequester")
+  supplyRequestsProcessed SupplyRequest[] @relation("SupplyProcessor")
+  noticesCreated Notice[]
+  inquiriesCreated Inquiry[] @relation("InquiryAuthor")
+  inquiriesAnswered Inquiry[] @relation("InquiryAnswerer")
+  tokens Token[]
+  updates User[] @relation("UserUpdater")
+
+  @@index([email])
+  @@index([hospitalId, role])
+  @@index([status])
+  @@map("users")
+}
+
+model AuthSession {
+  id Int @id @default(autoincrement())
+  userId String @db.Uuid @map("user_id")
+  accessToken String @unique @db.VarChar(500) @map("access_token")
+  /// 브라우저 정보
+  userAgent String? @db.Text @map("user_agent")
+  /// 접속 IP
+  ipAddress String? @db.VarChar(45) @map("ip_address")
+  expiresAt DateTime @map("expires_at")
+  isActive Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([accessToken])
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+model PatientPin {
+  id String @id @default(uuid()) @db.Uuid
+  /// 유저 카드 키
+  userCardKey String? @db.Text @map("user_card_key")
+  /// hashed pin 번호
+  pinNumber String? @db.VarChar(100) @map("pin_number")
+
+  @@map("patient_pins")
+}
+
+// ============================================================
+// 부서
+// ============================================================
+
+model Department {
+  id Int @id @default(autoincrement())
+  hospitalId String @db.Uuid @map("hospital_id")
+  name String @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  users User[]
+  medicalRecords MedicalRecord[]
+  tokens Token[]
+
+  @@index([hospitalId])
+  @@map("departments")
+}
+
+// ============================================================
+// 진료 기록
+// ============================================================
+
+model MedicalRecord {
+  id Int @id @default(autoincrement())
+  /// 환자의 비식별 ID (바코드 입력값)
+  patientId String @db.VarChar(50) @map("patient_id")
+  hospitalId String @db.Uuid @map("hospital_id")
+  departmentId Int? @map("department_id")
+  doctorId String @db.Uuid @map("doctor_id")
+
+  /// 암호화된 진료 데이터
+  encryptedChartData String @db.Text @map("encrypted_chart_data")
+
+  /// DRAFT, PAID, ON-CHAINED
+  status String @db.VarChar(20)
+  treatedAt DateTime? @map("treated_at")
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  doctor User @relation(fields: [doctorId], references: [id])
+  
+  payment Payment?
+  stats MedicalRecordStats?
+  items MedicalRecordItem[]
+  blockchainTransaction BlockchainTransaction?
+
+  @@index([patientId])
+  @@index([hospitalId])
+  @@index([status])
+  @@map("medical_records")
+}
+
+model MedicalRecordStats {
+  id Int @id @default(autoincrement())
+  medicalRecordId Int @unique @map("medical_record_id")
+  
+  // 환자 및 인구 통계
+  /// 연령대: 20s, 30s, 40s, 50s, 60s+
+  patientAgeGroup String? @db.VarChar(10) @map("patient_age_group")
+  /// 성별: M, F, OTHER
+  patientGender String? @db.VarChar(10) @map("patient_gender")
+  /// 고위험군 여부
+  isHighRisk Boolean? @map("is_high_risk")
+  
+  // 시술 트렌드 및 부위 통계
+  /// 시술 유형: IMPLANT, BRIDGE, CROWN 등
+  procedureType String? @db.VarChar(50) @map("procedure_type")
+  /// 시술 부위: UPPER_JAW, LOWER_JAW, SPECIFIC_TOOTH 등
+  procedureSite String? @db.VarChar(50) @map("procedure_site")
+  /// 치아 위치: 11, 12, 21, 22 등
+  toothPosition String? @db.VarChar(10) @map("tooth_position")
+  
+  // 재료 및 제품 사용 통계
+  // MedicalRecordItem 조인으로 집계
+  
+  // 수술 세부 정보 통계
+  /// 골이식 시행 여부
+  boneGraftUsed Boolean? @map("bone_graft_used")
+  /// 골이식 재료: AUTOGRAFT, ALLOGRAFT, XENOGRAFT 등
+  boneGraftMaterial String? @db.VarChar(50) @map("bone_graft_material")
+  /// 골질: TYPE1, TYPE2, TYPE3, TYPE4
+  boneQuality String? @db.VarChar(10) @map("bone_quality")
+  /// 수술 방식: IMMEDIATE, DELAYED, TWO_STAGE 등
+  surgeryMethod String? @db.VarChar(50) @map("surgery_method")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+
+  @@index([patientAgeGroup])
+  @@index([procedureType])
+  @@map("medical_record_stats")
+}
+
+model MedicalRecordItem {
+  id Int @id @default(autoincrement())
+  medicalRecordId Int @map("medical_record_id")
+  implantItemId Int @map("implant_item_id")
+  quantity Int @default(1)
+  createdAt DateTime? @map("created_at")
+  
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  implantItem ImplantItem @relation(fields: [implantItemId], references: [id])
+
+  @@index([medicalRecordId])
+  @@index([implantItemId])
+  @@map("medical_record_items")
+}
+
+// ============================================================
+// 결제 관리
+// ============================================================
+
+model Payment {
+  id Int @id @default(autoincrement())
+  medicalRecordId Int @unique @map("medical_record_id")
+  hospitalId String @db.Uuid @map("hospital_id")
+  /// 정산 후 추가
+  settlementId Int? @map("settlement_id")
+  /// PG 가맹점 번호
+  subMid String @db.VarChar(50) @map("sub_mid")
+  
+  // PG 정보
+  /// PG 승인 번호
+  approveNo String? @db.VarChar(50) @map("approve_no")
+  pgTransactionId String? @db.VarChar(100) @map("pg_transaction_id")
+  
+  // 금액 및 수단
+  amount Decimal @db.Decimal(15, 2)
+  /// CARD, CASH, MIXED
+  paymentMethod String? @db.VarChar(20) @map("payment_method")
+  
+  // 상태
+  /// READY, PAID, SETTLED, CANCELLED
+  status String @db.VarChar(20)
+
+  // 시간
+  paidAt DateTime? @map("paid_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  settlement Settlement? @relation(fields: [settlementId], references: [id])
+  idempotencies PaymentIdempotency[]
+
+  @@index([subMid])
+  @@index([approveNo])
+  @@index([status])
+  @@index([hospitalId, paidAt])
+  @@map("payments")
+}
+
+model PaymentIdempotency {
+  id Int @id @default(autoincrement())
+  idempotencyKey String @unique @db.VarChar(100) @map("idempotency_key")
+  /// APPROVE, CANCEL
+  operation String @db.VarChar(20)
+  requestHash String @db.VarChar(64) @map("request_hash")
+  /// PENDING, SUCCEEDED, FAILED
+  status String @db.VarChar(20)
+  response Json? @map("response")
+  paymentId Int? @map("payment_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([status])
+  @@map("payment_idempotencies")
+}
+
+model TestPaymentSession {
+  id Int @id @default(autoincrement())
+  hospitalId String @db.Uuid @map("hospital_id")
+  sessionToken String @unique @db.VarChar(255) @map("session_token")
+  /// 10원 결제 승인 번호
+  testTxId String? @db.VarChar(100) @map("test_tx_id")
+  testAmount Decimal @default(10.00) @db.Decimal(10, 2) @map("test_amount")
+  /// SUCCESS, TIMEOUT, FAILED
+  verifyStatus String? @db.VarChar(20) @map("verify_status")
+  expiresAt DateTime @map("expires_at")
+  /// 자동 취소 시각
+  voidAt DateTime? @map("void_at")
+  createdAt DateTime? @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  @@map("test_payment_sessions")
+}
+
+// ============================================================
+// 정산 관리
+// ============================================================
+
+model Settlement {
+  id Int @id @default(autoincrement())
+  hospitalId String @db.Uuid @map("hospital_id")
+  settlementPeriodStart DateTime @db.Date @map("settlement_period_start")
+  settlementPeriodEnd DateTime @db.Date @map("settlement_period_end")
+  totalVolume Decimal @db.Decimal(15, 2) @map("total_volume")
+  /// 정산율 (%)
+  appliedRate Decimal @db.Decimal(5, 2) @map("applied_rate")
+  /// 실제 지급액
+  paybackAmount Decimal @db.Decimal(15, 2) @map("payback_amount")
+  /// NFT 보유 여부
+  isNftBoosted Boolean @default(false) @map("is_nft_boosted")
+  /// PENDING_PAYMENT, SETTLED
+  status String @db.VarChar(20)
+  settledAt DateTime? @map("settled_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  
+  payments Payment[]
+  bankTransfers BankTransfer[]
+
+  @@index([hospitalId])
+  @@index([status])
+  @@index([settlementPeriodStart, settlementPeriodEnd])
+  @@map("settlements")
+}
+
+model BankTransfer {
+  id Int @id @default(autoincrement())
+  settlementId Int @map("settlement_id")
+  amount Decimal @db.Decimal(15, 2)
+  accountNumber String @db.VarChar(50) @map("account_number")
+  bankName String @db.VarChar(20) @map("bank_name")
+  /// PENDING, SUCCESS, FAILED
+  transferStatus String? @db.VarChar(20) @map("transfer_status")
+  transferResult String? @db.Text @map("transfer_result")
+  transferredAt DateTime? @map("transferred_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  settlement Settlement @relation(fields: [settlementId], references: [id])
+
+  @@index([settlementId])
+  @@map("bank_transfers")
+}
+
+// ============================================================
+// 블록체인
+// ============================================================
+
+model BlockchainTransaction {
+  id Int @id @default(autoincrement())
+  medicalRecordId Int @unique @map("medical_record_id")
+  txHash String @unique @db.VarChar(100) @map("tx_hash")
+  /// 원문 데이터 해시
+  dataHash String @db.VarChar(100) @map("data_hash")
+  blockNumber BigInt? @map("block_number")
+  /// PENDING, IN_PROGRESS, CONFIRMED, FAILED (CronJob 이 중복으로 트랜잭션을 날리지 않게 하기 위한 용도)
+  status String @db.VarChar(20)
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+
+  @@index([txHash])
+  @@index([medicalRecordId])
+  @@map("blockchain_transactions")
+}
+
+model NFT {
+  id String @id @default(uuid()) @db.Uuid
+  hospitalId String @db.Uuid @map("hospital_id")
+  tokenId String @unique @db.VarChar(100) @map("token_id")
+  contractAddress String @db.VarChar(100) @map("contract_address")
+  isActive Boolean @default(true) @map("is_active")
+  mintedAt DateTime @default(now()) @map("minted_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  @@index([hospitalId])
+  @@index([tokenId])
+  @@map("nfts")
+}
+
+// ============================================================
+// 제품 관리
+// ============================================================
+
+model Manufacturer {
+  id Int @id @default(autoincrement())
+  name String @unique @db.VarChar(100)
+  country String? @db.VarChar(50)
+  createdAt DateTime? @map("created_at")
+  
+  brands ImplantBrand[]
+
+  @@map("manufacturers")
+}
+
+model ImplantBrand {
+  id Int @id @default(autoincrement())
+  manufacturerId Int @map("manufacturer_id")
+  name String @db.VarChar(100)
+  description String? @db.Text
+  createdAt DateTime? @map("created_at")
+  
+  manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
+  models ImplantModel[]
+
+  @@map("implant_brands")
+}
+
+model ImplantModel {
+  id Int @id @default(autoincrement())
+  brandId Int @map("brand_id")
+  name String @db.VarChar(100)
+  createdAt DateTime? @map("created_at")
+  
+  brand ImplantBrand @relation(fields: [brandId], references: [id])
+  items ImplantItem[]
+
+  @@map("implant_models")
+}
+
+model ImplantItem {
+  id Int @id @default(autoincrement())
+  modelId Int @map("model_id")
+  /// 직경 (mm)
+  diameter Decimal @db.Decimal(4, 2)
+  /// 길이 (mm)
+  length Decimal @db.Decimal(4, 2)
+  /// SLA, RBM, Anodized 등
+  surfaceTreatment String? @db.VarChar(50) @map("surface_treatment")
+  /// Internal, External 등
+  connectionType String? @db.VarChar(50) @map("connection_type")
+  /// ACTIVE, INACTIVE
+  status String @db.VarChar(20)
+  createdAt DateTime? @map("created_at")
+  
+  model ImplantModel @relation(fields: [modelId], references: [id])
+  medicalRecordItems MedicalRecordItem[]
+
+  @@index([modelId])
+  @@index([diameter, length])
+  @@map("implant_items")
+}
+
+// ============================================================
+// 고객 지원
+// ============================================================
+
+model SupplyRequest {
+  id String @id @default(uuid()) @db.Uuid
+  hospitalId String @db.Uuid @map("hospital_id")
+  requesterId String @db.Uuid @map("requester_id")
+  
+  // 신청 물품
+  /// CARD, BARCODE_SCANNER, POS
+  itemType String @db.VarChar(20) @map("item_type")
+  quantity Int @default(1)
+  
+  // 배송 정보
+  recipientName String? @db.VarChar(50) @map("recipient_name")
+  recipientPhone String? @db.VarChar(20) @map("recipient_phone")
+  deliveryAddress String? @db.VarChar(500) @map("delivery_address")
+  deliveryZipcode String? @db.VarChar(10) @map("delivery_zipcode")
+  
+  /// PENDING, APPROVED, SHIPPED, DELIVERED, REJECTED
+  status String? @db.VarChar(20)
+  processedBy String? @db.Uuid @map("processed_by")
+  processedAt DateTime? @map("processed_at")
+  rejectionReason String? @db.Text @map("rejection_reason")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  requester User @relation("SupplyRequester", fields: [requesterId], references: [id])
+  processor User? @relation("SupplyProcessor", fields: [processedBy], references: [id])
+
+  @@index([hospitalId])
+  @@index([status])
+  @@map("supply_requests")
+}
+
+model Notice {
+  id String @id @default(uuid()) @db.Uuid
+  authorId String @db.Uuid @map("author_id")
+  title String @db.VarChar(200)
+  content String @db.Text
+
+  // 공지 대상자
+  /// ALL, HOSPITAL, DEPT
+  targetGroup String? @db.VarChar(20) @map("target_group")
+  /// HOPITAL ID
+  targetHospitalId String? @db.Uuid @map("target_hospital_id")
+  /// SUPER_ADMIN, MASTER_ADMIN, SUB_ADMIN, DEPT_ADMIN
+  targetRole String? @db.VarChar(20) @map("target_role")
+
+  isPinned Boolean @default(false) @map("is_pinned")
+  /// DRAFT, PUBLISHED, DELETED
+  status String @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  author User @relation(fields: [authorId], references: [id])
+  attachments NoticeAttachment[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("notices")
+}
+
+model NoticeAttachment {
+  id Int @id @default(autoincrement())
+  noticeId String @db.Uuid @map("notice_id")
+  fileName String @db.VarChar(255) @map("file_name")
+  fileUrl String @db.VarChar(500) @map("file_url")
+  fileSize BigInt? @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  notice Notice @relation(fields: [noticeId], references: [id])
+
+  @@map("notice_attachments")
+}
+
+model Inquiry {
+  id String @id @default(uuid()) @db.Uuid
+  hospitalId String @db.Uuid @map("hospital_id")
+  authorId String @db.Uuid @map("author_id")
+  categoryId Int @map("category_id")
+  title String @db.VarChar(200)
+  content String @db.Text
+
+  /// 접수, 처리중, 답변완료 (PENDING, IN_PROGRESS, COMPLETED)
+  status String @db.VarChar(20)
+
+  /// 운영사 답변 내용
+  answerContent String? @db.Text @map("answer_content")
+  /// 답변한 운영사 어드민
+  answeredBy String? @db.Uuid @map("answered_by")
+  answeredAt DateTime? @map("answered_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  author User @relation("InquiryAuthor", fields: [authorId], references: [id])
+  category InquiryCategory @relation(fields: [categoryId], references: [id])
+  answerer User? @relation("InquiryAnswerer", fields: [answeredBy], references: [id])
+  attachments InquiryAttachment[]
+
+  @@index([hospitalId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("inquiries")
+}
+
+model InquiryCategory {
+  id Int @id @default(autoincrement())
+  name String @unique @db.VarChar(50)
+  description String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  inquiries Inquiry[]
+
+  @@map("inquiry_categories")
+}
+
+model InquiryAttachment {
+  id Int @id @default(autoincrement())
+  inquiryId String @db.Uuid @map("inquiry_id")
+  fileName String @db.VarChar(255) @map("file_name")
+  fileUrl String @db.VarChar(500) @map("file_url")
+  fileSize BigInt? @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id])
+
+  @@map("inquiry_attachments")
+}
+
+// ============================================================
+// 알림
+// ============================================================
+
+model Notification {
+  id Int @id @default(autoincrement())
+  /// NOTICE, INQUIRY (공지, 문의)
+  entityType String? @db.VarChar(20) @map("entity_type")
+  entityId Int? @map("entity_id")
+  recipientId Int? @map("recipient_id")
+  recipientEmail String? @db.VarChar(100) @map("recipient_email")
+  /// EMAIL, SMS, SLACK
+  channel String? @db.VarChar(20)
+  title String? @db.VarChar(200)
+  content String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+// ============================================================
+// 토큰
+// ============================================================
+
+model Token {
+  id String @id @default(uuid()) @db.Uuid
+  /// ACTIVATION (병원 가입), INVITATION (학과 초대), PASSWORD_RESET (비밀번호 초기화) - 3일, 미정, 1시간
+  tokenType String @db.VarChar(20) @map("token_type")
+  token String @unique @db.VarChar(255)
+  userId String? @db.Uuid @map("user_id")
+  hospitalId String? @db.Uuid @map("hospital_id")
+  /// INVITATION 에서 학과 id, 나머지는 null
+  departmentId Int? @map("department_id")
+  email String? @db.VarChar(100)
+  expiresAt DateTime @map("expires_at")
+  /// false 의 경우 알림 재발송 가능하게
+  isUsed Boolean @default(false) @map("is_used")
+  createdAt DateTime? @map("created_at")
+  
+  user User? @relation(fields: [userId], references: [id])
+  hospital Hospital? @relation("HospitalTokens", fields: [hospitalId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  @@map("tokens")
+}

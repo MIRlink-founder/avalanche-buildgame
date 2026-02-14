@@ -1,0 +1,5 @@
+{
+  "name": "@mire/blockchain",
+  "projectType": "library",
+  "sourceRoot": "packages/blockchain/src"
+}

@@ -2,5 +2,21 @@
   "extends": "./tsconfig.base.json",
   "compileOnSave": false,
   "files": [],
-  "references": []
+  "references": [
+    {
+      "path": "./apps/hospital-web"
+    },
+    {
+      "path": "./apps/patient-web"
+    },
+    {
+      "path": "./packages/blockchain"
+    },
+    {
+      "path": "./packages/database"
+    },
+    {
+      "path": "./packages/ui"
+    }
+  ]
 }

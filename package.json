@@ -1,21 +1,42 @@
 {
-  "name": "@org/source",
-  "version": "0.0.0",
+  "name": "@mire/source",
+  "version": "0.1.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "dev:hospital": "nx dev @mire/hospital-web",
+    "dev:patient": "nx dev @mire/patient-web",
+    "build:all": "nx run-many -t build",
+    "lint:all": "nx run-many -t lint",
+    "db:generate": "nx run @mire/database:generate",
+    "db:migrate:dev": "nx run @mire/database:migrate-dev",
+    "db:migrate:deploy": "nx run @mire/database:migrate-deploy",
+    "db:push": "nx run @mire/database:push",
+    "db:studio": "nx run @mire/database:studio"
+  },
   "private": true,
-  "dependencies": {},
   "devDependencies": {
-    "@nx/js": "22.5.0",
+    "@nx/js": "22.5.1",
+    "@nx/next": "^22.5.1",
+    "@nx/react": "^22.5.1",
     "@swc-node/register": "1.11.1",
+    "@swc/cli": "~0.8.0",
     "@swc/core": "1.15.8",
     "@swc/helpers": "0.5.18",
+    "@types/node": "^20.19.33",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "nx": "22.5.0",
-    "prettier": "^2.6.2",
+    "prettier": "^3.8.1",
     "tslib": "^2.3.0",
     "typescript": "~5.9.2"
   },
   "workspaces": [
-    "packages/*"
-  ]
+    "packages/*",
+    "apps/*"
+  ],
+  "dependencies": {
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  }
 }

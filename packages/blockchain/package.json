@@ -1,0 +1,27 @@
+{
+  "name": "@mire/blockchain",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./wagmi/config": "./src/wagmi/config.ts",
+    "./wagmi/chains": "./src/wagmi/chains.ts",
+    "./wagmi/contracts/abis": "./src/wagmi/contracts/abis.ts",
+    "./wagmi/contracts/addresses": "./src/wagmi/contracts/addresses.ts",
+    "./viem/clients": "./src/viem/clients.ts"
+  },
+  "dependencies": {
+    "viem": "^2.45.3",
+    "wagmi": "^3.4.3",
+    "@tanstack/react-query": "^5.90.20"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

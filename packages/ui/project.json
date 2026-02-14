@@ -1,0 +1,5 @@
+{
+  "name": "@mire/ui",
+  "projectType": "library",
+  "sourceRoot": "packages/ui/src"
+}
