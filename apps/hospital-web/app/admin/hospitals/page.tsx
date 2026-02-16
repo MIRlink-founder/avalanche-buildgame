@@ -1,4 +1,6 @@
-import { HospitalsPageClient } from '@/components/admin/HospitalsPageClient'
+'use client';
+
+import { HospitalsPageClient } from '@/components/admin/HospitalsPageClient';
 
 export default function HospitalsPage() {
   return (
@@ -14,5 +16,5 @@ export default function HospitalsPage() {
 
       <HospitalsPageClient />
     </>
-  )
+  );
 }

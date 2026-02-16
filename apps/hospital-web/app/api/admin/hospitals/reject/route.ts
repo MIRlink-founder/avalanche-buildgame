@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@mire/database';
 import { requireAuth, AuthError, isAdminRole } from '@/lib/auth-guard';
+import { sendRejectionEmail } from '@/lib/send-email';
 
 // 병원 가입 반려 처리
 export async function POST(request: Request) {
@@ -27,21 +28,43 @@ export async function POST(request: Request) {
       );
     }
 
+    const existing = await prisma.hospital.findUnique({
+      where: { id: hospitalId },
+      select: { status: true },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: '병원 정보를 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+    if (existing.status !== 'PENDING') {
+      return NextResponse.json(
+        { success: false, error: '승인 대기 상태가 아닙니다.' },
+        { status: 400 },
+      );
+    }
+
     const reviewerId = user.id;
     const reasonText = memo != null ? String(memo).trim() : '';
 
-    await prisma.registrationRequest.updateMany({
-      where: {
-        hospitalId,
-        status: 'PENDING',
-      },
-      data: {
-        status: 'REJECTED',
-        reviewedBy: reviewerId,
-        reviewedAt: new Date(),
-        rejectionReason: reasonText || null,
-      },
-    });
+    await prisma.$transaction([
+      prisma.registrationRequest.updateMany({
+        where: {
+          hospitalId,
+          reviewedAt: null,
+        },
+        data: {
+          reviewedBy: reviewerId,
+          reviewedAt: new Date(),
+          rejectionReason: reasonText || null,
+        },
+      }),
+      prisma.hospital.update({
+        where: { id: hospitalId },
+        data: { status: 'REJECTED' },
+      }),
+    ]);
 
     if (reasonText) {
       await prisma.hospitalMemo.create({
@@ -53,8 +76,26 @@ export async function POST(request: Request) {
       });
     }
 
+    const hospital = await prisma.hospital.findUnique({
+      where: { id: hospitalId },
+      select: { managerEmail: true, officialName: true, displayName: true },
+    });
+    let mailSent = false;
+    if (hospital?.managerEmail) {
+      try {
+        await sendRejectionEmail({
+          to: hospital.managerEmail,
+          hospitalName: hospital.displayName ?? hospital.officialName,
+          rejectionReason: reasonText,
+        });
+        mailSent = true;
+      } catch (mailError) {
+        console.error('반려 메일 발송 실패:', mailError);
+      }
+    }
+
     revalidatePath('/admin/hospitals');
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, mailSent });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json(

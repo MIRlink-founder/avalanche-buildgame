@@ -1,7 +1,8 @@
 'use client';
 
+import { useRef, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   Building2,
@@ -12,6 +13,7 @@ import {
   Package,
   Settings,
   MoreVertical,
+  LogOut,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -22,7 +24,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  Badge,
 } from '@mire/ui';
 
 const menuItems = [
@@ -65,6 +66,26 @@ const menuItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (!menuOpen) return;
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('accessToken');
+    setMenuOpen(false);
+    router.push('/');
+  };
 
   // TODO: 실제 로그인한 담당자 정보로 대체
   const managerInfo = {
@@ -122,12 +143,29 @@ export function AdminSidebar() {
               </span>
             </div>
           </div>
-          <button
-            className="flex h-8 w-8 items-center justify-center"
-            aria-label="더보기"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+              aria-label="더보기"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+            {menuOpen && (
+              <div className="z-100 absolute bottom-full mb-1 min-w-[140px] rounded-md border bg-popover py-1 shadow-md">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
+                  로그아웃
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>
