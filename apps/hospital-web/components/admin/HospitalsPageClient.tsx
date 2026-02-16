@@ -18,15 +18,6 @@ interface HospitalFromApi {
   managerPhone: string | null;
   createdAt: string;
   status: string;
-  registrationRequests: Array<{
-    status: string;
-    createdAt: string;
-  }>;
-  memos?: Array<{
-    id: string;
-    content: string;
-    createdAt: string;
-  }>;
 }
 
 interface ApiResponse {
@@ -112,18 +103,10 @@ export function HospitalsPageClient() {
     );
   }
 
-  // API에서 받은 날짜 문자열을 Date로 변환 (테이블/드로어 호환)
+  // API에서 받은 날짜 문자열을 Date로 변환 (테이블용, 상세/메모는 드로어에서 fetch)
   const hospitals = data.hospitals.map((h) => ({
     ...h,
     createdAt: new Date(h.createdAt),
-    registrationRequests: h.registrationRequests.map((r) => ({
-      ...r,
-      createdAt: new Date(r.createdAt),
-    })),
-    memos: (h.memos ?? []).map((m) => ({
-      ...m,
-      createdAt: new Date(m.createdAt),
-    })),
   }));
 
   return (

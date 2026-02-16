@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Sheet,
@@ -13,6 +13,13 @@ import {
 import { Button } from '@mire/ui';
 import { ScrollArea } from '@mire/ui';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
+import {
+  formatDate,
+  formatBusinessNumber,
+  formatPhone,
+  HOSPITAL_STATUS_LABELS,
+  HOSPITAL_STATUS_COLORS,
+} from '@/lib/admin-hospital-format';
 
 export interface HospitalForDrawer {
   id: string;
@@ -25,9 +32,10 @@ export interface HospitalForDrawer {
   businessAddress?: string | null;
   createdAt: Date;
   status: string;
-  registrationRequests: Array<{
-    status: string;
+  registrationRequests?: Array<{
     createdAt: Date;
+    reviewedAt?: Date | null;
+    rejectionReason?: string | null;
   }>;
   memos?: Array<{
     id: string;
@@ -37,68 +45,71 @@ export interface HospitalForDrawer {
 }
 
 interface HospitalReviewDrawerProps {
-  hospital: HospitalForDrawer | null;
+  hospitalId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const statusLabels: Record<string, string> = {
-  PENDING: '승인대기',
-  APPROVED: '승인완료',
-  ACTIVE: '승인완료',
-  REJECTED: '반려',
-  DISABLED: '정지',
-  WITHDRAWN: '탈퇴',
-};
-
-const statusColors: Record<string, string> = {
-  PENDING: 'bg-orange-100 text-orange-800',
-  APPROVED: 'bg-green-100 text-green-800',
-  ACTIVE: 'bg-green-100 text-green-800',
-  REJECTED: 'bg-red-100 text-red-800',
-  DISABLED: 'bg-gray-100 text-gray-800',
-  WITHDRAWN: 'bg-gray-100 text-gray-800',
-};
-
-function formatDate(date: Date) {
-  return new Date(date).toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatBusinessNumber(num: string) {
-  if (num.length === 10) {
-    return `${num.slice(0, 3)}-${num.slice(3, 5)}-${num.slice(5)}`;
-  }
-  return num;
-}
-
-function formatPhone(phone: string | null) {
-  if (!phone) return '-';
-  if (phone.startsWith('02')) {
-    if (phone.length === 9) {
-      return `${phone.slice(0, 2)}-${phone.slice(2, 5)}-${phone.slice(5)}`;
-    }
-    return `${phone.slice(0, 2)}-${phone.slice(2, 6)}-${phone.slice(6)}`;
-  }
-  return `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7)}`;
-}
-
 export function HospitalReviewDrawer({
-  hospital,
+  hospitalId,
   open,
   onOpenChange,
 }: HospitalReviewDrawerProps) {
   const router = useRouter();
+  const [hospital, setHospital] = useState<HospitalForDrawer | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [memo, setMemo] = useState('');
 
-  const isPending = hospital?.registrationRequests?.[0]?.status === 'PENDING';
+  useEffect(() => {
+    if (!open || !hospitalId) {
+      setHospital(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setHospital(null);
+    fetch(`/api/admin/hospitals/${hospitalId}`, {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => {
+        if (redirectIfUnauthorized(res)) return null;
+        if (!res.ok) throw new Error('상세 조회에 실패했습니다.');
+        return res.json();
+      })
+      .then((data: HospitalForDrawer | null) => {
+        if (!cancelled && data) {
+          setHospital({
+            ...data,
+            createdAt: new Date(data.createdAt),
+            registrationRequests: (data.registrationRequests ?? []).map((r) => ({
+              ...r,
+              createdAt: new Date(r.createdAt),
+              reviewedAt:
+                r.reviewedAt != null ? new Date(r.reviewedAt) : null,
+            })),
+            memos: (data.memos ?? []).map((m) => ({
+              ...m,
+              createdAt: new Date(m.createdAt),
+            })),
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setHospital(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, hospitalId]);
+
+  const isPending = hospital?.status === 'PENDING';
+  const isApprovedWaiting = hospital?.status === 'APPROVED_WAITING';
 
   const handleApprove = async () => {
     if (!hospital) return;
@@ -118,6 +129,9 @@ export function HospitalReviewDrawer({
       if (redirectIfUnauthorized(res)) return;
       const result = await res.json();
       if (result.success) {
+        if (result.mailSent === false) {
+          alert('승인 처리되었습니다. 단, 활성화 메일 발송에 실패했습니다. 수신자 이메일과 SMTP 설정을 확인해 주세요.');
+        }
         window.dispatchEvent(new CustomEvent('hospitals-updated'));
         router.refresh();
         onOpenChange(false);
@@ -149,6 +163,9 @@ export function HospitalReviewDrawer({
       if (redirectIfUnauthorized(res)) return;
       const result = await res.json();
       if (result.success) {
+        if (result.mailSent === false) {
+          alert('반려 처리되었습니다. 단, 안내 메일 발송에 실패했습니다. 수신자 이메일과 SMTP 설정을 확인해 주세요.');
+        }
         window.dispatchEvent(new CustomEvent('hospitals-updated'));
         router.refresh();
         onOpenChange(false);
@@ -160,6 +177,34 @@ export function HospitalReviewDrawer({
       alert('반려 처리 중 오류가 발생했습니다.');
     } finally {
       setIsRejecting(false);
+    }
+  };
+
+  const handleResendActivation = async () => {
+    if (!hospital) return;
+    setIsResending(true);
+    try {
+      const res = await fetch('/api/admin/hospitals/resend-activation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ hospitalId: hospital.id }),
+      });
+      if (redirectIfUnauthorized(res)) return;
+      const result = await res.json();
+      if (result.success) {
+        window.dispatchEvent(new CustomEvent('hospitals-updated'));
+        router.refresh();
+        alert('활성화 메일을 재발송했습니다.');
+      } else {
+        alert(result.error || '재발송에 실패했습니다.');
+      }
+    } catch {
+      alert('재발송 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -175,8 +220,8 @@ export function HospitalReviewDrawer({
             <SheetHeader>
               <SheetTitle>
                 {isPending ? '가입 승인 심사' : '병원 상세'}
-                <Badge className={`${statusColors[hospital.status]} ml-2`}>
-                  {statusLabels[hospital.status]}
+                <Badge className={`${HOSPITAL_STATUS_COLORS[hospital.status] ?? ''} ml-2`}>
+                  {HOSPITAL_STATUS_LABELS[hospital.status] ?? hospital.status}
                 </Badge>
               </SheetTitle>
             </SheetHeader>
@@ -298,19 +343,35 @@ export function HospitalReviewDrawer({
                   </Button>
                 </>
               ) : (
-                <Button
-                  variant="outline"
-                  size="xl"
-                  onClick={() => onOpenChange(false)}
-                >
-                  닫기
-                </Button>
+                <>
+                  {isApprovedWaiting && (
+                    <Button
+                      variant="outline"
+                      size="xl"
+                      onClick={handleResendActivation}
+                      disabled={isResending}
+                    >
+                      {isResending ? '재발송 중...' : '활성화 메일 재발송'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="xl"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    닫기
+                  </Button>
+                </>
               )}
             </SheetFooter>
           </>
-        ) : (
+        ) : loading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             데이터를 불러오는 중...
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            병원 정보를 불러올 수 없습니다.
           </div>
         )}
       </SheetContent>

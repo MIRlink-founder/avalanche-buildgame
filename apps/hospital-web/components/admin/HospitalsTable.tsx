@@ -4,9 +4,13 @@ import { useState } from 'react';
 import { Badge } from '@mire/ui';
 import { Button } from '@mire/ui';
 import {
-  HospitalReviewDrawer,
-  type HospitalForDrawer,
-} from './HospitalReviewDrawer';
+  formatDate,
+  formatBusinessNumber,
+  formatPhone,
+  HOSPITAL_STATUS_LABELS,
+  HOSPITAL_STATUS_COLORS,
+} from '@/lib/admin-hospital-format';
+import { HospitalReviewDrawer } from './HospitalReviewDrawer';
 
 interface Hospital {
   id: string;
@@ -17,47 +21,26 @@ interface Hospital {
   managerPhone: string | null;
   createdAt: Date;
   status: string;
-  registrationRequests: Array<{
-    status: string;
-    createdAt: Date;
-  }>;
 }
 
 interface HospitalsTableProps {
   hospitals: Hospital[];
 }
 
-const statusLabels: Record<string, string> = {
-  PENDING: '승인대기',
-  APPROVED: '승인완료',
-  ACTIVE: '승인완료',
-  REJECTED: '반려',
-  DISABLED: '정지',
-  WITHDRAWN: '탈퇴',
-};
-
-const statusColors: Record<string, string> = {
-  PENDING: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
-  APPROVED: 'bg-green-100 text-green-800 hover:bg-green-100',
-  ACTIVE: 'bg-green-100 text-green-800 hover:bg-green-100',
-  REJECTED: 'bg-red-100 text-red-800 hover:bg-red-100',
-  DISABLED: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  WITHDRAWN: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-};
-
 export function HospitalsTable({ hospitals }: HospitalsTableProps) {
-  const [selectedHospital, setSelectedHospital] =
-    useState<HospitalForDrawer | null>(null);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(
+    null,
+  );
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const openDrawer = (hospital: Hospital) => {
-    setSelectedHospital(hospital as HospitalForDrawer);
+    setSelectedHospitalId(hospital.id);
     setIsDrawerOpen(true);
   };
 
   const closeDrawer = () => {
     setIsDrawerOpen(false);
-    setSelectedHospital(null);
+    setSelectedHospitalId(null);
   };
 
   const handleManagementButtonClick = (
@@ -66,45 +49,6 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
   ) => {
     e.stopPropagation();
     openDrawer(hospital);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatBusinessNumber = (num: string) => {
-    // 123-45-67890 형식으로 변환
-    if (num.length === 10) {
-      return `${num.slice(0, 3)}-${num.slice(3, 5)}-${num.slice(5)}`;
-    }
-    return num;
-  };
-
-  const formatPhone = (phone: string | null) => {
-    if (!phone) return '-';
-    // 02-1234-5678 형식으로 변환
-    if (phone.startsWith('02')) {
-      if (phone.length === 9) {
-        return `${phone.slice(0, 2)}-${phone.slice(2, 5)}-${phone.slice(5)}`;
-      }
-      return `${phone.slice(0, 2)}-${phone.slice(2, 6)}-${phone.slice(6)}`;
-    }
-    // 010-1234-5678 형식
-    return `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7)}`;
-  };
-
-  const getHospitalStatus = (hospital: Hospital) => {
-    const latestRequest = hospital.registrationRequests[0];
-    if (latestRequest && latestRequest.status === 'PENDING') {
-      return 'PENDING';
-    }
-    return hospital.status;
   };
 
   return (
@@ -149,7 +93,7 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                 </tr>
               ) : (
                 hospitals.map((hospital) => {
-                  const status = getHospitalStatus(hospital);
+                  const status = hospital.status;
                   const isPending = status === 'PENDING';
 
                   return (
@@ -168,8 +112,8 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                         {formatDate(hospital.createdAt)}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge className={statusColors[status]}>
-                          {statusLabels[status] || status}
+                        <Badge className={HOSPITAL_STATUS_COLORS[status]}>
+                          {HOSPITAL_STATUS_LABELS[status] || status}
                         </Badge>
                       </td>
                       <td
@@ -208,7 +152,7 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
       </div>
 
       <HospitalReviewDrawer
-        hospital={selectedHospital}
+        hospitalId={selectedHospitalId}
         open={isDrawerOpen}
         onOpenChange={(open) => {
           if (!open) closeDrawer();

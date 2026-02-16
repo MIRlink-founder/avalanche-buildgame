@@ -8,6 +8,7 @@ export function getAuthHeaders(): Record<string, string> {
 // 401 응답 시 "/" 로 리다이렉트
 export function redirectIfUnauthorized(res: Response): boolean {
   if (res.status === 401) {
+    localStorage.removeItem('accessToken');
     window.location.href = '/';
     return true;
   }
