@@ -126,16 +126,15 @@ model HospitalDocument {
   @@map("hospital_documents")
 }
 
+/// 심사 이력/감사용. 현재 상태는 Hospital.status 로만 관리.
 model RegistrationRequest {
   id Int @id @default(autoincrement())
   hospitalId String @db.Uuid @map("hospital_id")
-  /// PENDING, APPROVED, REJECTED
-  status String @db.VarChar(20)
   rejectionReason String? @db.Text @map("rejection_reason")
   reviewedBy String? @db.Uuid @map("reviewed_by")
   reviewedAt DateTime? @map("reviewed_at")
   createdAt DateTime @default(now()) @map("created_at")
-  
+
   hospital Hospital @relation(fields: [hospitalId], references: [id])
   reviewer User? @relation("RegistrationReviewer", fields: [reviewedBy], references: [id])
 
@@ -285,8 +284,8 @@ model MedicalRecord {
   /// DRAFT, PAID, ON-CHAINED
   status String @db.VarChar(20)
   treatedAt DateTime? @map("treated_at")
-  createdAt DateTime? @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   
   hospital Hospital @relation(fields: [hospitalId], references: [id])
   department Department? @relation(fields: [departmentId], references: [id])
@@ -350,8 +349,8 @@ model MedicalRecordItem {
   medicalRecordId Int @map("medical_record_id")
   implantItemId Int @map("implant_item_id")
   quantity Int @default(1)
-  createdAt DateTime? @map("created_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
   implantItem ImplantItem @relation(fields: [implantItemId], references: [id])
 
@@ -435,8 +434,8 @@ model TestPaymentSession {
   expiresAt DateTime @map("expires_at")
   /// 자동 취소 시각
   voidAt DateTime? @map("void_at")
-  createdAt DateTime? @map("created_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+
   hospital Hospital @relation(fields: [hospitalId], references: [id])
 
   @@map("test_payment_sessions")
@@ -537,8 +536,8 @@ model Manufacturer {
   id Int @id @default(autoincrement())
   name String @unique @db.VarChar(100)
   country String? @db.VarChar(50)
-  createdAt DateTime? @map("created_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+
   brands ImplantBrand[]
 
   @@map("manufacturers")
@@ -549,8 +548,8 @@ model ImplantBrand {
   manufacturerId Int @map("manufacturer_id")
   name String @db.VarChar(100)
   description String? @db.Text
-  createdAt DateTime? @map("created_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+
   manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
   models ImplantModel[]
 
@@ -561,8 +560,8 @@ model ImplantModel {
   id Int @id @default(autoincrement())
   brandId Int @map("brand_id")
   name String @db.VarChar(100)
-  createdAt DateTime? @map("created_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+
   brand ImplantBrand @relation(fields: [brandId], references: [id])
   items ImplantItem[]
 
@@ -582,8 +581,8 @@ model ImplantItem {
   connectionType String? @db.VarChar(50) @map("connection_type")
   /// ACTIVE, INACTIVE
   status String @db.VarChar(20)
-  createdAt DateTime? @map("created_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+
   model ImplantModel @relation(fields: [modelId], references: [id])
   medicalRecordItems MedicalRecordItem[]
 
@@ -760,8 +759,8 @@ model Token {
   expiresAt DateTime @map("expires_at")
   /// false 의 경우 알림 재발송 가능하게
   isUsed Boolean @default(false) @map("is_used")
-  createdAt DateTime? @map("created_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+
   user User? @relation(fields: [userId], references: [id])
   hospital Hospital? @relation("HospitalTokens", fields: [hospitalId], references: [id])
   department Department? @relation(fields: [departmentId], references: [id])

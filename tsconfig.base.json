@@ -21,6 +21,7 @@
       "@mire/blockchain/*": ["packages/blockchain/src/*"],
       "@mire/ui": ["packages/ui/src/index.ts"],
       "@mire/ui/*": ["packages/ui/src/*"]
-    }
+    },
+    "baseUrl": "."
   }
 }
