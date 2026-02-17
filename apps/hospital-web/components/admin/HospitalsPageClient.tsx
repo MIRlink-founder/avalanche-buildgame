@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
+import { Tabs } from '@/components/layout/Tabs';
 import { StatsCards } from './StatsCards';
-import { HospitalTabs } from './HospitalTabs';
 import { SearchBar } from './SearchBar';
 import { HospitalsTable } from './HospitalsTable';
 import { Pagination } from './Pagination';
@@ -118,7 +118,16 @@ export function HospitalsPageClient() {
       />
 
       <div className="space-y-6 rounded-lg border bg-card p-6">
-        <HospitalTabs />
+        <Tabs
+          tabs={[
+            { id: 'all', label: '전체' },
+            { id: 'active', label: '정상' },
+            { id: 'suspended', label: '정지/탈퇴' },
+            { id: 'pending', label: '심사' },
+          ]}
+          basePath="/admin/hospitals"
+          defaultTab="pending"
+        />
         <SearchBar />
         <HospitalsTable hospitals={hospitals} />
         <Pagination
