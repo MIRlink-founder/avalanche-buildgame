@@ -20,14 +20,21 @@ interface Hospital {
   businessNumber: string;
   managerPhone: string | null;
   createdAt: Date;
+  /** 계정 생성일 (해당 병원 User 최초 생성일, 전체/정상/정지·탈퇴 탭용) */
+  accountCreatedAt?: Date | null;
   status: string;
 }
 
 interface HospitalsTableProps {
   hospitals: Hospital[];
+  /** true면 계정 생성일, false면 가입 신청일 컬럼 표시 */
+  showAccountCreatedAt?: boolean;
 }
 
-export function HospitalsTable({ hospitals }: HospitalsTableProps) {
+export function HospitalsTable({
+  hospitals,
+  showAccountCreatedAt = false,
+}: HospitalsTableProps) {
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(
     null,
   );
@@ -71,7 +78,7 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                   연락처
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                  가입 신청일
+                  {showAccountCreatedAt ? '계정 생성일' : '가입 신청일'}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                   상태
@@ -109,7 +116,11 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                         {formatPhone(hospital.managerPhone)}
                       </td>
                       <td className="px-4 py-3">
-                        {formatDate(hospital.createdAt)}
+                        {showAccountCreatedAt
+                          ? hospital.accountCreatedAt
+                            ? formatDate(hospital.accountCreatedAt)
+                            : '-'
+                          : formatDate(hospital.createdAt)}
                       </td>
                       <td className="px-4 py-3">
                         <Badge className={HOSPITAL_STATUS_COLORS[status]}>
@@ -134,9 +145,21 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={(e) =>
-                              handleManagementButtonClick(e, hospital)
-                            }
+                            onClick={(e) => {
+                              if (
+                                hospital.status === 'PENDING' ||
+                                hospital.status === 'APPROVED' ||
+                                hospital.status === 'REJECTED'
+                              ) {
+                                handleManagementButtonClick(e, hospital);
+                              } else if (
+                                hospital.status === 'ACTIVE' ||
+                                hospital.status === 'DISABLED' ||
+                                hospital.status === 'WITHDRAWN'
+                              ) {
+                                window.location.href = `/admin/hospitals/${hospital.id}`;
+                              }
+                            }}
                           >
                             상세
                           </Button>

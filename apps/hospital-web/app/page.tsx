@@ -19,7 +19,7 @@ export default function Home() {
     switch (role) {
       case 'SUPER_ADMIN':
       case 'SUB_ADMIN':
-        router.replace('/admin');
+        router.replace('/admin/hospitals');
         break;
       case 'MASTER_ADMIN':
       case 'DEPT_ADMIN':

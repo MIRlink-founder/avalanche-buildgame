@@ -69,7 +69,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { token: tokenValue, password, passwordConfirm } = body as {
+    const {
+      token: tokenValue,
+      password,
+      passwordConfirm,
+    } = body as {
       token?: string;
       password?: string;
       passwordConfirm?: string;
@@ -156,7 +160,7 @@ export async function POST(request: Request) {
       }),
       prisma.hospital.update({
         where: { id: hospital.id },
-        data: { status: 'APPROVED' },
+        data: { status: 'ACTIVE' },
       }),
       prisma.token.update({
         where: { id: tokenRecord.id },

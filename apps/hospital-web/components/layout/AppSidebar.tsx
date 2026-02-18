@@ -36,7 +36,7 @@ const DEFAULT_USER = {
 
 export function AppSidebar({
   menuItems,
-  logoHref = '/admin',
+  logoHref = '/admin/hospitals',
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();

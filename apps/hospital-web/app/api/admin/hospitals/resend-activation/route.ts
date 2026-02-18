@@ -4,7 +4,7 @@ import { prisma } from '@mire/database';
 import { requireAuth, AuthError, isAdminRole } from '@/lib/auth-guard';
 // import { sendActivationEmail } from '@/lib/send-email';
 
-// APPROVED_WAITING 상태에서 활성화 메일 재발송
+// APPROVED 상태에서 활성화 메일 재발송
 export async function POST(request: Request) {
   try {
     const { user } = await requireAuth(request);
@@ -26,8 +26,13 @@ export async function POST(request: Request) {
     }
 
     const hospital = await prisma.hospital.findUnique({
-      where: { id: hospitalId, status: 'APPROVED_WAITING' },
-      select: { id: true, managerEmail: true, officialName: true, displayName: true },
+      where: { id: hospitalId, status: 'APPROVED' },
+      select: {
+        id: true,
+        managerEmail: true,
+        officialName: true,
+        displayName: true,
+      },
     });
 
     if (!hospital) {
@@ -49,7 +54,10 @@ export async function POST(request: Request) {
 
     if (!tokenRecord) {
       return NextResponse.json(
-        { success: false, error: '유효한 활성화 토큰이 없거나 만료되었습니다.' },
+        {
+          success: false,
+          error: '유효한 활성화 토큰이 없거나 만료되었습니다.',
+        },
         { status: 400 },
       );
     }

@@ -73,10 +73,10 @@ export function LoginForm() {
         const role = data.user?.role;
         switch (role) {
           case 'SUPER_ADMIN': // 운영사 - 슈퍼 어드민
-            router.push('/admin');
+            router.push('/admin/hospitals');
             break;
           case 'SUB_ADMIN': // 운영사 - 하위 어드민
-            router.push('/admin');
+            router.push('/admin/hospitals');
             break;
           case 'MASTER_ADMIN': // 병원 - 마스터 어드민
             router.push('/dashboard');
