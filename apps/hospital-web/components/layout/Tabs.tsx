@@ -17,6 +17,8 @@ interface TabsProps {
   paramName?: string;
   /** 기본 선택 탭 id (미지정 시 tabs[0].id) */
   defaultTab?: string;
+  /** true면 page/search 등 기존 쿼리 유지 (상세 페이지에서 목록 복귀용) */
+  preserveParams?: boolean;
 }
 
 export function Tabs({
@@ -24,6 +26,7 @@ export function Tabs({
   basePath,
   paramName = 'tab',
   defaultTab,
+  preserveParams = false,
 }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,8 +36,10 @@ export function Tabs({
   const handleTabChange = (tabId: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set(paramName, tabId);
-    params.delete('page');
-    params.delete('search');
+    if (!preserveParams) {
+      params.delete('page');
+      params.delete('search');
+    }
     router.push(`${basePath}?${params.toString()}`);
   };
 

@@ -166,6 +166,11 @@ export function HospitalsPageClient() {
           <HospitalsTable
             hospitals={hospitals}
             showAccountCreatedAt={tab !== 'pending'}
+            listQueryString={new URLSearchParams({
+              tab,
+              page,
+              ...(search ? { search } : {}),
+            }).toString()}
           />
         )}
         <Pagination

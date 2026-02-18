@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Badge } from '@mire/ui';
 import { Button } from '@mire/ui';
 import {
@@ -20,20 +21,20 @@ interface Hospital {
   businessNumber: string;
   managerPhone: string | null;
   createdAt: Date;
-  /** 계정 생성일 (해당 병원 User 최초 생성일, 전체/정상/정지·탈퇴 탭용) */
-  accountCreatedAt?: Date | null;
+  accountCreatedAt?: Date | null; // 계정 (최초 User) 생성일
   status: string;
 }
 
 interface HospitalsTableProps {
   hospitals: Hospital[];
-  /** true면 계정 생성일, false면 가입 신청일 컬럼 표시 */
   showAccountCreatedAt?: boolean;
+  listQueryString?: string;
 }
 
 export function HospitalsTable({
   hospitals,
   showAccountCreatedAt = false,
+  listQueryString = '',
 }: HospitalsTableProps) {
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(
     null,
@@ -141,25 +142,23 @@ export function HospitalsTable({
                           >
                             승인 심사
                           </Button>
+                        ) : hospital.status === 'ACTIVE' ||
+                          hospital.status === 'DISABLED' ||
+                          hospital.status === 'WITHDRAWN' ? (
+                          <Button size="sm" variant="outline" asChild>
+                            <Link
+                              href={`/admin/hospitals/${hospital.id}${listQueryString ? `?${listQueryString}` : ''}`}
+                            >
+                              상세
+                            </Link>
+                          </Button>
                         ) : (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={(e) => {
-                              if (
-                                hospital.status === 'PENDING' ||
-                                hospital.status === 'APPROVED' ||
-                                hospital.status === 'REJECTED'
-                              ) {
-                                handleManagementButtonClick(e, hospital);
-                              } else if (
-                                hospital.status === 'ACTIVE' ||
-                                hospital.status === 'DISABLED' ||
-                                hospital.status === 'WITHDRAWN'
-                              ) {
-                                window.location.href = `/admin/hospitals/${hospital.id}`;
-                              }
-                            }}
+                            onClick={(e) =>
+                              handleManagementButtonClick(e, hospital)
+                            }
                           >
                             상세
                           </Button>
