@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Badge } from '@mire/ui';
 import { Button } from '@mire/ui';
 import {
@@ -20,14 +21,21 @@ interface Hospital {
   businessNumber: string;
   managerPhone: string | null;
   createdAt: Date;
+  accountCreatedAt?: Date | null; // 계정 (최초 User) 생성일
   status: string;
 }
 
 interface HospitalsTableProps {
   hospitals: Hospital[];
+  showAccountCreatedAt?: boolean;
+  listQueryString?: string;
 }
 
-export function HospitalsTable({ hospitals }: HospitalsTableProps) {
+export function HospitalsTable({
+  hospitals,
+  showAccountCreatedAt = false,
+  listQueryString = '',
+}: HospitalsTableProps) {
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(
     null,
   );
@@ -71,7 +79,7 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                   연락처
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                  가입 신청일
+                  {showAccountCreatedAt ? '계정 생성일' : '가입 신청일'}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                   상태
@@ -109,7 +117,11 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                         {formatPhone(hospital.managerPhone)}
                       </td>
                       <td className="px-4 py-3">
-                        {formatDate(hospital.createdAt)}
+                        {showAccountCreatedAt
+                          ? hospital.accountCreatedAt
+                            ? formatDate(hospital.accountCreatedAt)
+                            : '-'
+                          : formatDate(hospital.createdAt)}
                       </td>
                       <td className="px-4 py-3">
                         <Badge className={HOSPITAL_STATUS_COLORS[status]}>
@@ -129,6 +141,16 @@ export function HospitalsTable({ hospitals }: HospitalsTableProps) {
                             }
                           >
                             승인 심사
+                          </Button>
+                        ) : hospital.status === 'ACTIVE' ||
+                          hospital.status === 'DISABLED' ||
+                          hospital.status === 'WITHDRAWN' ? (
+                          <Button size="sm" variant="outline" asChild>
+                            <Link
+                              href={`/admin/hospitals/${hospital.id}${listQueryString ? `?${listQueryString}` : ''}`}
+                            >
+                              상세
+                            </Link>
                           </Button>
                         ) : (
                           <Button

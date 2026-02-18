@@ -63,7 +63,7 @@ model Hospital {
   // 5. 시스템 관련 정보
   /// GENERAL(일반), UNIVERSITY(대학병원)
   type String @db.VarChar(20)
-  /// PENDING, APPROVED_WAITING, ACTIVE, DISABLED, WITHDRAWN
+  /// PENDING(회원가입 신청), APPROVED(운영사 승인), REJECTED(운영사 반려), ACTIVE(비밀번호 설정), DISABLED(정지), WITHDRAWN(탈퇴)
   status String @db.VarChar(20)
 
   // -------- 정산 대상자 상태 변경에 필요한 데이터 --------

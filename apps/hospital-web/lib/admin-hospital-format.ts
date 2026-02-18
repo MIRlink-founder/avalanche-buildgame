@@ -30,9 +30,8 @@ export function formatPhone(phone: string | null): string {
 
 export const HOSPITAL_STATUS_LABELS: Record<string, string> = {
   PENDING: '승인대기',
-  APPROVED_WAITING: '활성화 대기',
   APPROVED: '승인완료',
-  ACTIVE: '활성화',
+  ACTIVE: '정상',
   REJECTED: '반려',
   DISABLED: '정지',
   WITHDRAWN: '탈퇴',
@@ -40,10 +39,9 @@ export const HOSPITAL_STATUS_LABELS: Record<string, string> = {
 
 export const HOSPITAL_STATUS_COLORS: Record<string, string> = {
   PENDING: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
-  APPROVED_WAITING: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
-  APPROVED: 'bg-green-100 text-green-800 hover:bg-green-100',
-  ACTIVE: 'bg-green-100 text-green-800 hover:bg-green-100',
+  APPROVED: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
+  ACTIVE: 'bg-blue-600 text-white hover:bg-blue-600',
   REJECTED: 'bg-red-100 text-red-800 hover:bg-red-100',
-  DISABLED: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  WITHDRAWN: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+  DISABLED: 'bg-red-600 text-white hover:bg-red-600',
+  WITHDRAWN: 'bg-gray-400 text-white hover:bg-gray-400',
 };

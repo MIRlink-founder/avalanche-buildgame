@@ -84,12 +84,14 @@ export function HospitalReviewDrawer({
           setHospital({
             ...data,
             createdAt: new Date(data.createdAt),
-            registrationRequests: (data.registrationRequests ?? []).map((r) => ({
-              ...r,
-              createdAt: new Date(r.createdAt),
-              reviewedAt:
-                r.reviewedAt != null ? new Date(r.reviewedAt) : null,
-            })),
+            registrationRequests: (data.registrationRequests ?? []).map(
+              (r) => ({
+                ...r,
+                createdAt: new Date(r.createdAt),
+                reviewedAt:
+                  r.reviewedAt != null ? new Date(r.reviewedAt) : null,
+              }),
+            ),
             memos: (data.memos ?? []).map((m) => ({
               ...m,
               createdAt: new Date(m.createdAt),
@@ -109,7 +111,7 @@ export function HospitalReviewDrawer({
   }, [open, hospitalId]);
 
   const isPending = hospital?.status === 'PENDING';
-  const isApprovedWaiting = hospital?.status === 'APPROVED_WAITING';
+  const isApprovedWaiting = hospital?.status === 'APPROVED';
 
   const handleApprove = async () => {
     if (!hospital) return;
@@ -130,7 +132,9 @@ export function HospitalReviewDrawer({
       const result = await res.json();
       if (result.success) {
         if (result.mailSent === false) {
-          alert('승인 처리되었습니다. 단, 활성화 메일 발송에 실패했습니다. 수신자 이메일과 SMTP 설정을 확인해 주세요.');
+          alert(
+            '승인 처리되었습니다. 단, 활성화 메일 발송에 실패했습니다. 수신자 이메일과 SMTP 설정을 확인해 주세요.',
+          );
         }
         window.dispatchEvent(new CustomEvent('hospitals-updated'));
         router.refresh();
@@ -164,7 +168,9 @@ export function HospitalReviewDrawer({
       const result = await res.json();
       if (result.success) {
         if (result.mailSent === false) {
-          alert('반려 처리되었습니다. 단, 안내 메일 발송에 실패했습니다. 수신자 이메일과 SMTP 설정을 확인해 주세요.');
+          alert(
+            '반려 처리되었습니다. 단, 안내 메일 발송에 실패했습니다. 수신자 이메일과 SMTP 설정을 확인해 주세요.',
+          );
         }
         window.dispatchEvent(new CustomEvent('hospitals-updated'));
         router.refresh();
@@ -220,7 +226,9 @@ export function HospitalReviewDrawer({
             <SheetHeader>
               <SheetTitle>
                 {isPending ? '가입 승인 심사' : '병원 상세'}
-                <Badge className={`${HOSPITAL_STATUS_COLORS[hospital.status] ?? ''} ml-2`}>
+                <Badge
+                  className={`${HOSPITAL_STATUS_COLORS[hospital.status] ?? ''} ml-2`}
+                >
                   {HOSPITAL_STATUS_LABELS[hospital.status] ?? hospital.status}
                 </Badge>
               </SheetTitle>

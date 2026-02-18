@@ -21,21 +21,29 @@ export async function GET(request: NextRequest) {
     const searchTerm = searchParams.get('search') || '';
 
     // 1. 통계 데이터 (Hospital.status 기준)
-    const [pendingCount, activeCount, newThisMonthCount] = await Promise.all([
+    const [
+      pendingCount,
+      activeCount,
+      newThisMonthCount,
+      totalHospitalCount,
+      withdrawnCount,
+    ] = await Promise.all([
       prisma.hospital.count({
         where: { status: 'PENDING' },
-      }),
+      }), // 가입 승인 대기
       prisma.hospital.count({
-        where: { status: { in: ['ACTIVE', 'APPROVED', 'APPROVED_WAITING'] } },
-      }),
+        where: { status: { in: ['ACTIVE'] } },
+      }), // 정상 운영 중
       prisma.hospital.count({
         where: {
-          status: { in: ['ACTIVE', 'APPROVED', 'APPROVED_WAITING'] },
+          status: { in: ['ACTIVE'] },
           createdAt: {
             gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
           },
         },
-      }),
+      }), // 이번 달 신규 가입
+      prisma.hospital.count({}), // 전체 병원
+      prisma.hospital.count({ where: { status: 'WITHDRAWN' } }), // 탈퇴 병원
     ]);
 
     // 2. 탭 필터 (Hospital.status 기준)
@@ -48,14 +56,24 @@ export async function GET(request: NextRequest) {
     } = {};
 
     if (currentTab === 'pending') {
+      // 심사
       whereCondition = {
-        status: { in: ['PENDING', 'REJECTED'] },
+        status: { in: ['PENDING', 'APPROVED', 'REJECTED'] },
       };
     } else if (currentTab === 'active') {
-      whereCondition = { status: { in: ['ACTIVE', 'APPROVED', 'APPROVED_WAITING'] } };
+      // 정상
+      whereCondition = {
+        status: { in: ['ACTIVE'] },
+      };
     } else if (currentTab === 'suspended') {
+      // 정지/탈퇴
       whereCondition = {
         status: { in: ['DISABLED', 'WITHDRAWN'] },
+      };
+    } else {
+      // 전체
+      whereCondition = {
+        status: { in: ['ACTIVE', 'DISABLED', 'WITHDRAWN'] },
       };
     }
 
@@ -70,16 +88,35 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // 4. 목록 + 총 개수 (상세/메모는 드로어에서 GET [id]로 로드, 상태는 Hospital.status만 사용)
-    const [hospitals, totalCount] = await Promise.all([
+    // 4. 목록 + 총 개수 (계정 생성일 = 해당 병원 User 중 최초 생성일)
+    const [hospitalsRaw, totalCount] = await Promise.all([
       prisma.hospital.findMany({
         where: whereCondition,
         orderBy: { createdAt: 'desc' },
         skip: (currentPage - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
+        include: {
+          users: {
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
       }),
       prisma.hospital.count({ where: whereCondition }),
     ]);
+
+    const hospitals = hospitalsRaw.map((h) => ({
+      id: h.id,
+      officialName: h.officialName,
+      displayName: h.displayName,
+      ceoName: h.ceoName,
+      businessNumber: h.businessNumber,
+      managerPhone: h.managerPhone,
+      createdAt: h.createdAt,
+      status: h.status,
+      accountCreatedAt: h.users[0]?.createdAt ?? null,
+    }));
 
     const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
@@ -90,6 +127,8 @@ export async function GET(request: NextRequest) {
       pendingCount,
       activeCount,
       newThisMonthCount,
+      totalHospitalCount,
+      withdrawnCount,
       pageSize: PAGE_SIZE,
     });
   } catch (error) {

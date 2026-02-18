@@ -17,6 +17,7 @@ interface HospitalFromApi {
   businessNumber: string;
   managerPhone: string | null;
   createdAt: string;
+  accountCreatedAt: string | null;
   status: string;
 }
 
@@ -27,6 +28,8 @@ interface ApiResponse {
   pendingCount: number;
   activeCount: number;
   newThisMonthCount: number;
+  totalHospitalCount: number;
+  withdrawnCount: number;
   pageSize: number;
 }
 
@@ -38,7 +41,7 @@ export function HospitalsPageClient() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const page = searchParams.get('page') || '1';
-  const tab = searchParams.get('tab') || 'pending';
+  const tab = searchParams.get('tab') || 'all';
   const search = searchParams.get('search') || '';
 
   useEffect(() => {
@@ -92,7 +95,8 @@ export function HospitalsPageClient() {
     );
   }
 
-  if (loading || !data) {
+  // 첫 로딩(데이터 없음)일 때만 전체 스켈레톤
+  if (!data && loading) {
     return (
       <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
@@ -103,19 +107,44 @@ export function HospitalsPageClient() {
     );
   }
 
-  // API에서 받은 날짜 문자열을 Date로 변환 (테이블용, 상세/메모는 드로어에서 fetch)
-  const hospitals = data.hospitals.map((h) => ({
+  // 데이터가 없고 로딩도 끝난 경우(에러 등) — 레이아웃만
+  const safeData = data ?? {
+    hospitals: [],
+    totalCount: 0,
+    totalPages: 0,
+    pendingCount: 0,
+    activeCount: 0,
+    newThisMonthCount: 0,
+    totalHospitalCount: 0,
+    withdrawnCount: 0,
+    pageSize: 10,
+  };
+
+  const hospitals = safeData.hospitals.map((h) => ({
     ...h,
     createdAt: new Date(h.createdAt),
+    accountCreatedAt: h.accountCreatedAt
+      ? new Date(h.accountCreatedAt)
+      : null,
   }));
 
   return (
     <div className="space-y-6 p-6">
-      <StatsCards
-        pendingCount={data.pendingCount}
-        activeCount={data.activeCount}
-        newThisMonthCount={data.newThisMonthCount}
-      />
+      {tab === 'pending' ? (
+        <StatsCards
+          variant="pending"
+          pendingCount={safeData.pendingCount}
+          activeCount={safeData.activeCount}
+          newThisMonthCount={safeData.newThisMonthCount}
+        />
+      ) : (
+        <StatsCards
+          variant="overview"
+          totalCount={safeData.totalHospitalCount}
+          newThisMonthCount={safeData.newThisMonthCount}
+          withdrawnCount={safeData.withdrawnCount}
+        />
+      )}
 
       <div className="space-y-6 rounded-lg border bg-card p-6">
         <Tabs
@@ -126,15 +155,29 @@ export function HospitalsPageClient() {
             { id: 'pending', label: '심사' },
           ]}
           basePath="/admin/hospitals"
-          defaultTab="pending"
+          defaultTab="all"
         />
         <SearchBar />
-        <HospitalsTable hospitals={hospitals} />
+        {loading ? (
+          <div className="flex min-h-[400px] items-center justify-center text-muted-foreground">
+            불러오는 중...
+          </div>
+        ) : (
+          <HospitalsTable
+            hospitals={hospitals}
+            showAccountCreatedAt={tab !== 'pending'}
+            listQueryString={new URLSearchParams({
+              tab,
+              page,
+              ...(search ? { search } : {}),
+            }).toString()}
+          />
+        )}
         <Pagination
           currentPage={Number(page) || 1}
-          totalPages={data.totalPages}
-          totalCount={data.totalCount}
-          pageSize={data.pageSize}
+          totalPages={safeData.totalPages}
+          totalCount={safeData.totalCount}
+          pageSize={safeData.pageSize}
         />
       </div>
     </div>

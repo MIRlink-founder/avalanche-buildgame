@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       }),
       prisma.hospital.update({
         where: { id: hospitalId },
-        data: { status: 'APPROVED_WAITING' },
+        data: { status: 'APPROVED' },
       }),
       prisma.token.create({
         data: {
