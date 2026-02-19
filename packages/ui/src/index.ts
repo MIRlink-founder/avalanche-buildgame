@@ -53,6 +53,7 @@ export {
   SidebarTrigger,
   useSidebar,
 } from './components/sidebar';
+} from './components/sidebar';
 export {
   Table,
   TableBody,

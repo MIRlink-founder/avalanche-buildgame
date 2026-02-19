@@ -1,118 +1,118 @@
-"use client"
+'use client';
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Button } from "@mire/ui/components/button"
-import { Input } from "@mire/ui/components/input"
-import { Checkbox } from "@mire/ui/components/checkbox"
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@mire/ui/components/button';
+import { Input } from '@mire/ui/components/input';
+import { Checkbox } from '@mire/ui/components/checkbox';
 
-const STORAGE_KEY = "mire_saved_email"
+const STORAGE_KEY = 'mire_saved_email';
 
 export function LoginForm() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [rememberMe, setRememberMe] = useState(false)
-  const [emailError, setEmailError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedEmail = localStorage.getItem(STORAGE_KEY)
+    if (typeof window !== 'undefined') {
+      const savedEmail = localStorage.getItem(STORAGE_KEY);
       if (savedEmail) {
-        setEmail(savedEmail)
-        setRememberMe(true)
+        setEmail(savedEmail);
+        setRememberMe(true);
       }
     }
-  }, [])
+  }, []);
 
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleEmailBlur = () => {
     if (email && !validateEmail(email)) {
-      setEmailError("이메일 형식을 확인해주세요")
+      setEmailError('이메일 형식을 확인해주세요');
     } else {
-      setEmailError("")
+      setEmailError('');
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!validateEmail(email)) {
-      setEmailError("이메일 형식을 확인해주세요")
-      return
+      setEmailError('이메일 형식을 확인해주세요');
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (response.ok) {
         // accessToken 저장
-        localStorage.setItem("accessToken", data.accessToken)
+        localStorage.setItem('accessToken', data.accessToken);
         // 로컬스토리지에 아이디 저장/삭제
         if (rememberMe) {
-          localStorage.setItem(STORAGE_KEY, email)
+          localStorage.setItem(STORAGE_KEY, email);
         } else {
-          localStorage.removeItem(STORAGE_KEY)
+          localStorage.removeItem(STORAGE_KEY);
         }
 
         // TODO: role 에 따라 페이지 리다이렉트
-        const role = data.user?.role
+        const role = data.user?.role;
         switch (role) {
-          case "SUPER_ADMIN": // 운영사 - 슈퍼 어드민
-            router.push("/admin")
-            break
-          case "SUB_ADMIN": // 운영사 - 하위 어드민
-            router.push("/admin")
-            break
-          case "MASTER_ADMIN": // 병원 - 마스터 어드민
-            router.push("/hospital/dashboard")
-            break
-          case "DEPT_ADMIN": // 병원 - 학과 어드민
-            router.push("/hospital/records")
-            break
+          case 'SUPER_ADMIN': // 운영사 - 슈퍼 어드민
+            router.push('/admin/hospitals');
+            break;
+          case 'SUB_ADMIN': // 운영사 - 하위 어드민
+            router.push('/admin/hospitals');
+            break;
+          case 'MASTER_ADMIN': // 병원 - 마스터 어드민
+            router.push('/dashboard');
+            break;
+          case 'DEPT_ADMIN': // 병원 - 학과 어드민
+            router.push('/dashboard');
+            break;
           default:
-            router.push("/")
+            router.push('/');
         }
       } else {
         if (response.status === 403) {
-          if (data.error?.includes("탈퇴")) {
-            alert("탈퇴된 계정입니다. 관리자에게 문의하세요.")
-          } else if (data.error?.includes("차단")) {
-            alert("운영 정책에 의해 차단된 계정입니다.")
+          if (data.error?.includes('탈퇴')) {
+            alert('탈퇴된 계정입니다. 관리자에게 문의하세요.');
+          } else if (data.error?.includes('차단')) {
+            alert('운영 정책에 의해 차단된 계정입니다.');
           } else {
-            alert(data.error || "로그인에 실패했습니다.")
+            alert(data.error || '로그인에 실패했습니다.');
           }
         } else {
-          alert("아이디 또는 비밀번호를 확인해주세요.")
+          alert('아이디 또는 비밀번호를 확인해주세요.');
         }
       }
     } catch (error) {
-      console.error("Login error:", error)
-      alert("로그인 중 오류가 발생했습니다. 다시 시도해주세요.")
+      console.error('Login error:', error);
+      alert('로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && password) {
-      handleSubmit(e as any)
+    if (e.key === 'Enter' && password) {
+      handleSubmit(e as any);
     }
-  }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -125,7 +125,7 @@ export function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           onBlur={handleEmailBlur}
           disabled={isLoading}
-          className={emailError ? "border-red-500" : ""}
+          className={emailError ? 'border-red-500' : ''}
         />
         {emailError && <p className="text-sm text-red-500">{emailError}</p>}
       </div>
@@ -170,9 +170,9 @@ export function LoginForm() {
         type="submit"
         size="xl"
         className="w-full"
-        disabled={isLoading || !email || !password || emailError !== ""}
+        disabled={isLoading || !email || !password || emailError !== ''}
       >
-        {isLoading ? "로그인 중..." : "로그인"}
+        {isLoading ? '로그인 중...' : '로그인'}
       </Button>
 
       <Link href="/auth/register">
@@ -184,5 +184,5 @@ export function LoginForm() {
         </Button>
       </Link>
     </form>
-  )
+  );
 }
