@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       const hospital = await prisma.hospital.findUnique({
         where: { id: user.hospitalId! },
       });
-      if (!hospital || hospital.status !== 'APPROVED') {
+      if (!hospital || hospital.status !== 'ACTIVE') {
         return NextResponse.json(
           {
             error: '병원 승인이 완료되지 않았습니다',
