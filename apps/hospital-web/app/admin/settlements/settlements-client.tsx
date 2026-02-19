@@ -207,8 +207,8 @@ export function SettlementsClient() {
   };
 
   return (
-    <div className="space-y-5">
-      <Card className="border-border bg-secondary">
+    <div className="space-y-6 p-6">
+      <Card className="border-border bg-card">
         <CardHeader className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <CardTitle className="text-lg">정산 필터</CardTitle>
@@ -293,8 +293,8 @@ export function SettlementsClient() {
         </Card>
       )}
 
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
+      <Card className="border-border bg-card">
+        <CardHeader className="border-border border-b">
           <div className="grid gap-3 sm:grid-cols-2">
             <Card className="border-border shadow-none">
               <CardContent className="p-4">
@@ -320,7 +320,7 @@ export function SettlementsClient() {
         </CardHeader>
         <CardContent className="p-0">
           <Table className="min-w-[860px]">
-            <TableHeader className="bg-secondary">
+            <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-muted-foreground">기간</TableHead>
                 <TableHead className="text-muted-foreground">병원</TableHead>
@@ -408,7 +408,7 @@ export function SettlementsClient() {
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter className="border-border justify-between border-t px-4 py-3">
+        <CardFooter className="border-border justify-between border-t px-6 py-4">
           <p className="text-muted-foreground text-xs">
             {isLoading ? '데이터를 불러오는 중입니다' : ''}
           </p>

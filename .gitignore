@@ -53,3 +53,6 @@ next-env.d.ts
 
 # Planning
 .planning/
+
+# Private session notes
+PRIVATE-SESSION-CONTEXT.md

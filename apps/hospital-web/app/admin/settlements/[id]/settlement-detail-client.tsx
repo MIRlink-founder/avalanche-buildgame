@@ -631,8 +631,8 @@ export function SettlementDetailClient({
   };
 
   return (
-    <div className="space-y-5">
-      <Card className="border-border bg-secondary">
+    <div className="space-y-6 p-6">
+      <Card className="border-border bg-card">
         <CardHeader className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -685,8 +685,8 @@ export function SettlementDetailClient({
         </Card>
       )}
 
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
+      <Card className="border-border bg-card">
+        <CardHeader className="border-border border-b">
           <CardTitle className="flex items-center gap-2 text-base">
             <FontAwesomeIcon
               icon={faCircleCheck}
@@ -739,8 +739,8 @@ export function SettlementDetailClient({
         </CardFooter>
       </Card>
 
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
+      <Card className="border-border bg-card">
+        <CardHeader className="border-border border-b">
           <CardTitle className="flex items-center gap-2 text-base">
             <FontAwesomeIcon
               icon={faMoneyBill1}
@@ -780,7 +780,7 @@ export function SettlementDetailClient({
               <Label className="text-muted-foreground text-xs font-semibold">
                 예상 페이백
               </Label>
-              <div className="border-border bg-secondary flex h-10 items-center rounded-md border px-3 text-sm">
+              <div className="border-border bg-muted/50 flex h-10 items-center rounded-md border px-3 text-sm">
                 {previewPayback === null
                   ? '-'
                   : `${formatAmount(String(previewPayback))}원`}
@@ -819,8 +819,8 @@ export function SettlementDetailClient({
         </CardFooter>
       </Card>
 
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
+      <Card className="border-border bg-card">
+        <CardHeader className="border-border border-b">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <FontAwesomeIcon
@@ -891,8 +891,8 @@ export function SettlementDetailClient({
         </CardFooter>
       </Card>
 
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
+      <Card className="border-border bg-card">
+        <CardHeader className="border-border border-b">
           <CardTitle className="flex items-center gap-2 text-base">
             <FontAwesomeIcon
               icon={faCreditCard}
@@ -903,7 +903,7 @@ export function SettlementDetailClient({
         </CardHeader>
         <CardContent className="p-0">
           <Table className="min-w-[900px]">
-            <TableHeader className="bg-secondary">
+            <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-muted-foreground">결제 ID</TableHead>
                 <TableHead className="text-muted-foreground">진료 ID</TableHead>
@@ -956,8 +956,8 @@ export function SettlementDetailClient({
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
+      <Card className="border-border bg-card">
+        <CardHeader className="border-border border-b">
           <CardTitle className="flex items-center gap-2 text-base">
             <FontAwesomeIcon
               icon={faRectangleList}
@@ -968,7 +968,7 @@ export function SettlementDetailClient({
         </CardHeader>
         <CardContent className="p-0">
           <Table className="min-w-[900px]">
-            <TableHeader className="bg-secondary">
+            <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-muted-foreground">이체 ID</TableHead>
                 <TableHead className="text-muted-foreground">은행</TableHead>
@@ -1019,7 +1019,7 @@ export function SettlementDetailClient({
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter className="border-border justify-between border-t px-4 py-3">
+        <CardFooter className="border-border justify-between border-t px-6 py-4">
           <p className="text-muted-foreground text-xs">
             {isLoading ? '데이터를 불러오는 중입니다' : ''}
           </p>
