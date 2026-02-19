@@ -51,11 +51,10 @@ export async function POST(request: Request) {
         },
       })
 
-      // 등록 요청 생성
+      // 등록 요청 생성 (심사 이력용, 상태는 Hospital.status 로 관리)
       await tx.registrationRequest.create({
         data: {
           hospitalId: hospital.id,
-          status: "PENDING",
         },
       })
 

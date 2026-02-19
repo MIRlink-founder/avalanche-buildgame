@@ -227,7 +227,7 @@ export function RegisterForm() {
     }
 
     try {
-      // 사업자번호 중복 여부 & 국제청 API (계속사업자) 확인
+      // 사업자번호 중복 여부 확인 (국세청 API는 추후 연동 예정)
       const response = await fetch(
         `/api/auth/check-business?businessNumber=${encodeURIComponent(businessNumber)}`
       )
@@ -238,6 +238,7 @@ export function RegisterForm() {
         setBusinessError("이미 가입된 병원입니다.")
       } else {
         setBusinessChecked(true)
+        setBusinessError("")
       }
     } catch (error) {
       console.error("Business check error:", error)
