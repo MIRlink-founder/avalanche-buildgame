@@ -62,7 +62,7 @@ export function OnboardingCarousel() {
       <Carousel
         setApi={setApi}
         plugins={[plugin.current]}
-        className="w-full flex-1 min-h-0 border-1"
+        className="w-full flex-1 min-h-0"
         opts={{
           loop: true,
         }}
