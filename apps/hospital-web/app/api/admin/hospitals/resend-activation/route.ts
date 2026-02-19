@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@mire/database';
 import { requireAuth, AuthError, isAdminRole } from '@/lib/auth-guard';
-// import { sendActivationEmail } from '@/lib/send-email';
+import { sendActivationEmail } from '@/lib/send-email';
 
 // APPROVED 상태에서 활성화 메일 재발송
 export async function POST(request: Request) {
@@ -69,22 +69,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // 활성화 메일 재발송 (SMTP 설정 후 주석 해제)
-    // try {
-    //   await sendActivationEmail({
-    //     to: hospital.managerEmail,
-    //     hospitalName: hospital.displayName ?? hospital.officialName,
-    //     managerEmail: hospital.managerEmail,
-    //     approvedAt: tokenRecord.createdAt ?? new Date(),
-    //     token: tokenRecord.token,
-    //   });
-    // } catch (mailError) {
-    //   console.error('활성화 메일 재발송 실패:', mailError);
-    //   return NextResponse.json(
-    //     { success: false, error: '메일 발송에 실패했습니다.' },
-    //     { status: 500 },
-    //   );
-    // }
+    // 활성화 메일 재발송
+    try {
+      await sendActivationEmail({
+        to: hospital.managerEmail,
+        hospitalName: hospital.displayName ?? hospital.officialName,
+        managerEmail: hospital.managerEmail,
+        approvedAt: tokenRecord.createdAt ?? new Date(),
+        token: tokenRecord.token,
+      });
+    } catch (mailError) {
+      console.error('활성화 메일 재발송 실패:', mailError);
+      return NextResponse.json(
+        { success: false, error: '메일 발송에 실패했습니다.' },
+        { status: 500 },
+      );
+    }
 
     revalidatePath('/admin/hospitals');
     return NextResponse.json({ success: true });
