@@ -10,6 +10,8 @@ interface PaginationProps {
   totalPages: number;
   totalCount: number;
   pageSize: number;
+  /** 미지정 시 /admin/hospitals (목록 페이지용) */
+  basePath?: string;
 }
 
 export function Pagination({
@@ -17,6 +19,7 @@ export function Pagination({
   totalPages,
   totalCount,
   pageSize,
+  basePath = '/admin/hospitals',
 }: PaginationProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,7 +27,7 @@ export function Pagination({
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', page.toString());
-    router.push(`/admin/hospitals?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   };
 
   // 표시할 페이지 번호 계산 (현재 페이지 기준 좌우 2개씩)
