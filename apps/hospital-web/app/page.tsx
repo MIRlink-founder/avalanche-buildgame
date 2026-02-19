@@ -1,20 +1,32 @@
-"use client"
+'use client';
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Image from "next/image"
-import { OnboardingCarousel } from "@/components/home/OnboardingCarousel"
-import { LoginForm } from "@/components/home/LoginForm"
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { OnboardingCarousel } from '@/components/home/OnboardingCarousel';
+import { LoginForm } from '@/components/home/LoginForm';
+import { getPayloadFromToken } from '@/lib/decode-token';
 
 export default function Home() {
-  const router = useRouter()
+  const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken")
-    if (token) {
-      router.replace("/dashboard")
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    const payload = getPayloadFromToken(token);
+    const role = payload?.role;
+
+    switch (role) {
+      case 'SUPER_ADMIN':
+      case 'SUB_ADMIN':
+        router.replace('/admin/hospitals');
+        break;
+      case 'MASTER_ADMIN':
+      case 'DEPT_ADMIN':
+        router.replace('/dashboard');
+        break;
     }
-  }, [router])
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -43,5 +55,5 @@ export default function Home() {
         </div>
       </div>
     </div>
-  )
+  );
 }
