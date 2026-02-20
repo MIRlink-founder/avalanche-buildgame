@@ -8,9 +8,12 @@ function base64UrlDecodeToUtf8(base64Url: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-export function getPayloadFromToken(
-  token: string,
-): { email?: string; name?: string; role?: string } | null {
+export function getPayloadFromToken(token: string): {
+  email?: string;
+  name?: string;
+  role?: string;
+  hospitalId?: string | null;
+} | null {
   try {
     const payload = token.split('.')[1];
     if (!payload) return null;
@@ -18,6 +21,7 @@ export function getPayloadFromToken(
       email?: string;
       name?: string;
       role?: string;
+      hospitalId?: string | null;
     };
   } catch {
     return null;
