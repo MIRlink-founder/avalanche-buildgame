@@ -57,4 +57,7 @@ packages/database/.env
 
 # Private session notes
 PRIVATE-SESSION-CONTEXT.md
+PRIVATE-PAYMENTS-CHECK.md
+PRIVATE-UI-CONTEXT.md
+PRIVATE-IMPLEMENTATION-GAPS.md
 .vercel

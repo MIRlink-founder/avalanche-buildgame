@@ -650,7 +650,7 @@ export function SettlementsClient() {
                       onClick={() => handleSort('paybackAmount')}
                       className={getSortButtonClass('right')}
                     >
-                      <span>정산액</span>
+                      <span>페이백</span>
                       {getSortIcon('paybackAmount')}
                     </button>
                   </th>

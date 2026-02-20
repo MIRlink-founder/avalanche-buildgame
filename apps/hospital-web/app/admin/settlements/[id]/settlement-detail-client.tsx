@@ -49,6 +49,7 @@ type BankTransferRow = {
   amount: string;
   accountNumber: string;
   bankName: string;
+  accountHolder?: string | null;
   transferStatus: string | null;
   transferResult: string | null;
   transferredAt: string | null;
@@ -126,6 +127,7 @@ const MOCK_TRANSFERS: BankTransferRow[] = [
     amount: '11562500',
     accountNumber: '110-234-998877',
     bankName: '신한',
+    accountHolder: '김혁',
     transferStatus: 'SUCCESS',
     transferResult: '정상 이체 완료',
     transferredAt: '2026-03-01T10:30:00.000Z',
@@ -137,6 +139,7 @@ const MOCK_TRANSFERS: BankTransferRow[] = [
     amount: '8820000',
     accountNumber: '302-44-123456',
     bankName: '국민',
+    accountHolder: '박민지',
     transferStatus: 'PENDING',
     transferResult: null,
     transferredAt: null,
@@ -201,26 +204,10 @@ export function SettlementDetailClient({
   const [accountError, setAccountError] = useState<string | null>(null);
   const [isAccountLoading, setIsAccountLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isAccountChecked, setIsAccountChecked] = useState(false);
-  const [initialAccount, setInitialAccount] = useState({
-    bank: '',
-    number: '',
-    holder: '',
-  });
   const [statusDraft, setStatusDraft] = useState<'PENDING_PAYMENT' | 'SETTLED'>(
     'PENDING_PAYMENT',
   );
   const [settledAtDraft, setSettledAtDraft] = useState('');
-
-  // 할 일: 계좌 실명/유효성 확인 API 연동 필요
-  const isAccountDirty =
-    accountBank.trim() !== initialAccount.bank ||
-    accountNumber.trim() !== initialAccount.number ||
-    accountHolder.trim() !== initialAccount.holder;
-  const canCheckAccount =
-    isAccountDirty &&
-    !isAccountChecked &&
-    Boolean(accountBank.trim() && accountNumber.trim() && accountHolder.trim());
 
   const payments = detail?.payments?.length ? detail.payments : MOCK_PAYMENTS;
   const bankTransfers = detail?.bankTransfers?.length
@@ -243,6 +230,48 @@ export function SettlementDetailClient({
     : '-';
   const isSettled =
     detail?.status === 'SETTLED' || detail?.status === 'COMPLETED';
+  const accountSnapshot = useMemo(() => {
+    const transfer = bankTransfers[0];
+    if (isSettled && transfer) {
+      return {
+        bank: transfer.bankName ?? '-',
+        number: transfer.accountNumber ?? '-',
+        holder: transfer.accountHolder ?? displayHospitalName,
+      };
+    }
+
+    const bank = accountBank.trim();
+    const number = accountNumber.trim();
+    const holder = accountHolder.trim();
+    if (bank || number || holder) {
+      return {
+        bank: bank || '-',
+        number: number || '-',
+        holder: holder || '-',
+      };
+    }
+
+    if (transfer) {
+      return {
+        bank: transfer.bankName ?? '-',
+        number: transfer.accountNumber ?? '-',
+        holder: transfer.accountHolder ?? displayHospitalName,
+      };
+    }
+
+    return {
+      bank: '-',
+      number: '-',
+      holder: displayHospitalName,
+    };
+  }, [
+    accountBank,
+    accountHolder,
+    accountNumber,
+    bankTransfers,
+    displayHospitalName,
+    isSettled,
+  ]);
   const listHref = '/admin/settlements';
   const statusBadgeClass = isSettled
     ? 'bg-blue-600 text-white hover:bg-blue-600'
@@ -251,7 +280,6 @@ export function SettlementDetailClient({
   const tabParam = searchParams.get('detailTab');
   const currentTab =
     tabParam === 'settlement' ||
-    tabParam === 'account' ||
     tabParam === 'payments' ||
     tabParam === 'transfers'
       ? tabParam
@@ -347,12 +375,6 @@ export function SettlementDetailClient({
 
       const accountData = payload.data ?? null;
       applyAccount(accountData);
-      setInitialAccount({
-        bank: accountData?.accountBank?.trim() ?? '',
-        number: accountData?.accountNumber?.trim() ?? '',
-        holder: accountData?.accountHolder?.trim() ?? '',
-      });
-      setIsAccountChecked(false);
       return true;
     } catch (fetchError) {
       setAccountError('정산 계좌 조회 중 오류가 발생했습니다');
@@ -362,91 +384,6 @@ export function SettlementDetailClient({
       setIsAccountLoading(false);
     }
   }, [detail?.hospitalId, applyAccount]);
-
-  const handleSaveAccount = async () => {
-    const hospitalId = detail?.hospitalId;
-    if (!hospitalId) {
-      setAccountError('병원 정보를 확인할 수 없습니다');
-      return;
-    }
-
-    if (!isAccountChecked) {
-      setAccountError('계좌 조회가 필요합니다');
-      return;
-    }
-
-    if (!accountBank.trim() || !accountNumber.trim() || !accountHolder.trim()) {
-      setAccountError('정산 계좌 정보를 모두 입력해주세요');
-      return;
-    }
-
-    setIsAccountLoading(true);
-    setAccountError(null);
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        setAccountError('로그인이 필요합니다');
-        return;
-      }
-
-      const params = new URLSearchParams();
-      params.set('hospitalId', hospitalId);
-
-      const response = await fetch(
-        `/api/hospitals/settlement-account?${params.toString()}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            accountBank: accountBank.trim(),
-            accountNumber: accountNumber.trim(),
-            accountHolder: accountHolder.trim(),
-          }),
-        },
-      );
-
-      const payload = (await response
-        .json()
-        .catch(() => ({}))) as Partial<SettlementAccountResponse> & {
-        error?: string;
-      };
-
-      if (!response.ok) {
-        setAccountError(payload.error || '정산 계좌 저장에 실패했습니다');
-        return;
-      }
-
-      if (payload.data) {
-        applyAccount(payload.data);
-        setToastMessage('정산 계좌가 저장되었습니다');
-        setInitialAccount({
-          bank: payload.data.accountBank ?? '',
-          number: payload.data.accountNumber ?? '',
-          holder: payload.data.accountHolder ?? '',
-        });
-        setIsAccountChecked(false);
-      }
-    } catch (saveError) {
-      setAccountError('정산 계좌 저장 중 오류가 발생했습니다');
-      console.error(saveError);
-    } finally {
-      setIsAccountLoading(false);
-    }
-  };
-
-  const handleAccountCheck = () => {
-    if (!canCheckAccount) {
-      setAccountError('정산 계좌 정보를 모두 입력해주세요');
-      return;
-    }
-    setAccountError(null);
-    setIsAccountChecked(true);
-    setToastMessage('계좌 조회되었습니다');
-  };
 
   const handleStatusSelectChange = (
     event: React.ChangeEvent<HTMLSelectElement>,
@@ -489,12 +426,6 @@ export function SettlementDetailClient({
     setAccountBank('');
     setAccountNumber('');
     setAccountHolder('');
-    setIsAccountChecked(false);
-    setInitialAccount({
-      bank: '',
-      number: '',
-      holder: '',
-    });
   }, [settlementId]);
 
   useEffect(() => {
@@ -581,15 +512,12 @@ export function SettlementDetailClient({
 
   const totalVolumeValue = parseNumber(detail?.totalVolume ?? '');
   const draftRateValue = parseNumber(draftRate);
-  const draftPaybackValue = parseNumber(draftPayback);
   const autoPayback = Number.isFinite(totalVolumeValue)
     ? Number.isFinite(draftRateValue)
       ? (totalVolumeValue * draftRateValue) / 100
       : null
     : null;
-  const previewPayback = Number.isFinite(draftPaybackValue)
-    ? draftPaybackValue
-    : autoPayback;
+  const previewPayback = autoPayback;
 
   const handleRateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextRate = event.target.value;
@@ -674,7 +602,10 @@ export function SettlementDetailClient({
     setAdjustMessage(null);
 
     const rateValue = parseNumber(draftRate);
-    const paybackValue = parseNumber(draftPayback);
+    const resolvedAutoPayback = Number.isFinite(autoPayback ?? Number.NaN)
+      ? autoPayback
+      : null;
+    const paybackValue = resolvedAutoPayback ?? parseNumber(draftPayback);
 
     if (!Number.isFinite(rateValue) || rateValue < 0 || rateValue > 100) {
       setAdjustError('정산율은 0에서 100 사이 숫자여야 합니다');
@@ -731,8 +662,8 @@ export function SettlementDetailClient({
         );
         setDraftRate(updated.appliedRate);
         setDraftPayback(updated.paybackAmount);
-        setAdjustMessage('정산율과 페이백이 저장되었습니다');
-        setToastMessage('정산율과 페이백이 저장되었습니다');
+        setAdjustMessage('정산율이 저장되었습니다');
+        setToastMessage('정산율이 저장되었습니다');
       }
     } catch (saveError) {
       setAdjustError('정산 정보 저장 중 오류가 발생했습니다');
@@ -803,7 +734,6 @@ export function SettlementDetailClient({
       <Tabs
         tabs={[
           { id: 'settlement', label: '정산 관리' },
-          { id: 'account', label: '계좌 관리' },
           { id: 'payments', label: '결제 내역' },
           { id: 'transfers', label: '이체 내역' },
         ]}
@@ -864,18 +794,54 @@ export function SettlementDetailClient({
                   {statusError}
                 </div>
               )}
+              <div className="mt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2" />
+                <div className="mt-3 grid gap-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      은행명
+                    </span>
+                    <span className="mt-1 font-medium">
+                      {accountSnapshot.bank}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      계좌번호
+                    </span>
+                    <span className="mt-1 font-mono font-medium">
+                      {accountSnapshot.number}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      예금주
+                    </span>
+                    <span className="mt-1 font-medium">
+                      {accountSnapshot.holder}
+                    </span>
+                  </div>
+                </div>
+                {isAccountLoading && (
+                  <div className="text-muted-foreground mt-2 text-sm">
+                    계좌 정보를 불러오는 중입니다.
+                  </div>
+                )}
+                {accountError && (
+                  <div className="text-destructive mt-2 text-sm">
+                    {accountError}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
           <Card className="border-border bg-card shadow-none">
             <CardHeader className="border-border border-b">
-              <CardTitle className="text-base">정산율/페이백 조정</CardTitle>
-              <CardDescription className="text-muted-foreground text-xs">
-                정산율 변경 시 예상 페이백을 미리 확인합니다
-              </CardDescription>
+              <CardTitle className="text-base">정산율 조정</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
-              <div className="grid gap-4 lg:grid-cols-[1.1fr_1.1fr_1fr_auto]">
+              <div className="grid gap-4 lg:grid-cols-[260px_320px_auto]">
                 <div className="space-y-2">
                   <Label className="text-muted-foreground text-xs font-semibold">
                     정산율 (%)
@@ -883,17 +849,6 @@ export function SettlementDetailClient({
                   <Input
                     value={draftRate}
                     onChange={handleRateChange}
-                    inputMode="decimal"
-                    className="h-10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground text-xs font-semibold">
-                    페이백 금액 (원)
-                  </Label>
-                  <Input
-                    value={draftPayback}
-                    onChange={(event) => setDraftPayback(event.target.value)}
                     inputMode="decimal"
                     className="h-10"
                   />
@@ -924,71 +879,6 @@ export function SettlementDetailClient({
             </CardContent>
           </Card>
         </>
-      )}
-
-      {currentTab === 'account' && (
-        <Card className="border-border bg-card shadow-none">
-          <CardContent className="space-y-4 p-6">
-            <h3 className="font-semibold text-foreground">정산 계좌 정보</h3>
-            <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr_1fr_auto]">
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">은행명</Label>
-                <Input
-                  value={accountBank}
-                  onChange={(event) => {
-                    setAccountBank(event.target.value);
-                    setIsAccountChecked(false);
-                  }}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">
-                  계좌번호
-                </Label>
-                <Input
-                  value={accountNumber}
-                  onChange={(event) => {
-                    setAccountNumber(event.target.value);
-                    setIsAccountChecked(false);
-                  }}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">예금주</Label>
-                <Input
-                  value={accountHolder}
-                  onChange={(event) => {
-                    setAccountHolder(event.target.value);
-                    setIsAccountChecked(false);
-                  }}
-                  className="h-10"
-                />
-              </div>
-              <div className="flex items-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAccountCheck}
-                  disabled={!canCheckAccount || isAccountLoading}
-                >
-                  계좌 조회
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleSaveAccount}
-                  disabled={!isAccountChecked || isAccountLoading}
-                >
-                  저장하기
-                </Button>
-              </div>
-            </div>
-            {accountError && (
-              <div className="text-destructive text-sm">{accountError}</div>
-            )}
-          </CardContent>
-        </Card>
       )}
 
       {currentTab === 'payments' && (
