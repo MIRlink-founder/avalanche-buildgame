@@ -3,11 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCreditCard,
-  faRectangleList,
-} from '@fortawesome/free-regular-svg-icons';
 import { ChevronRight } from 'lucide-react';
 import { Tabs } from '@/components/layout/Tabs';
 import { Badge } from '@mire/ui/components/badge';
@@ -89,12 +84,93 @@ type SettlementAccount = {
   accountHolder: string | null;
 };
 
+// 할 일: API 데이터 연동 시 목데이터 제거
+const MOCK_PAYMENTS: PaymentRow[] = [
+  {
+    id: 3102,
+    medicalRecordId: 8801,
+    hospitalId: 'HOS-2026-001',
+    settlementId: 101,
+    subMid: 'MID-AX01',
+    approveNo: 'A43812',
+    pgTransactionId: 'TX-20260218-001',
+    amount: '450000',
+    paymentMethod: 'CARD',
+    status: 'PAID',
+    paidAt: '2026-02-18T10:12:00.000Z',
+    cancelledAt: null,
+    createdAt: '2026-02-18T10:12:00.000Z',
+  },
+  {
+    id: 3103,
+    medicalRecordId: 8814,
+    hospitalId: 'HOS-2026-001',
+    settlementId: 101,
+    subMid: 'MID-AX01',
+    approveNo: 'A43835',
+    pgTransactionId: 'TX-20260220-014',
+    amount: '720000',
+    paymentMethod: 'TRANSFER',
+    status: 'PAID',
+    paidAt: '2026-02-20T15:40:00.000Z',
+    cancelledAt: null,
+    createdAt: '2026-02-20T15:40:00.000Z',
+  },
+];
+
+// 할 일: API 데이터 연동 시 목데이터 제거
+const MOCK_TRANSFERS: BankTransferRow[] = [
+  {
+    id: 9001,
+    settlementId: 101,
+    amount: '11562500',
+    accountNumber: '110-234-998877',
+    bankName: '신한',
+    transferStatus: 'SUCCESS',
+    transferResult: '정상 이체 완료',
+    transferredAt: '2026-03-01T10:30:00.000Z',
+    createdAt: '2026-03-01T10:30:00.000Z',
+  },
+  {
+    id: 9002,
+    settlementId: 101,
+    amount: '8820000',
+    accountNumber: '302-44-123456',
+    bankName: '국민',
+    transferStatus: 'PENDING',
+    transferResult: null,
+    transferredAt: null,
+    createdAt: '2026-03-02T09:55:00.000Z',
+  },
+];
+
 const STATUS_LABELS: Record<string, string> = {
   PENDING_PAYMENT: '대기',
   SETTLED: '완료',
   PENDING: '대기',
   READY: '대기',
   COMPLETED: '완료',
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CARD: '카드',
+  TRANSFER: '계좌이체',
+  CASH: '현금',
+  VIRTUAL_ACCOUNT: '가상계좌',
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PAID: '결제 완료',
+  CANCELLED: '결제 취소',
+  PARTIAL_CANCELLED: '부분 취소',
+  FAILED: '결제 실패',
+  PENDING: '결제 대기',
+};
+
+const TRANSFER_STATUS_LABELS: Record<string, string> = {
+  SUCCESS: '이체 완료',
+  PENDING: '이체 대기',
+  FAILED: '이체 실패',
 };
 
 type SettlementDetailResponse = {
@@ -123,12 +199,33 @@ export function SettlementDetailClient({
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
   const [accountError, setAccountError] = useState<string | null>(null);
-  const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [isAccountLoading, setIsAccountLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isAccountChecked, setIsAccountChecked] = useState(false);
+  const [initialAccount, setInitialAccount] = useState({
+    bank: '',
+    number: '',
+    holder: '',
+  });
+  const [statusDraft, setStatusDraft] = useState<'PENDING_PAYMENT' | 'SETTLED'>(
+    'PENDING_PAYMENT',
+  );
+  const [settledAtDraft, setSettledAtDraft] = useState('');
 
-  const payments = detail?.payments ?? [];
-  const bankTransfers = detail?.bankTransfers ?? [];
+  // 할 일: 계좌 실명/유효성 확인 API 연동 필요
+  const isAccountDirty =
+    accountBank.trim() !== initialAccount.bank ||
+    accountNumber.trim() !== initialAccount.number ||
+    accountHolder.trim() !== initialAccount.holder;
+  const canCheckAccount =
+    isAccountDirty &&
+    !isAccountChecked &&
+    Boolean(accountBank.trim() && accountNumber.trim() && accountHolder.trim());
+
+  const payments = detail?.payments?.length ? detail.payments : MOCK_PAYMENTS;
+  const bankTransfers = detail?.bankTransfers?.length
+    ? detail.bankTransfers
+    : MOCK_TRANSFERS;
 
   const rawStatus = detail?.status ?? '';
   const statusLabel =
@@ -202,28 +299,27 @@ export function SettlementDetailClient({
     }
   }, [settlementId]);
 
-  const applyAccount = useCallback((account: SettlementAccount) => {
-    setAccountBank(account.accountBank ?? '');
-    setAccountNumber(account.accountNumber ?? '');
-    setAccountHolder(account.accountHolder ?? '');
+  const applyAccount = useCallback((account: SettlementAccount | null) => {
+    setAccountBank(account?.accountBank ?? '');
+    setAccountNumber(account?.accountNumber ?? '');
+    setAccountHolder(account?.accountHolder ?? '');
   }, []);
 
   const fetchAccount = useCallback(async () => {
     const hospitalId = detail?.hospitalId;
     if (!hospitalId) {
       setAccountError('병원 정보를 확인할 수 없습니다');
-      return;
+      return false;
     }
 
     setIsAccountLoading(true);
     setAccountError(null);
-    setAccountMessage(null);
 
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) {
         setAccountError('로그인이 필요합니다');
-        return;
+        return false;
       }
 
       const params = new URLSearchParams();
@@ -246,16 +342,22 @@ export function SettlementDetailClient({
 
       if (!response.ok) {
         setAccountError(payload.error || '정산 계좌 조회에 실패했습니다');
-        return;
+        return false;
       }
 
-      if (payload.data) {
-        applyAccount(payload.data);
-        setAccountMessage('정산 계좌를 불러왔습니다');
-      }
+      const accountData = payload.data ?? null;
+      applyAccount(accountData);
+      setInitialAccount({
+        bank: accountData?.accountBank?.trim() ?? '',
+        number: accountData?.accountNumber?.trim() ?? '',
+        holder: accountData?.accountHolder?.trim() ?? '',
+      });
+      setIsAccountChecked(false);
+      return true;
     } catch (fetchError) {
       setAccountError('정산 계좌 조회 중 오류가 발생했습니다');
       console.error(fetchError);
+      return false;
     } finally {
       setIsAccountLoading(false);
     }
@@ -268,6 +370,11 @@ export function SettlementDetailClient({
       return;
     }
 
+    if (!isAccountChecked) {
+      setAccountError('계좌 조회가 필요합니다');
+      return;
+    }
+
     if (!accountBank.trim() || !accountNumber.trim() || !accountHolder.trim()) {
       setAccountError('정산 계좌 정보를 모두 입력해주세요');
       return;
@@ -275,7 +382,6 @@ export function SettlementDetailClient({
 
     setIsAccountLoading(true);
     setAccountError(null);
-    setAccountMessage(null);
 
     try {
       const token = localStorage.getItem('accessToken');
@@ -316,7 +422,13 @@ export function SettlementDetailClient({
 
       if (payload.data) {
         applyAccount(payload.data);
-        setAccountMessage('정산 계좌가 저장되었습니다');
+        setToastMessage('정산 계좌가 저장되었습니다');
+        setInitialAccount({
+          bank: payload.data.accountBank ?? '',
+          number: payload.data.accountNumber ?? '',
+          holder: payload.data.accountHolder ?? '',
+        });
+        setIsAccountChecked(false);
       }
     } catch (saveError) {
       setAccountError('정산 계좌 저장 중 오류가 발생했습니다');
@@ -326,14 +438,63 @@ export function SettlementDetailClient({
     }
   };
 
+  const handleAccountCheck = () => {
+    if (!canCheckAccount) {
+      setAccountError('정산 계좌 정보를 모두 입력해주세요');
+      return;
+    }
+    setAccountError(null);
+    setIsAccountChecked(true);
+    setToastMessage('계좌 조회되었습니다');
+  };
+
+  const handleStatusSelectChange = (
+    event: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const nextStatus = event.target.value as 'PENDING_PAYMENT' | 'SETTLED';
+    if (
+      (isSettled && nextStatus === 'SETTLED') ||
+      (!isSettled && nextStatus === 'PENDING_PAYMENT')
+    ) {
+      return;
+    }
+    setStatusDraft(nextStatus);
+    setStatusError(null);
+
+    if (nextStatus === 'PENDING_PAYMENT') {
+      setSettledAtDraft('');
+      handleChangeStatus('PENDING_PAYMENT');
+    }
+  };
+
+  const handleSettledAtChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const nextDate = event.target.value;
+    setSettledAtDraft(nextDate);
+    if (!nextDate) {
+      setStatusError('정산일을 입력해주세요');
+      return;
+    }
+    if (isStatusSaving) {
+      return;
+    }
+    handleChangeStatus('SETTLED', nextDate);
+  };
+
   useEffect(() => {
     setDetail(null);
     setError(null);
     setAccountError(null);
-    setAccountMessage(null);
     setAccountBank('');
     setAccountNumber('');
     setAccountHolder('');
+    setIsAccountChecked(false);
+    setInitialAccount({
+      bank: '',
+      number: '',
+      holder: '',
+    });
   }, [settlementId]);
 
   useEffect(() => {
@@ -349,6 +510,16 @@ export function SettlementDetailClient({
       fetchAccount();
     }
   }, [detail?.hospitalId, fetchAccount]);
+
+  useEffect(() => {
+    if (!detail) {
+      return;
+    }
+    const settled =
+      detail.status === 'SETTLED' || detail.status === 'COMPLETED';
+    setStatusDraft(settled ? 'SETTLED' : 'PENDING_PAYMENT');
+    setSettledAtDraft(detail.settledAt ? detail.settledAt.split('T')[0] : '');
+  }, [detail, detail?.status, detail?.settledAt]);
 
   const summaryRows = useMemo(() => {
     if (!detail) {
@@ -440,6 +611,7 @@ export function SettlementDetailClient({
 
   const handleChangeStatus = async (
     nextStatus: 'PENDING_PAYMENT' | 'SETTLED',
+    settledAt?: string,
   ) => {
     setStatusError(null);
     setStatusMessage(null);
@@ -458,7 +630,10 @@ export function SettlementDetailClient({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status: nextStatus }),
+        body: JSON.stringify({
+          status: nextStatus,
+          settledAt: settledAt || undefined,
+        }),
       });
 
       const payload = (await response
@@ -649,45 +824,43 @@ export function SettlementDetailClient({
       {currentTab === 'settlement' && (
         <>
           <Card className="border-border bg-card shadow-none">
-            <CardContent className="space-y-4 py-5">
-              <div className="text-sm font-semibold">정산 요약</div>
-              <div className="space-y-3">
+            <CardContent className="p-6">
+              <dl className="grid gap-2">
                 {summaryRows.map((row) => (
-                  <div
-                    key={row.label}
-                    className="flex flex-wrap items-center justify-between gap-3 text-sm"
-                  >
-                    <p className="text-muted-foreground">{row.label}</p>
-                    <p className="font-medium">{row.value}</p>
+                  <div key={row.label} className="flex justify-between">
+                    <dt className="text-sm text-muted-foreground">
+                      {row.label}
+                    </dt>
+                    <dd className="mt-1 font-medium">{row.value}</dd>
                   </div>
                 ))}
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                  <p className="text-muted-foreground">정산 상태</p>
-                  <Select
-                    value={isSettled ? 'SETTLED' : 'PENDING_PAYMENT'}
-                    onChange={(event) => {
-                      const nextStatus = event.target.value as
-                        | 'PENDING_PAYMENT'
-                        | 'SETTLED';
-                      if (
-                        (isSettled && nextStatus === 'SETTLED') ||
-                        (!isSettled && nextStatus === 'PENDING_PAYMENT')
-                      ) {
-                        return;
-                      }
-                      handleChangeStatus(nextStatus);
-                    }}
-                    className="h-9 w-[96px] text-sm"
-                    disabled={isStatusSaving}
-                    aria-label="정산 상태 변경"
-                  >
-                    <option value="PENDING_PAYMENT">대기</option>
-                    <option value="SETTLED">완료</option>
-                  </Select>
+                <div className="flex items-center justify-between">
+                  <dt className="text-sm text-muted-foreground">정산 상태</dt>
+                  <dd className="mt-1 flex flex-wrap items-center gap-2">
+                    <Select
+                      value={statusDraft}
+                      onChange={handleStatusSelectChange}
+                      className="h-9 w-[96px] text-sm"
+                      disabled={isStatusSaving}
+                      aria-label="정산 상태 변경"
+                    >
+                      <option value="PENDING_PAYMENT">대기</option>
+                      <option value="SETTLED">완료</option>
+                    </Select>
+                    {!isSettled && statusDraft === 'SETTLED' && (
+                      <Input
+                        type="date"
+                        value={settledAtDraft}
+                        onChange={handleSettledAtChange}
+                        className="h-9 w-[150px] text-sm"
+                        aria-label="정산일"
+                      />
+                    )}
+                  </dd>
                 </div>
-              </div>
+              </dl>
               {statusError && (
-                <div className="text-destructive text-xs text-right">
+                <div className="mt-2 text-sm text-destructive">
                   {statusError}
                 </div>
               )}
@@ -755,64 +928,64 @@ export function SettlementDetailClient({
 
       {currentTab === 'account' && (
         <Card className="border-border bg-card shadow-none">
-          <CardHeader className="border-border border-b">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-base">정산 계좌 정보</CardTitle>
-            </div>
-            <CardDescription className="text-muted-foreground text-xs">
-              병원 정산 계좌 정보를 확인하고 수정합니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-6">
+          <CardContent className="space-y-4 p-6">
+            <h3 className="font-semibold text-foreground">정산 계좌 정보</h3>
             <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr_1fr_auto]">
               <div className="space-y-2">
-                <Label className="text-muted-foreground text-xs font-semibold">
-                  은행명
-                </Label>
+                <Label className="text-sm text-muted-foreground">은행명</Label>
                 <Input
                   value={accountBank}
-                  onChange={(event) => setAccountBank(event.target.value)}
+                  onChange={(event) => {
+                    setAccountBank(event.target.value);
+                    setIsAccountChecked(false);
+                  }}
                   className="h-10"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-muted-foreground text-xs font-semibold">
+                <Label className="text-sm text-muted-foreground">
                   계좌번호
                 </Label>
                 <Input
                   value={accountNumber}
-                  onChange={(event) => setAccountNumber(event.target.value)}
+                  onChange={(event) => {
+                    setAccountNumber(event.target.value);
+                    setIsAccountChecked(false);
+                  }}
                   className="h-10"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-muted-foreground text-xs font-semibold">
-                  예금주
-                </Label>
+                <Label className="text-sm text-muted-foreground">예금주</Label>
                 <Input
                   value={accountHolder}
-                  onChange={(event) => setAccountHolder(event.target.value)}
+                  onChange={(event) => {
+                    setAccountHolder(event.target.value);
+                    setIsAccountChecked(false);
+                  }}
                   className="h-10"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAccountCheck}
+                  disabled={!canCheckAccount || isAccountLoading}
+                >
+                  계좌 조회
+                </Button>
                 <Button
                   type="button"
                   onClick={handleSaveAccount}
-                  disabled={isAccountLoading}
+                  disabled={!isAccountChecked || isAccountLoading}
                 >
                   저장하기
                 </Button>
               </div>
             </div>
-            <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-              <span>병원명: {displayHospitalName}</span>
-            </div>
             {accountError && (
               <div className="text-destructive text-sm">{accountError}</div>
-            )}
-            {accountMessage && (
-              <div className="text-primary text-sm">{accountMessage}</div>
             )}
           </CardContent>
         </Card>
@@ -821,37 +994,31 @@ export function SettlementDetailClient({
       {currentTab === 'payments' && (
         <Card className="border-border bg-card shadow-none">
           <CardHeader className="border-border border-b">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FontAwesomeIcon
-                icon={faCreditCard}
-                className="text-primary size-4"
-              />
-              결제 내역
-            </CardTitle>
+            <CardTitle className="text-base">결제 내역</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <Table className="min-w-[900px]">
+            <Table className="min-w-[860px] table-fixed text-sm">
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[90px] whitespace-nowrap text-sm">
                     결제 ID
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[90px] whitespace-nowrap text-sm">
                     진료 ID
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[120px] whitespace-nowrap text-sm">
                     결제 수단
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[120px] whitespace-nowrap text-sm">
                     승인번호
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11 text-right">
+                  <TableHead className="w-[140px] whitespace-nowrap text-right text-sm">
                     금액
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[110px] whitespace-nowrap text-sm">
                     상태
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[120px] whitespace-nowrap text-sm">
                     결제일
                   </TableHead>
                 </TableRow>
@@ -869,25 +1036,25 @@ export function SettlementDetailClient({
                 ) : (
                   payments.map((payment) => (
                     <TableRow key={payment.id} className="border-border">
-                      <TableCell className="py-3">{payment.id}</TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
+                        {payment.id}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
                         {payment.medicalRecordId ?? '-'}
                       </TableCell>
-                      <TableCell className="py-3">
-                        {payment.paymentMethod ?? '-'}
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
+                        {formatPaymentMethod(payment.paymentMethod)}
                       </TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
                         {payment.approveNo ?? '-'}
                       </TableCell>
-                      <TableCell className="py-3 text-right font-semibold">
+                      <TableCell className="py-3 text-right font-semibold text-sm whitespace-nowrap">
                         {formatAmount(payment.amount)}원
                       </TableCell>
-                      <TableCell className="py-3">
-                        <Badge className="bg-primary-subtle text-primary text-[10px] font-semibold">
-                          {payment.status}
-                        </Badge>
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
+                        {formatPaymentStatus(payment.status)}
                       </TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
                         {payment.paidAt ? formatDate(payment.paidAt) : '-'}
                       </TableCell>
                     </TableRow>
@@ -902,37 +1069,31 @@ export function SettlementDetailClient({
       {currentTab === 'transfers' && (
         <Card className="border-border bg-card shadow-none">
           <CardHeader className="border-border border-b">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FontAwesomeIcon
-                icon={faRectangleList}
-                className="text-primary size-4"
-              />
-              이체 내역
-            </CardTitle>
+            <CardTitle className="text-base">이체 내역</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <Table className="min-w-[900px]">
+            <Table className="min-w-[900px] table-fixed text-sm">
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[90px] whitespace-nowrap text-sm">
                     이체 ID
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[90px] whitespace-nowrap text-sm">
                     은행
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[160px] whitespace-nowrap text-sm">
                     계좌
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11 text-right">
+                  <TableHead className="w-[140px] whitespace-nowrap text-right text-sm">
                     이체 금액
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[110px] whitespace-nowrap text-sm">
                     상태
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[120px] whitespace-nowrap text-sm">
                     이체일
                   </TableHead>
-                  <TableHead className="text-muted-foreground h-11">
+                  <TableHead className="w-[160px] whitespace-nowrap text-sm">
                     결과
                   </TableHead>
                 </TableRow>
@@ -950,27 +1111,27 @@ export function SettlementDetailClient({
                 ) : (
                   bankTransfers.map((transfer) => (
                     <TableRow key={transfer.id} className="border-border">
-                      <TableCell className="py-3">{transfer.id}</TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
+                        {transfer.id}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
                         {transfer.bankName}
                       </TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
                         {transfer.accountNumber}
                       </TableCell>
-                      <TableCell className="py-3 text-right font-semibold">
+                      <TableCell className="py-3 text-right font-semibold text-sm whitespace-nowrap">
                         {formatAmount(transfer.amount)}원
                       </TableCell>
-                      <TableCell className="py-3">
-                        <Badge className="bg-primary-subtle text-primary text-[10px] font-semibold">
-                          {transfer.transferStatus ?? '-'}
-                        </Badge>
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
+                        {formatTransferStatus(transfer.transferStatus)}
                       </TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className="py-3 text-sm whitespace-nowrap">
                         {transfer.transferredAt
                           ? formatDate(transfer.transferredAt)
                           : '-'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground py-3 text-xs">
+                      <TableCell className="text-muted-foreground py-3 text-sm whitespace-nowrap">
                         {transfer.transferResult ?? '-'}
                       </TableCell>
                     </TableRow>
@@ -1016,6 +1177,27 @@ function formatDate(value: string) {
 
 function formatPeriod(start: string, end: string) {
   return `${formatDate(start)} ~ ${formatDate(end)}`;
+}
+
+function formatPaymentMethod(value: string | null) {
+  if (!value) {
+    return '-';
+  }
+  return PAYMENT_METHOD_LABELS[value] ?? value;
+}
+
+function formatPaymentStatus(value: string | null) {
+  if (!value) {
+    return '-';
+  }
+  return PAYMENT_STATUS_LABELS[value] ?? value;
+}
+
+function formatTransferStatus(value: string | null) {
+  if (!value) {
+    return '-';
+  }
+  return TRANSFER_STATUS_LABELS[value] ?? value;
 }
 
 function parseNumber(value: string) {

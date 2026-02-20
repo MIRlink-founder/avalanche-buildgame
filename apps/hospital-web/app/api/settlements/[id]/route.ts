@@ -138,6 +138,7 @@ export async function PATCH(
       status: string;
       appliedRate: string | number;
       paybackAmount: string | number;
+      settledAt: string;
     }>;
 
     const settlement = await prisma.settlement.findUnique({
@@ -167,7 +168,24 @@ export async function PATCH(
         );
       }
       data.status = status;
-      data.settledAt = status === 'SETTLED' ? new Date() : null;
+      if (status === 'SETTLED') {
+        if (!body.settledAt) {
+          return NextResponse.json(
+            { error: '정산일을 입력해주세요' },
+            { status: 400 },
+          );
+        }
+        const settledAtDate = new Date(body.settledAt);
+        if (Number.isNaN(settledAtDate.getTime())) {
+          return NextResponse.json(
+            { error: '정산일 형식이 올바르지 않습니다' },
+            { status: 400 },
+          );
+        }
+        data.settledAt = settledAtDate;
+      } else {
+        data.settledAt = null;
+      }
     }
 
     if (hasRate || hasPayback) {
