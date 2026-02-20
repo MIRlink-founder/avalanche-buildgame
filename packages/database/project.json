@@ -24,6 +24,20 @@
         "cwd": "packages/database"
       }
     },
+    "migrate-reset": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx prisma migrate reset --force",
+        "cwd": "packages/database"
+      }
+    },
+    "seed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx prisma db seed",
+        "cwd": "packages/database"
+      }
+    },
     "push": {
       "executor": "nx:run-commands",
       "options": {
