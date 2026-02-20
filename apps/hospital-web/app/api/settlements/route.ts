@@ -158,6 +158,7 @@ export async function GET(request: Request) {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: {
         id: true,
+        publicId: true,
         hospitalId: true,
         settlementPeriodStart: true,
         settlementPeriodEnd: true,

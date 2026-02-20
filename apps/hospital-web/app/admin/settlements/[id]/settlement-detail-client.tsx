@@ -65,6 +65,7 @@ type BankTransferRow = {
 
 type SettlementDetail = {
   id: number;
+  publicId?: string;
   hospitalId: string;
   hospital?: {
     id: string;
@@ -99,179 +100,6 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: '정산 완료',
 };
 
-const MOCK_HOSPITALS: Record<string, SettlementDetail['hospital']> = {
-  'HOS-2026-001': {
-    id: 'HOS-2026-001',
-    displayName: '김병원',
-    officialName: '김병원',
-  },
-  'HOS-2026-014': {
-    id: 'HOS-2026-014',
-    displayName: '어쩌구병원',
-    officialName: '어쩌구병원',
-  },
-  'HOS-2025-032': {
-    id: 'HOS-2025-032',
-    displayName: '멀쩡한병원',
-    officialName: '멀쩡한병원',
-  },
-  'HOS-2025-007': {
-    id: 'HOS-2025-007',
-    displayName: '샘플병원',
-    officialName: '샘플병원',
-  },
-};
-
-const MOCK_DETAILS: Record<string, SettlementDetail> = {
-  '101': {
-    id: 101,
-    hospitalId: 'HOS-2026-001',
-    settlementPeriodStart: '2026-02-01',
-    settlementPeriodEnd: '2026-02-28',
-    totalVolume: '12500000',
-    appliedRate: '92.50',
-    paybackAmount: '11562500',
-    isNftBoosted: true,
-    status: 'PENDING_PAYMENT',
-    settledAt: null,
-    createdAt: '2026-03-01T09:00:00.000Z',
-    payments: [
-      {
-        id: 3102,
-        medicalRecordId: 8801,
-        hospitalId: 'HOS-2026-001',
-        settlementId: 101,
-        subMid: 'MID-AX01',
-        approveNo: 'A43812',
-        pgTransactionId: 'TX-20260218-001',
-        amount: '450000',
-        paymentMethod: 'CARD',
-        status: 'PAID',
-        paidAt: '2026-02-18T10:12:00.000Z',
-        cancelledAt: null,
-        createdAt: '2026-02-18T10:12:00.000Z',
-      },
-      {
-        id: 3103,
-        medicalRecordId: 8814,
-        hospitalId: 'HOS-2026-001',
-        settlementId: 101,
-        subMid: 'MID-AX01',
-        approveNo: 'A43835',
-        pgTransactionId: 'TX-20260220-014',
-        amount: '720000',
-        paymentMethod: 'CARD',
-        status: 'PAID',
-        paidAt: '2026-02-20T15:40:00.000Z',
-        cancelledAt: null,
-        createdAt: '2026-02-20T15:40:00.000Z',
-      },
-    ],
-    bankTransfers: [
-      {
-        id: 9001,
-        settlementId: 101,
-        amount: '11562500',
-        accountNumber: '110-234-998877',
-        bankName: '신한',
-        transferStatus: 'PENDING',
-        transferResult: null,
-        transferredAt: null,
-        createdAt: '2026-03-01T10:30:00.000Z',
-      },
-    ],
-  },
-  '100': {
-    id: 100,
-    hospitalId: 'HOS-2026-014',
-    settlementPeriodStart: '2026-01-01',
-    settlementPeriodEnd: '2026-01-31',
-    totalVolume: '9800000',
-    appliedRate: '90.00',
-    paybackAmount: '8820000',
-    isNftBoosted: false,
-    status: 'SETTLED',
-    settledAt: '2026-02-05T10:30:00.000Z',
-    createdAt: '2026-02-01T08:10:00.000Z',
-    payments: [
-      {
-        id: 3007,
-        medicalRecordId: 8702,
-        hospitalId: 'HOS-2026-014',
-        settlementId: 100,
-        subMid: 'MID-BX77',
-        approveNo: 'B30210',
-        pgTransactionId: 'TX-20260105-044',
-        amount: '320000',
-        paymentMethod: 'CARD',
-        status: 'PAID',
-        paidAt: '2026-01-05T09:30:00.000Z',
-        cancelledAt: null,
-        createdAt: '2026-01-05T09:30:00.000Z',
-      },
-      {
-        id: 3011,
-        medicalRecordId: 8710,
-        hospitalId: 'HOS-2026-014',
-        settlementId: 100,
-        subMid: 'MID-BX77',
-        approveNo: 'B30278',
-        pgTransactionId: 'TX-20260118-082',
-        amount: '510000',
-        paymentMethod: 'TRANSFER',
-        status: 'PAID',
-        paidAt: '2026-01-18T11:12:00.000Z',
-        cancelledAt: null,
-        createdAt: '2026-01-18T11:12:00.000Z',
-      },
-    ],
-    bankTransfers: [
-      {
-        id: 8802,
-        settlementId: 100,
-        amount: '8820000',
-        accountNumber: '302-44-123456',
-        bankName: '국민',
-        transferStatus: 'SUCCESS',
-        transferResult: '정상 이체 완료',
-        transferredAt: '2026-02-05T10:20:00.000Z',
-        createdAt: '2026-02-05T09:55:00.000Z',
-      },
-    ],
-  },
-};
-
-const MOCK_ACCOUNTS: Record<string, SettlementAccount> = {
-  'HOS-2026-001': {
-    hospitalId: 'HOS-2026-001',
-    accountBank: '신한',
-    accountNumber: '110-234-998877',
-    accountHolder: '이튼튼치과',
-  },
-  'HOS-2026-014': {
-    hospitalId: 'HOS-2026-014',
-    accountBank: '국민',
-    accountNumber: '302-44-123456',
-    accountHolder: '포레스트치과',
-  },
-};
-
-const FALLBACK_DETAIL = MOCK_DETAILS['101'];
-const FALLBACK_ACCOUNT = MOCK_ACCOUNTS['HOS-2026-001'];
-
-function getMockDetail(id: string) {
-  const detail = MOCK_DETAILS[id] ?? FALLBACK_DETAIL;
-  if (detail.hospital) {
-    return detail;
-  }
-  const hospital = MOCK_HOSPITALS[detail.hospitalId] ?? null;
-  return hospital ? { ...detail, hospital } : detail;
-}
-
-function getMockAccount(hospitalId: string) {
-  return MOCK_ACCOUNTS[hospitalId] ?? FALLBACK_ACCOUNT;
-}
-
 type SettlementDetailResponse = {
   data: SettlementDetail;
 };
@@ -285,9 +113,7 @@ export function SettlementDetailClient({
 }: {
   settlementId: string;
 }) {
-  const [detail, setDetail] = useState<SettlementDetail>(() =>
-    getMockDetail(settlementId),
-  );
+  const [detail, setDetail] = useState<SettlementDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [adjustError, setAdjustError] = useState<string | null>(null);
@@ -303,10 +129,10 @@ export function SettlementDetailClient({
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [isAccountLoading, setIsAccountLoading] = useState(false);
 
-  const payments = detail.payments ?? [];
-  const bankTransfers = detail.bankTransfers ?? [];
+  const payments = detail?.payments ?? [];
+  const bankTransfers = detail?.bankTransfers ?? [];
 
-  const rawStatus = detail.status ?? '';
+  const rawStatus = detail?.status ?? '';
   const statusLabel =
     STATUS_LABELS[rawStatus] ??
     (rawStatus.includes('PENDING')
@@ -315,16 +141,15 @@ export function SettlementDetailClient({
         ? '정산 완료'
         : rawStatus);
   const hospitalName =
-    detail.hospital?.displayName || detail.hospital?.officialName || '';
+    detail?.hospital?.displayName || detail?.hospital?.officialName || '';
   const displayHospitalName = hospitalName || '-';
-  const periodLabel = formatPeriod(
-    detail.settlementPeriodStart,
-    detail.settlementPeriodEnd,
-  );
-  const isSettled = detail.status === 'SETTLED';
+  const periodLabel = detail
+    ? formatPeriod(detail.settlementPeriodStart, detail.settlementPeriodEnd)
+    : '-';
+  const isSettled = detail?.status === 'SETTLED';
   const listHref = '/admin/settlements';
   const statusBadgeClass =
-    detail.status === 'SETTLED'
+    detail?.status === 'SETTLED'
       ? 'border-primary/20 bg-primary-subtle text-primary'
       : 'bg-secondary text-muted-foreground';
   const searchParams = useSearchParams();
@@ -386,7 +211,8 @@ export function SettlementDetailClient({
   }, []);
 
   const fetchAccount = useCallback(async () => {
-    if (!detail.hospitalId) {
+    const hospitalId = detail?.hospitalId;
+    if (!hospitalId) {
       setAccountError('병원 정보를 확인할 수 없습니다');
       return;
     }
@@ -403,7 +229,7 @@ export function SettlementDetailClient({
       }
 
       const params = new URLSearchParams();
-      params.set('hospitalId', detail.hospitalId);
+      params.set('hospitalId', hospitalId);
 
       const response = await fetch(
         `/api/hospitals/settlement-account?${params.toString()}`,
@@ -435,10 +261,11 @@ export function SettlementDetailClient({
     } finally {
       setIsAccountLoading(false);
     }
-  }, [detail.hospitalId, applyAccount]);
+  }, [detail?.hospitalId, applyAccount]);
 
   const handleSaveAccount = async () => {
-    if (!detail.hospitalId) {
+    const hospitalId = detail?.hospitalId;
+    if (!hospitalId) {
       setAccountError('병원 정보를 확인할 수 없습니다');
       return;
     }
@@ -460,7 +287,7 @@ export function SettlementDetailClient({
       }
 
       const params = new URLSearchParams();
-      params.set('hospitalId', detail.hospitalId);
+      params.set('hospitalId', hospitalId);
 
       const response = await fetch(
         `/api/hospitals/settlement-account?${params.toString()}`,
@@ -502,15 +329,14 @@ export function SettlementDetailClient({
   };
 
   useEffect(() => {
-    setDetail(getMockDetail(settlementId));
+    setDetail(null);
     setError(null);
-  }, [settlementId]);
-
-  useEffect(() => {
-    applyAccount(getMockAccount(detail.hospitalId));
     setAccountError(null);
     setAccountMessage(null);
-  }, [detail.hospitalId, applyAccount]);
+    setAccountBank('');
+    setAccountNumber('');
+    setAccountHolder('');
+  }, [settlementId]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -521,13 +347,22 @@ export function SettlementDetailClient({
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    if (token && detail.hospitalId) {
+    if (token && detail?.hospitalId) {
       fetchAccount();
     }
-  }, [detail.hospitalId, fetchAccount]);
+  }, [detail?.hospitalId, fetchAccount]);
 
-  const summaryCards = useMemo(
-    () => [
+  const summaryCards = useMemo(() => {
+    if (!detail) {
+      return [
+        { label: '총 거래액', value: '-' },
+        { label: '정산율', value: '-' },
+        { label: '페이백', value: '-' },
+        { label: '정산 상태', value: '-' },
+      ];
+    }
+
+    return [
       {
         label: '총 거래액',
         value: `${formatAmount(detail.totalVolume)}원`,
@@ -544,19 +379,21 @@ export function SettlementDetailClient({
         label: '정산 상태',
         value: statusLabel,
       },
-    ],
-    [detail.appliedRate, detail.paybackAmount, detail.totalVolume, statusLabel],
-  );
+    ];
+  }, [detail, statusLabel]);
 
-  const [draftRate, setDraftRate] = useState(detail.appliedRate);
-  const [draftPayback, setDraftPayback] = useState(detail.paybackAmount);
+  const [draftRate, setDraftRate] = useState('');
+  const [draftPayback, setDraftPayback] = useState('');
 
   useEffect(() => {
+    if (!detail) {
+      return;
+    }
     setDraftRate(detail.appliedRate);
     setDraftPayback(detail.paybackAmount);
-  }, [detail.appliedRate, detail.paybackAmount]);
+  }, [detail]);
 
-  const totalVolumeValue = parseNumber(detail.totalVolume);
+  const totalVolumeValue = parseNumber(detail?.totalVolume ?? '');
   const draftRateValue = parseNumber(draftRate);
   const draftPaybackValue = parseNumber(draftPayback);
   const autoPayback = Number.isFinite(totalVolumeValue)
@@ -611,11 +448,15 @@ export function SettlementDetailClient({
 
       if (payload.data) {
         const updated = payload.data;
-        setDetail((prev) => ({
-          ...prev,
-          status: updated.status,
-          settledAt: updated.settledAt,
-        }));
+        setDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: updated.status,
+                settledAt: updated.settledAt,
+              }
+            : prev,
+        );
         setStatusMessage('정산 상태가 변경되었습니다');
       }
     } catch (saveError) {
@@ -677,11 +518,15 @@ export function SettlementDetailClient({
 
       if (payload.data) {
         const updated = payload.data;
-        setDetail((prev) => ({
-          ...prev,
-          appliedRate: updated.appliedRate,
-          paybackAmount: updated.paybackAmount,
-        }));
+        setDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                appliedRate: updated.appliedRate,
+                paybackAmount: updated.paybackAmount,
+              }
+            : prev,
+        );
         setDraftRate(updated.appliedRate);
         setDraftPayback(updated.paybackAmount);
         setAdjustMessage('정산율과 페이백이 저장되었습니다');
@@ -693,6 +538,36 @@ export function SettlementDetailClient({
       setIsAdjustSaving(false);
     }
   };
+
+  if (!detail) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Link href={listHref} className="hover:text-foreground">
+              정산 관리
+            </Link>
+            <ChevronRight className="h-4 w-4" />
+            <Link href={listHref} className="hover:text-foreground">
+              정산 목록
+            </Link>
+            <ChevronRight className="h-4 w-4" />
+            <span className="text-foreground">상세 정보</span>
+          </nav>
+          <Button variant="outline" asChild>
+            <Link href={listHref}>목록으로</Link>
+          </Button>
+        </div>
+        <Card className="border-border bg-card shadow-none">
+          <CardContent className="text-muted-foreground pt-6 text-sm">
+            {isLoading
+              ? '정산 상세를 불러오는 중입니다.'
+              : (error ?? '정산 정보를 불러올 수 없습니다.')}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -752,7 +627,7 @@ export function SettlementDetailClient({
                 </CardTitle>
                 <CardDescription className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                   <span>
-                    정산 ID #{detail.id} · {periodLabel}
+                    정산 ID #{detail.publicId ?? detail.id} · {periodLabel}
                   </span>
                 </CardDescription>
               </div>

@@ -12,6 +12,12 @@ function getPositiveInt(value: string) {
   return parsed > 0 ? parsed : null;
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  );
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -20,8 +26,9 @@ export async function GET(
     const { user } = await requireAuth(request);
     const { id } = await context.params;
     const settlementId = getPositiveInt(id);
+    const isPublicId = isUuid(id);
 
-    if (!settlementId) {
+    if (!settlementId && !isPublicId) {
       return NextResponse.json(
         { error: '정산 ID 형식이 올바르지 않습니다' },
         { status: 400 },
@@ -71,7 +78,7 @@ export async function GET(
     }
 
     const settlement = await prisma.settlement.findUnique({
-      where: { id: settlementId },
+      where: settlementId ? { id: settlementId } : { publicId: id },
       include: {
         ...include,
         hospital: {
