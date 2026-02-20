@@ -6,6 +6,7 @@ import { Button, Separator } from '@mire/ui';
 import { Label } from '@mire/ui';
 import { Input } from '@mire/ui';
 import Navigation from '@/components/layout/Navigation';
+import { AlertModal } from '@/components/layout/AlertModal';
 import { AlertCircle, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 
 // 영문·숫자·특수문자 조합 8자 이상
@@ -128,36 +129,24 @@ function ActivateForm() {
   if (status === 'invalid') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-4">
-        {/* 상단 네비게이션 - 고정 */}
         <Navigation />
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg border bg-card p-8 shadow-lg">
-            <p className="text-center text-lg font-medium text-foreground">
-              {invalidReason === 'expired'
-                ? '인증 링크의 유효기간이 만료되었습니다.'
-                : '유효하지 않은 링크입니다.'}
-            </p>
-            {invalidReason === 'expired' ? (
-              <Button
-                className="mt-6 w-full"
-                size="xl"
-                onClick={() => router.push('/')}
-              >
-                메일 재발송
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="mt-6 w-full"
-                size="xl"
-                // 재발송 요청 api 추가
-                onClick={() => router.push('/')}
-              >
-                확인
-              </Button>
-            )}
-          </div>
-        </div>
+        <AlertModal
+          message={
+            invalidReason === 'expired'
+              ? '인증 링크의 유효기간이 만료되었습니다.'
+              : '유효하지 않은 링크입니다.'
+          }
+          primaryButton={
+            invalidReason === 'expired'
+              ? { label: '메일 재발송', onClick: () => router.push('/') }
+              : undefined
+          }
+          secondaryButton={
+            invalidReason !== 'expired'
+              ? { label: '확인', onClick: () => router.push('/') }
+              : undefined
+          }
+        />
       </div>
     );
   }
