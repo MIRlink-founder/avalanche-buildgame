@@ -7,7 +7,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBuilding,
   faChartBar,
-  faCircleCheck,
   faCreditCard,
   faMoneyBill1,
   faRectangleList,
@@ -26,6 +25,7 @@ import {
 } from '@mire/ui/components/card';
 import { Input } from '@mire/ui/components/input';
 import { Label } from '@mire/ui/components/label';
+import { Select } from '@mire/ui/components/select';
 import {
   Table,
   TableBody,
@@ -93,11 +93,11 @@ type SettlementAccount = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING_PAYMENT: '정산 대기',
-  SETTLED: '정산 완료',
-  PENDING: '정산 대기',
-  READY: '정산 대기',
-  COMPLETED: '정산 완료',
+  PENDING_PAYMENT: '대기',
+  SETTLED: '완료',
+  PENDING: '대기',
+  READY: '대기',
+  COMPLETED: '완료',
 };
 
 type SettlementDetailResponse = {
@@ -128,6 +128,7 @@ export function SettlementDetailClient({
   const [accountError, setAccountError] = useState<string | null>(null);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [isAccountLoading, setIsAccountLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const payments = detail?.payments ?? [];
   const bankTransfers = detail?.bankTransfers ?? [];
@@ -146,12 +147,12 @@ export function SettlementDetailClient({
   const periodLabel = detail
     ? formatPeriod(detail.settlementPeriodStart, detail.settlementPeriodEnd)
     : '-';
-  const isSettled = detail?.status === 'SETTLED';
+  const isSettled =
+    detail?.status === 'SETTLED' || detail?.status === 'COMPLETED';
   const listHref = '/admin/settlements';
-  const statusBadgeClass =
-    detail?.status === 'SETTLED'
-      ? 'border-primary/20 bg-primary-subtle text-primary'
-      : 'bg-secondary text-muted-foreground';
+  const statusBadgeClass = isSettled
+    ? 'bg-blue-600 text-white hover:bg-blue-600'
+    : 'bg-amber-400 text-amber-950 hover:bg-amber-400';
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('detailTab');
   const currentTab =
@@ -352,35 +353,22 @@ export function SettlementDetailClient({
     }
   }, [detail?.hospitalId, fetchAccount]);
 
-  const summaryCards = useMemo(() => {
+  const summaryRows = useMemo(() => {
     if (!detail) {
-      return [
-        { label: '총 거래액', value: '-' },
-        { label: '정산율', value: '-' },
-        { label: '페이백', value: '-' },
-        { label: '정산 상태', value: '-' },
-      ];
+      return [];
     }
 
     return [
+      { label: '정산 기간', value: periodLabel },
+      { label: '총 거래액', value: `${formatAmount(detail.totalVolume)}원` },
+      { label: '정산율', value: `${formatRate(detail.appliedRate)}%` },
+      { label: '페이백', value: `${formatAmount(detail.paybackAmount)}원` },
       {
-        label: '총 거래액',
-        value: `${formatAmount(detail.totalVolume)}원`,
-      },
-      {
-        label: '정산율',
-        value: `${formatRate(detail.appliedRate)}%`,
-      },
-      {
-        label: '페이백',
-        value: `${formatAmount(detail.paybackAmount)}원`,
-      },
-      {
-        label: '정산 상태',
-        value: statusLabel,
+        label: '정산일',
+        value: detail.settledAt ? formatDate(detail.settledAt) : '-',
       },
     ];
-  }, [detail, statusLabel]);
+  }, [detail, periodLabel]);
 
   const [draftRate, setDraftRate] = useState('');
   const [draftPayback, setDraftPayback] = useState('');
@@ -392,6 +380,36 @@ export function SettlementDetailClient({
     setDraftRate(detail.appliedRate);
     setDraftPayback(detail.paybackAmount);
   }, [detail]);
+
+  useEffect(() => {
+    if (!statusMessage) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setStatusMessage(null);
+    }, 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [statusMessage]);
+
+  useEffect(() => {
+    if (!adjustMessage) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setAdjustMessage(null);
+    }, 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [adjustMessage]);
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [toastMessage]);
 
   const totalVolumeValue = parseNumber(detail?.totalVolume ?? '');
   const draftRateValue = parseNumber(draftRate);
@@ -469,6 +487,7 @@ export function SettlementDetailClient({
             : prev,
         );
         setStatusMessage('정산 상태가 변경되었습니다');
+        setToastMessage('정산 상태가 변경되었습니다');
       }
     } catch (saveError) {
       setStatusError('정산 상태 변경 중 오류가 발생했습니다');
@@ -541,6 +560,7 @@ export function SettlementDetailClient({
         setDraftRate(updated.appliedRate);
         setDraftPayback(updated.paybackAmount);
         setAdjustMessage('정산율과 페이백이 저장되었습니다');
+        setToastMessage('정산율과 페이백이 저장되었습니다');
       }
     } catch (saveError) {
       setAdjustError('정산 정보 저장 중 오류가 발생했습니다');
@@ -582,6 +602,11 @@ export function SettlementDetailClient({
 
   return (
     <div className="space-y-6 p-6">
+      {toastMessage && (
+        <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground px-4 py-2 text-sm text-background shadow-lg">
+          {toastMessage}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <nav className="flex items-center gap-1 text-sm text-muted-foreground">
           <Link href={listHref} className="hover:text-foreground">
@@ -627,79 +652,54 @@ export function SettlementDetailClient({
       {currentTab === 'settlement' && (
         <>
           <Card className="border-border bg-card shadow-none">
-            <CardHeader className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <FontAwesomeIcon
-                    icon={faChartBar}
-                    className="text-primary size-4"
-                  />
-                  정산 요약
-                </CardTitle>
-                <CardDescription className="text-muted-foreground text-xs">
-                  정산 기간: {periodLabel}
-                </CardDescription>
+            <CardContent className="space-y-4 py-5">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <FontAwesomeIcon
+                  icon={faChartBar}
+                  className="text-primary size-4"
+                />
+                정산 요약
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {summaryCards.map((item) => (
-                  <Card key={item.label} className="border-border shadow-none">
-                    <CardContent className="p-4">
-                      <p className="text-muted-foreground text-xs font-semibold">
-                        {item.label}
-                      </p>
-                      <p className="mt-2 text-lg font-semibold">{item.value}</p>
-                    </CardContent>
-                  </Card>
+              <div className="space-y-3">
+                {summaryRows.map((row) => (
+                  <div
+                    key={row.label}
+                    className="flex flex-wrap items-center justify-between gap-3 text-sm"
+                  >
+                    <p className="text-muted-foreground">{row.label}</p>
+                    <p className="font-medium">{row.value}</p>
+                  </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card shadow-none">
-            <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faCircleCheck}
-                    className="text-primary size-4"
-                  />
-                  <p className="text-sm font-semibold">정산 상태</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-sm">
-                  <Badge className={statusBadgeClass}>{statusLabel}</Badge>
-                  <span className="text-muted-foreground text-xs">
-                    정산일:{' '}
-                    {detail.settledAt ? formatDate(detail.settledAt) : '-'}
-                  </span>
-                </div>
-                {statusError && (
-                  <div className="text-destructive text-sm">{statusError}</div>
-                )}
-                {statusMessage && (
-                  <div className="text-primary text-sm">{statusMessage}</div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {isSettled ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleChangeStatus('PENDING_PAYMENT')}
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                  <p className="text-muted-foreground">정산 상태</p>
+                  <Select
+                    value={isSettled ? 'SETTLED' : 'PENDING_PAYMENT'}
+                    onChange={(event) => {
+                      const nextStatus = event.target.value as
+                        | 'PENDING_PAYMENT'
+                        | 'SETTLED';
+                      if (
+                        (isSettled && nextStatus === 'SETTLED') ||
+                        (!isSettled && nextStatus === 'PENDING_PAYMENT')
+                      ) {
+                        return;
+                      }
+                      handleChangeStatus(nextStatus);
+                    }}
+                    className="h-9 w-[140px] text-sm"
                     disabled={isStatusSaving}
+                    aria-label="정산 상태 변경"
                   >
-                    정산 대기로 변경
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={() => handleChangeStatus('SETTLED')}
-                    disabled={isStatusSaving}
-                  >
-                    정산 완료 처리
-                  </Button>
-                )}
+                    <option value="PENDING_PAYMENT">대기</option>
+                    <option value="SETTLED">완료</option>
+                  </Select>
+                </div>
               </div>
+              {statusError && (
+                <div className="text-destructive text-xs text-right">
+                  {statusError}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -753,9 +753,6 @@ export function SettlementDetailClient({
               </div>
               {adjustError && (
                 <div className="text-destructive text-sm">{adjustError}</div>
-              )}
-              {adjustMessage && (
-                <div className="text-primary text-sm">{adjustMessage}</div>
               )}
             </CardContent>
             <CardFooter className="border-border flex flex-wrap items-center justify-end gap-2 border-t px-6 py-3">
