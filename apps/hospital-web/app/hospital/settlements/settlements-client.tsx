@@ -7,13 +7,11 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@mire/ui/components/card';
 import { Input } from '@mire/ui/components/input';
 import { Label } from '@mire/ui/components/label';
-import { Select } from '@mire/ui/components/select';
 import {
   Table,
   TableBody,
@@ -22,8 +20,24 @@ import {
   TableHeader,
   TableRow,
 } from '@mire/ui/components/table';
+import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
 
-type PaymentRow = {
+interface SettlementRow {
+  id: number;
+  publicId?: string;
+  hospitalId: string;
+  settlementPeriodStart: string;
+  settlementPeriodEnd: string;
+  totalVolume: string;
+  appliedRate: string;
+  paybackAmount: string;
+  isNftBoosted: boolean;
+  status: 'PENDING_PAYMENT' | 'SETTLED' | string;
+  settledAt: string | null;
+  createdAt: string;
+}
+
+interface PaymentRow {
   id: number;
   medicalRecordId: number | null;
   hospitalId: string;
@@ -37,658 +51,552 @@ type PaymentRow = {
   paidAt: string | null;
   cancelledAt: string | null;
   createdAt: string;
-};
+}
 
-type SettlementRow = {
-  id: number;
-  hospitalId: string;
-  settlementPeriodStart: string;
-  settlementPeriodEnd: string;
-  totalVolume: string;
-  appliedRate: string;
-  paybackAmount: string;
-  isNftBoosted: boolean;
-  status: 'PENDING_PAYMENT' | 'SETTLED' | string;
-  settledAt: string | null;
-  createdAt: string;
-};
+interface SettlementAccount {
+  accountBank: string | null;
+  accountNumber: string | null;
+  accountHolder: string | null;
+}
 
-type PaymentsResponse = {
-  data: PaymentRow[];
-  nextCursor: number | null;
-};
-
-type SettlementsResponse = {
+interface SettlementsResponse {
   data: SettlementRow[];
   nextCursor: number | null;
-};
+}
 
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  READY: '결제 준비',
-  PAID: '결제 완료',
-  SETTLED: '정산 완료',
-  CANCELLED: '결제 취소',
-};
+interface PaymentsResponse {
+  data: PaymentRow[];
+  nextCursor: number | null;
+}
 
-const SETTLEMENT_STATUS_LABELS: Record<SettlementRow['status'], string> = {
+const SETTLEMENT_STATUS_LABELS: Record<string, string> = {
   PENDING_PAYMENT: '정산 대기',
   SETTLED: '정산 완료',
 };
 
-const MOCK_PAYMENTS: PaymentRow[] = [
-  {
-    id: 3107,
-    medicalRecordId: 9001,
-    hospitalId: 'HOS-2026-001',
-    settlementId: 101,
-    subMid: 'MID-AX01',
-    approveNo: 'A55120',
-    pgTransactionId: 'TX-20260302-017',
-    amount: '420000',
-    paymentMethod: 'CARD',
-    status: 'PAID',
-    paidAt: '2026-03-02T10:12:00.000Z',
-    cancelledAt: null,
-    createdAt: '2026-03-02T10:12:00.000Z',
-  },
-  {
-    id: 3106,
-    medicalRecordId: 8992,
-    hospitalId: 'HOS-2026-001',
-    settlementId: 101,
-    subMid: 'MID-AX01',
-    approveNo: 'A55105',
-    pgTransactionId: 'TX-20260301-010',
-    amount: '880000',
-    paymentMethod: 'TRANSFER',
-    status: 'PAID',
-    paidAt: '2026-03-01T14:25:00.000Z',
-    cancelledAt: null,
-    createdAt: '2026-03-01T14:25:00.000Z',
-  },
-  {
-    id: 3104,
-    medicalRecordId: 8978,
-    hospitalId: 'HOS-2026-001',
-    settlementId: null,
-    subMid: 'MID-AX01',
-    approveNo: 'A55044',
-    pgTransactionId: 'TX-20260226-004',
-    amount: '320000',
-    paymentMethod: 'CARD',
-    status: 'CANCELLED',
-    paidAt: '2026-02-26T09:20:00.000Z',
-    cancelledAt: '2026-02-26T11:10:00.000Z',
-    createdAt: '2026-02-26T09:20:00.000Z',
-  },
-];
+const SETTLEMENT_STATUS_COLORS: Record<string, string> = {
+  PENDING_PAYMENT: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
+  SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
+};
 
-const MOCK_SETTLEMENTS: SettlementRow[] = [
-  {
-    id: 101,
-    hospitalId: 'HOS-2026-001',
-    settlementPeriodStart: '2026-02-01',
-    settlementPeriodEnd: '2026-02-28',
-    totalVolume: '12500000',
-    appliedRate: '92.50',
-    paybackAmount: '11562500',
-    isNftBoosted: true,
-    status: 'PENDING_PAYMENT',
-    settledAt: null,
-    createdAt: '2026-03-01T09:00:00.000Z',
-  },
-  {
-    id: 99,
-    hospitalId: 'HOS-2026-001',
-    settlementPeriodStart: '2026-01-01',
-    settlementPeriodEnd: '2026-01-31',
-    totalVolume: '9800000',
-    appliedRate: '90.00',
-    paybackAmount: '8820000',
-    isNftBoosted: false,
-    status: 'SETTLED',
-    settledAt: '2026-02-05T10:30:00.000Z',
-    createdAt: '2026-02-01T08:10:00.000Z',
-  },
-];
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  READY: '결제 대기',
+  PAID: '결제 완료',
+  SETTLED: '정산 완료',
+  CANCELLED: '결제 취소',
+  FAILED: '결제 실패',
+  PENDING: '결제 대기',
+  PARTIAL_CANCELLED: '부분 취소',
+};
+
+const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  READY: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
+  PENDING: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
+  PAID: 'bg-blue-600 text-white hover:bg-blue-600',
+  SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
+  CANCELLED: 'bg-red-100 text-red-800 hover:bg-red-100',
+  FAILED: 'bg-red-100 text-red-800 hover:bg-red-100',
+  PARTIAL_CANCELLED: 'bg-red-100 text-red-800 hover:bg-red-100',
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CARD: '카드',
+  CASH: '현금',
+  TRANSFER: '계좌이체',
+  VIRTUAL_ACCOUNT: '가상계좌',
+  MIXED: '복합결제',
+};
+
+const LIST_LIMIT = 50;
 
 export function SettlementsClient() {
-  const [paymentStatus, setPaymentStatus] = useState('');
-  const [paidFrom, setPaidFrom] = useState('');
-  const [paidTo, setPaidTo] = useState('');
-  const [payments, setPayments] = useState<PaymentRow[]>(MOCK_PAYMENTS);
-  const [paymentNextCursor, setPaymentNextCursor] = useState<number | null>(
-    null,
-  );
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const [settlements, setSettlements] = useState<SettlementRow[]>([]);
+  const [settlementsLoading, setSettlementsLoading] = useState(true);
+  const [settlementsError, setSettlementsError] = useState<string | null>(null);
 
-  const [settlementStatus, setSettlementStatus] = useState('');
-  const [periodFrom, setPeriodFrom] = useState('');
-  const [periodTo, setPeriodTo] = useState('');
-  const [settlements, setSettlements] =
-    useState<SettlementRow[]>(MOCK_SETTLEMENTS);
-  const [settlementNextCursor, setSettlementNextCursor] = useState<
-    number | null
-  >(null);
-  const [settlementError, setSettlementError] = useState<string | null>(null);
-  const [isSettlementLoading, setIsSettlementLoading] = useState(false);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
 
-  const paymentTotals = useMemo(() => {
-    return payments.reduce(
-      (acc, payment) => {
-        const amount = parseNumber(payment.amount);
-        if (payment.status === 'PAID' || payment.status === 'SETTLED') {
-          if (Number.isFinite(amount)) {
-            acc.totalRevenue += amount;
-          }
-          acc.paidCount += 1;
-        }
-        if (payment.status === 'CANCELLED') {
-          acc.cancelledCount += 1;
-        }
-        return acc;
-      },
-      { totalRevenue: 0, paidCount: 0, cancelledCount: 0 },
-    );
-  }, [payments]);
+  const [accountBank, setAccountBank] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [initialAccount, setInitialAccount] =
+    useState<SettlementAccount | null>(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountMessage, setAccountMessage] = useState<string | null>(null);
 
-  const settlementTotals = useMemo(() => {
+  const fetchSettlements = useCallback(async () => {
+    setSettlementsLoading(true);
+    setSettlementsError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', String(LIST_LIMIT));
+      const res = await fetch(`/api/settlements?${params.toString()}`, {
+        headers: getAuthHeaders(),
+      });
+      if (redirectIfUnauthorized(res)) return;
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        setSettlementsError(
+          payload.error || '정산 내역을 불러오지 못했습니다.',
+        );
+        return;
+      }
+      const payload: SettlementsResponse = await res.json();
+      setSettlements(payload.data ?? []);
+    } catch {
+      setSettlementsError('정산 내역을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setSettlementsLoading(false);
+    }
+  }, []);
+
+  const fetchPayments = useCallback(async () => {
+    setPaymentsLoading(true);
+    setPaymentsError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', String(LIST_LIMIT));
+      const res = await fetch(`/api/payments?${params.toString()}`, {
+        headers: getAuthHeaders(),
+      });
+      if (redirectIfUnauthorized(res)) return;
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        setPaymentsError(payload.error || '결제 내역을 불러오지 못했습니다.');
+        return;
+      }
+      const payload: PaymentsResponse = await res.json();
+      setPayments(payload.data ?? []);
+    } catch {
+      setPaymentsError('결제 내역을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, []);
+
+  const fetchAccount = useCallback(async () => {
+    setAccountLoading(true);
+    setAccountError(null);
+    setAccountMessage(null);
+    try {
+      const res = await fetch('/api/hospitals/settlement-account', {
+        headers: getAuthHeaders(),
+      });
+      if (redirectIfUnauthorized(res)) return;
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        setAccountError(payload.error || '정산 계좌를 불러오지 못했습니다.');
+        return;
+      }
+      const payload = (await res.json()) as { data?: SettlementAccount };
+      const account = payload.data ?? {
+        accountBank: null,
+        accountNumber: null,
+        accountHolder: null,
+      };
+      setInitialAccount(account);
+      setAccountBank(account.accountBank ?? '');
+      setAccountNumber(account.accountNumber ?? '');
+      setAccountHolder(account.accountHolder ?? '');
+    } catch {
+      setAccountError('정산 계좌를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setAccountLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSettlements();
+    fetchPayments();
+    fetchAccount();
+  }, [fetchSettlements, fetchPayments, fetchAccount]);
+
+  const settlementSummary = useMemo(() => {
     return settlements.reduce(
-      (acc, settlement) => {
-        const amount = parseNumber(settlement.paybackAmount);
-        if (settlement.status === 'PENDING_PAYMENT') {
-          if (Number.isFinite(amount)) {
-            acc.pendingAmount += amount;
-          }
-          acc.pendingCount += 1;
-        }
-        if (settlement.status === 'SETTLED') {
-          if (Number.isFinite(amount)) {
-            acc.settledAmount += amount;
-          }
-          acc.settledCount += 1;
+      (acc, item) => {
+        const totalVolume = toNumber(item.totalVolume);
+        const payback = toNumber(item.paybackAmount);
+        acc.totalVolume += totalVolume;
+        acc.totalPayback += payback;
+        if (item.status === 'SETTLED') {
+          acc.settled += payback;
+        } else {
+          acc.pending += payback;
         }
         return acc;
       },
-      { pendingAmount: 0, settledAmount: 0, pendingCount: 0, settledCount: 0 },
+      { totalVolume: 0, totalPayback: 0, settled: 0, pending: 0 },
     );
   }, [settlements]);
 
-  const summaryCards = useMemo(
-    () => [
-      {
-        label: '총 매출',
-        value: `${formatAmount(String(paymentTotals.totalRevenue))}원`,
-        helper: `결제 ${paymentTotals.paidCount}건`,
+  const paymentSummary = useMemo(() => {
+    return payments.reduce(
+      (acc, item) => {
+        const amount = toNumber(item.amount);
+        if (item.status === 'PAID' || item.status === 'SETTLED') {
+          acc.paid += amount;
+        } else if (item.status === 'CANCELLED' || item.status === 'FAILED') {
+          acc.cancelled += amount;
+        }
+        acc.total += amount;
+        return acc;
       },
-      {
-        label: '정산 대기',
-        value: `${formatAmount(String(settlementTotals.pendingAmount))}원`,
-        helper: `${settlementTotals.pendingCount}건`,
-      },
-      {
-        label: '정산 완료',
-        value: `${formatAmount(String(settlementTotals.settledAmount))}원`,
-        helper: `${settlementTotals.settledCount}건`,
-      },
-      {
-        label: '결제 취소',
-        value: `${paymentTotals.cancelledCount}건`,
-        helper: '최근 결제 기준',
-      },
-    ],
-    [paymentTotals, settlementTotals],
-  );
+      { total: 0, paid: 0, cancelled: 0 },
+    );
+  }, [payments]);
 
-  const fetchPayments = useCallback(
-    async (cursor: number | null) => {
-      setIsPaymentLoading(true);
-      setPaymentError(null);
+  const accountReady = useMemo(() => {
+    return Boolean(
+      accountBank.trim() && accountNumber.trim() && accountHolder.trim(),
+    );
+  }, [accountBank, accountNumber, accountHolder]);
 
-      try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          setPaymentError('로그인이 필요합니다');
-          return;
-        }
+  const isAccountDirty = useMemo(() => {
+    const bank = accountBank.trim();
+    const number = accountNumber.trim();
+    const holder = accountHolder.trim();
+    if (!initialAccount) return accountReady;
+    return (
+      bank !== (initialAccount.accountBank ?? '') ||
+      number !== (initialAccount.accountNumber ?? '') ||
+      holder !== (initialAccount.accountHolder ?? '')
+    );
+  }, [accountBank, accountHolder, accountNumber, accountReady, initialAccount]);
 
-        const params = new URLSearchParams();
-        if (paymentStatus) {
-          params.set('status', paymentStatus);
-        }
-        if (paidFrom) {
-          params.set('paidFrom', paidFrom);
-        }
-        if (paidTo) {
-          params.set('paidTo', paidTo);
-        }
-        if (cursor) {
-          params.set('cursor', String(cursor));
-        }
-        params.set('limit', '10');
+  const canSaveAccount = accountReady && isAccountDirty;
 
-        const response = await fetch(`/api/payments?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const payload = (await response
-          .json()
-          .catch(() => ({}))) as Partial<PaymentsResponse> & {
-          error?: string;
-        };
-
-        if (!response.ok) {
-          setPaymentError(payload.error || '결제 내역 조회에 실패했습니다');
-          return;
-        }
-
-        const newItems = payload.data ?? [];
-        setPayments((prev) => (cursor ? [...prev, ...newItems] : newItems));
-        setPaymentNextCursor(payload.nextCursor ?? null);
-      } catch (fetchError) {
-        setPaymentError('결제 내역 조회 중 오류가 발생했습니다');
-        console.error(fetchError);
-      } finally {
-        setIsPaymentLoading(false);
-      }
-    },
-    [paidFrom, paidTo, paymentStatus],
-  );
-
-  const fetchSettlements = useCallback(
-    async (cursor: number | null) => {
-      setIsSettlementLoading(true);
-      setSettlementError(null);
-
-      try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          setSettlementError('로그인이 필요합니다');
-          return;
-        }
-
-        const params = new URLSearchParams();
-        if (settlementStatus) {
-          params.set('status', settlementStatus);
-        }
-        if (periodFrom) {
-          params.set('periodFrom', periodFrom);
-        }
-        if (periodTo) {
-          params.set('periodTo', periodTo);
-        }
-        if (cursor) {
-          params.set('cursor', String(cursor));
-        }
-        params.set('limit', '10');
-
-        const response = await fetch(`/api/settlements?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const payload = (await response
-          .json()
-          .catch(() => ({}))) as Partial<SettlementsResponse> & {
-          error?: string;
-        };
-
-        if (!response.ok) {
-          setSettlementError(payload.error || '정산 내역 조회에 실패했습니다');
-          return;
-        }
-
-        const newItems = payload.data ?? [];
-        setSettlements((prev) => (cursor ? [...prev, ...newItems] : newItems));
-        setSettlementNextCursor(payload.nextCursor ?? null);
-      } catch (fetchError) {
-        setSettlementError('정산 내역 조회 중 오류가 발생했습니다');
-        console.error(fetchError);
-      } finally {
-        setIsSettlementLoading(false);
-      }
-    },
-    [periodFrom, periodTo, settlementStatus],
-  );
-
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      fetchPayments(null);
-      fetchSettlements(null);
-    }
-  }, [fetchPayments, fetchSettlements]);
-
-  const handlePaymentSearch = () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setPaymentError('로그인이 필요합니다');
+  const handleAccountSave = async () => {
+    setAccountError(null);
+    setAccountMessage(null);
+    if (!accountReady) {
+      setAccountError('정산 계좌 정보를 모두 입력해주세요.');
       return;
     }
-    fetchPayments(null);
-  };
-
-  const handleSettlementSearch = () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setSettlementError('로그인이 필요합니다');
+    if (!isAccountDirty) {
+      setAccountMessage('변경된 내용이 없습니다.');
       return;
     }
-    fetchSettlements(null);
+    setAccountLoading(true);
+    try {
+      const res = await fetch('/api/hospitals/settlement-account', {
+        method: 'PATCH',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accountBank: accountBank.trim(),
+          accountNumber: accountNumber.trim(),
+          accountHolder: accountHolder.trim(),
+        }),
+      });
+      if (redirectIfUnauthorized(res)) return;
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAccountError(payload.error || '정산 계좌 저장에 실패했습니다.');
+        return;
+      }
+      setAccountMessage('정산 계좌가 저장되었습니다.');
+      setInitialAccount({
+        accountBank: accountBank.trim(),
+        accountNumber: accountNumber.trim(),
+        accountHolder: accountHolder.trim(),
+      });
+    } catch {
+      setAccountError('정산 계좌 저장 중 오류가 발생했습니다.');
+    } finally {
+      setAccountLoading(false);
+    }
   };
 
   return (
-    <div className="space-y-5">
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
-          <CardTitle className="text-base">정산 요약</CardTitle>
-          <CardDescription className="text-muted-foreground text-xs">
-            결제 및 정산 현황을 요약합니다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-4">
-          {summaryCards.map((item) => (
-            <Card key={item.label} className="border-border shadow-none">
-              <CardContent className="p-4">
-                <p className="text-muted-foreground text-xs font-semibold">
-                  {item.label}
-                </p>
-                <p className="mt-2 text-lg font-semibold">{item.value}</p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {item.helper}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </CardContent>
-      </Card>
+    <section className="space-y-6 p-6">
+      <div className="grid gap-4 lg:grid-cols-4">
+        <Card className="border-border">
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs font-semibold">
+              총 매출
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {formatAmount(String(paymentSummary.paid))}원
+            </p>
+            <p className="text-muted-foreground mt-2 text-xs">
+              최근 결제 {LIST_LIMIT}건 기준
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs font-semibold">
+              정산 대기 금액
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {formatAmount(String(settlementSummary.pending))}원
+            </p>
+            <p className="text-muted-foreground mt-2 text-xs">
+              정산 내역 {LIST_LIMIT}건 기준
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs font-semibold">
+              정산 완료 금액
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {formatAmount(String(settlementSummary.settled))}원
+            </p>
+            <p className="text-muted-foreground mt-2 text-xs">완료 처리 기준</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-4">
+            <p className="text-muted-foreground text-xs font-semibold">
+              총 정산금
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {formatAmount(String(settlementSummary.totalPayback))}원
+            </p>
+            <p className="text-muted-foreground mt-2 text-xs">정산 내역 합산</p>
+          </CardContent>
+        </Card>
+      </div>
 
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <CardTitle className="text-base">결제 내역</CardTitle>
-              <CardDescription className="text-muted-foreground text-xs">
-                결제 상태와 기간을 기준으로 확인합니다.
-              </CardDescription>
-            </div>
-            <Button
-              size="sm"
-              onClick={handlePaymentSearch}
-              disabled={isPaymentLoading}
-            >
-              조회하기
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                결제 상태
-              </Label>
-              <Select
-                value={paymentStatus}
-                onChange={(event) => setPaymentStatus(event.target.value)}
-                className="bg-background text-sm"
-              >
-                <option value="">전체</option>
-                <option value="READY">결제 준비</option>
-                <option value="PAID">결제 완료</option>
-                <option value="SETTLED">정산 완료</option>
-                <option value="CANCELLED">결제 취소</option>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                결제 시작일
-              </Label>
-              <Input
-                type="date"
-                value={paidFrom}
-                onChange={(event) => setPaidFrom(event.target.value)}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                결제 종료일
-              </Label>
-              <Input
-                type="date"
-                value={paidTo}
-                onChange={(event) => setPaidTo(event.target.value)}
-                className="h-10"
-              />
-            </div>
-          </div>
-          {paymentError && (
-            <div className="text-destructive text-sm">{paymentError}</div>
-          )}
-        </CardContent>
-        <CardContent className="p-0">
-          <Table className="min-w-[860px]">
-            <TableHeader className="bg-secondary">
-              <TableRow>
-                <TableHead className="text-muted-foreground">결제일</TableHead>
-                <TableHead className="text-muted-foreground">
-                  결제 수단
-                </TableHead>
-                <TableHead className="text-muted-foreground">
-                  승인번호
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right">
-                  금액
-                </TableHead>
-                <TableHead className="text-muted-foreground">상태</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payments.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-muted-foreground py-10 text-center text-sm"
-                  >
-                    결제 내역이 없습니다.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                payments.map((payment) => (
-                  <TableRow key={payment.id} className="border-border">
-                    <TableCell>
-                      {payment.paidAt
-                        ? formatDate(payment.paidAt)
-                        : formatDate(payment.createdAt)}
-                    </TableCell>
-                    <TableCell>{payment.paymentMethod ?? '-'}</TableCell>
-                    <TableCell>{payment.approveNo ?? '-'}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatAmount(payment.amount)}원
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-primary-subtle text-primary text-[10px] font-semibold">
-                        {PAYMENT_STATUS_LABELS[payment.status] ??
-                          payment.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-        <CardFooter className="border-border flex items-center justify-between border-t px-4 py-3">
-          <p className="text-muted-foreground text-xs">
-            {isPaymentLoading ? '결제 내역을 불러오는 중입니다' : ''}
-          </p>
-          {paymentNextCursor && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fetchPayments(paymentNextCursor)}
-              className="border-border text-foreground hover:bg-secondary"
-              disabled={isPaymentLoading}
-            >
-              더 보기
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
-
-      <Card className="border-border bg-background">
-        <CardHeader className="border-border bg-secondary border-b">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="space-y-6">
+          <Card className="border-border">
+            <CardHeader className="border-border border-b">
               <CardTitle className="text-base">정산 내역</CardTitle>
               <CardDescription className="text-muted-foreground text-xs">
-                정산 기간과 상태를 기준으로 확인합니다.
+                최근 정산 내역 {LIST_LIMIT}건 기준
               </CardDescription>
-            </div>
-            <Button
-              size="sm"
-              onClick={handleSettlementSearch}
-              disabled={isSettlementLoading}
-            >
-              조회하기
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                정산 상태
-              </Label>
-              <Select
-                value={settlementStatus}
-                onChange={(event) => setSettlementStatus(event.target.value)}
-                className="bg-background text-sm"
-              >
-                <option value="">전체</option>
-                <option value="PENDING_PAYMENT">정산 대기</option>
-                <option value="SETTLED">정산 완료</option>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                정산 시작일
-              </Label>
-              <Input
-                type="date"
-                value={periodFrom}
-                onChange={(event) => setPeriodFrom(event.target.value)}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                정산 종료일
-              </Label>
-              <Input
-                type="date"
-                value={periodTo}
-                onChange={(event) => setPeriodTo(event.target.value)}
-                className="h-10"
-              />
-            </div>
-          </div>
-          {settlementError && (
-            <div className="text-destructive text-sm">{settlementError}</div>
-          )}
-        </CardContent>
-        <CardContent className="p-0">
-          <Table className="min-w-[860px]">
-            <TableHeader className="bg-secondary">
-              <TableRow>
-                <TableHead className="text-muted-foreground">
-                  정산 기간
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right">
-                  정산금
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right">
-                  정산율
-                </TableHead>
-                <TableHead className="text-muted-foreground">상태</TableHead>
-                <TableHead className="text-muted-foreground">정산일</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {settlements.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-muted-foreground py-10 text-center text-sm"
-                  >
-                    정산 내역이 없습니다.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                settlements.map((settlement) => (
-                  <TableRow key={settlement.id} className="border-border">
-                    <TableCell>
-                      {formatPeriod(
-                        settlement.settlementPeriodStart,
-                        settlement.settlementPeriodEnd,
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatAmount(settlement.paybackAmount)}원
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatRate(settlement.appliedRate)}%
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-primary-subtle text-primary text-[10px] font-semibold">
-                        {SETTLEMENT_STATUS_LABELS[settlement.status] ??
-                          settlement.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {settlement.settledAt
-                        ? formatDate(settlement.settledAt)
-                        : '-'}
-                    </TableCell>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table className="min-w-[720px] text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-[160px]">정산 기간</TableHead>
+                    <TableHead className="text-right">거래액</TableHead>
+                    <TableHead className="text-right">정산금액</TableHead>
+                    <TableHead className="w-[120px]">정산 상태</TableHead>
+                    <TableHead className="w-[120px]">정산일</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-        <CardFooter className="border-border flex items-center justify-between border-t px-4 py-3">
-          <p className="text-muted-foreground text-xs">
-            {isSettlementLoading ? '정산 내역을 불러오는 중입니다' : ''}
-          </p>
-          {settlementNextCursor && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fetchSettlements(settlementNextCursor)}
-              className="border-border text-foreground hover:bg-secondary"
-              disabled={isSettlementLoading}
-            >
-              더 보기
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
-    </div>
-  );
-}
+                </TableHeader>
+                <TableBody className="divide-y">
+                  {settlementsLoading ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-muted-foreground"
+                      >
+                        불러오는 중...
+                      </TableCell>
+                    </TableRow>
+                  ) : settlementsError ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-destructive"
+                      >
+                        {settlementsError}
+                      </TableCell>
+                    </TableRow>
+                  ) : settlements.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-muted-foreground"
+                      >
+                        정산 내역이 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    settlements.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="px-4 py-3 whitespace-nowrap">
+                          {formatPeriod(
+                            item.settlementPeriodStart,
+                            item.settlementPeriodEnd,
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right whitespace-nowrap">
+                          {formatAmount(item.totalVolume)}원
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right whitespace-nowrap">
+                          {formatAmount(item.paybackAmount)}원
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
+                          <Badge
+                            className={
+                              SETTLEMENT_STATUS_COLORS[item.status] ??
+                              'bg-gray-100 text-gray-700 hover:bg-gray-100'
+                            }
+                          >
+                            {SETTLEMENT_STATUS_LABELS[item.status] ??
+                              item.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 whitespace-nowrap">
+                          {item.settledAt ? formatDate(item.settledAt) : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
-function parseNumber(value: string) {
-  if (!value) {
-    return Number.NaN;
-  }
-  const normalized = value.replace(/,/g, '').trim();
-  return Number(normalized);
+          <Card className="border-border">
+            <CardHeader className="border-border border-b">
+              <CardTitle className="text-base">결제 내역</CardTitle>
+              <CardDescription className="text-muted-foreground text-xs">
+                최근 결제 내역 {LIST_LIMIT}건 기준
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table className="min-w-[760px] text-sm">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-[160px]">결제일</TableHead>
+                    <TableHead className="text-right">결제 금액</TableHead>
+                    <TableHead className="w-[120px]">결제 수단</TableHead>
+                    <TableHead className="w-[120px]">상태</TableHead>
+                    <TableHead className="w-[160px]">승인 번호</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y">
+                  {paymentsLoading ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-muted-foreground"
+                      >
+                        불러오는 중...
+                      </TableCell>
+                    </TableRow>
+                  ) : paymentsError ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-destructive"
+                      >
+                        {paymentsError}
+                      </TableCell>
+                    </TableRow>
+                  ) : payments.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-muted-foreground"
+                      >
+                        결제 내역이 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    payments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="px-4 py-3 whitespace-nowrap">
+                          {formatDateTime(payment.paidAt ?? payment.createdAt)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right whitespace-nowrap">
+                          {formatAmount(payment.amount)}원
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
+                          {PAYMENT_METHOD_LABELS[payment.paymentMethod ?? ''] ??
+                            payment.paymentMethod ??
+                            '-'}
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
+                          <Badge
+                            className={
+                              PAYMENT_STATUS_COLORS[payment.status] ??
+                              'bg-gray-100 text-gray-700 hover:bg-gray-100'
+                            }
+                          >
+                            {PAYMENT_STATUS_LABELS[payment.status] ??
+                              payment.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 font-mono text-xs">
+                          {payment.approveNo ?? payment.pgTransactionId ?? '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="border-border">
+            <CardHeader className="border-border border-b">
+              <CardTitle className="text-base">정산 계좌 입력</CardTitle>
+              <CardDescription className="text-muted-foreground text-xs">
+                정산금 입금을 받을 계좌 정보를 등록해주세요.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 p-6">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">은행명</Label>
+                <Input
+                  value={accountBank}
+                  onChange={(event) => setAccountBank(event.target.value)}
+                  placeholder="은행명"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">
+                  계좌번호
+                </Label>
+                <Input
+                  value={accountNumber}
+                  onChange={(event) => setAccountNumber(event.target.value)}
+                  placeholder="계좌번호"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">예금주</Label>
+                <Input
+                  value={accountHolder}
+                  onChange={(event) => setAccountHolder(event.target.value)}
+                  placeholder="예금주명"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={fetchAccount}
+                  disabled={accountLoading}
+                >
+                  계좌 조회
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleAccountSave}
+                  disabled={accountLoading || !canSaveAccount}
+                >
+                  저장하기
+                </Button>
+              </div>
+              {accountError && (
+                <p className="text-sm text-destructive">{accountError}</p>
+              )}
+              {accountMessage && (
+                <p className="text-sm text-primary">{accountMessage}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function formatAmount(value: string) {
@@ -699,14 +607,6 @@ function formatAmount(value: string) {
   return new Intl.NumberFormat('ko-KR').format(amount);
 }
 
-function formatRate(value: string) {
-  const rate = Number(value);
-  if (!Number.isFinite(rate)) {
-    return value;
-  }
-  return rate.toFixed(2);
-}
-
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -715,9 +615,25 @@ function formatDate(value: string) {
   return date.toLocaleDateString('ko-KR');
 }
 
-function formatPeriod(start: string, end: string) {
-  if (!start || !end) {
-    return '-';
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
   }
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatPeriod(start: string, end: string) {
   return `${formatDate(start)} ~ ${formatDate(end)}`;
+}
+
+function toNumber(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
