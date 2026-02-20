@@ -5,10 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faBuilding,
-  faChartBar,
   faCreditCard,
-  faMoneyBill1,
   faRectangleList,
 } from '@fortawesome/free-regular-svg-icons';
 import { ChevronRight } from 'lucide-react';
@@ -603,7 +600,7 @@ export function SettlementDetailClient({
   return (
     <div className="space-y-6 p-6">
       {toastMessage && (
-        <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground px-4 py-2 text-sm text-background shadow-lg">
+        <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground shadow-lg">
           {toastMessage}
         </div>
       )}
@@ -653,13 +650,7 @@ export function SettlementDetailClient({
         <>
           <Card className="border-border bg-card shadow-none">
             <CardContent className="space-y-4 py-5">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <FontAwesomeIcon
-                  icon={faChartBar}
-                  className="text-primary size-4"
-                />
-                정산 요약
-              </div>
+              <div className="text-sm font-semibold">정산 요약</div>
               <div className="space-y-3">
                 {summaryRows.map((row) => (
                   <div
@@ -686,7 +677,7 @@ export function SettlementDetailClient({
                       }
                       handleChangeStatus(nextStatus);
                     }}
-                    className="h-9 w-[140px] text-sm"
+                    className="h-9 w-[96px] text-sm"
                     disabled={isStatusSaving}
                     aria-label="정산 상태 변경"
                   >
@@ -705,19 +696,13 @@ export function SettlementDetailClient({
 
           <Card className="border-border bg-card shadow-none">
             <CardHeader className="border-border border-b">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FontAwesomeIcon
-                  icon={faMoneyBill1}
-                  className="text-primary size-4"
-                />
-                정산율/페이백 조정
-              </CardTitle>
+              <CardTitle className="text-base">정산율/페이백 조정</CardTitle>
               <CardDescription className="text-muted-foreground text-xs">
-                정산율 변경 시 예상 페이백을 미리 확인합니다.
+                정산율 변경 시 예상 페이백을 미리 확인합니다
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 lg:grid-cols-[1.1fr_1.1fr_1fr_auto]">
                 <div className="space-y-2">
                   <Label className="text-muted-foreground text-xs font-semibold">
                     정산율 (%)
@@ -750,20 +735,20 @@ export function SettlementDetailClient({
                       : `${formatAmount(String(previewPayback))}원`}
                   </div>
                 </div>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    onClick={handleSaveAdjustment}
+                    disabled={isAdjustSaving}
+                  >
+                    {isAdjustSaving ? '저장 중...' : '저장'}
+                  </Button>
+                </div>
               </div>
               {adjustError && (
                 <div className="text-destructive text-sm">{adjustError}</div>
               )}
             </CardContent>
-            <CardFooter className="border-border flex flex-wrap items-center justify-end gap-2 border-t px-6 py-3">
-              <Button
-                type="button"
-                onClick={handleSaveAdjustment}
-                disabled={isAdjustSaving}
-              >
-                {isAdjustSaving ? '저장 중...' : '저장'}
-              </Button>
-            </CardFooter>
           </Card>
         </>
       )}
@@ -772,20 +757,14 @@ export function SettlementDetailClient({
         <Card className="border-border bg-card shadow-none">
           <CardHeader className="border-border border-b">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FontAwesomeIcon
-                  icon={faBuilding}
-                  className="text-primary size-4"
-                />
-                정산 계좌 정보
-              </CardTitle>
+              <CardTitle className="text-base">정산 계좌 정보</CardTitle>
             </div>
             <CardDescription className="text-muted-foreground text-xs">
               병원 정산 계좌 정보를 확인하고 수정합니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr_1fr_auto]">
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-xs font-semibold">
                   은행명
@@ -816,6 +795,15 @@ export function SettlementDetailClient({
                   className="h-10"
                 />
               </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  onClick={handleSaveAccount}
+                  disabled={isAccountLoading}
+                >
+                  저장하기
+                </Button>
+              </div>
             </div>
             <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
               <span>병원명: {displayHospitalName}</span>
@@ -827,15 +815,6 @@ export function SettlementDetailClient({
               <div className="text-primary text-sm">{accountMessage}</div>
             )}
           </CardContent>
-          <CardFooter className="border-border flex flex-wrap items-center justify-end gap-2 border-t px-6 py-3">
-            <Button
-              type="button"
-              onClick={handleSaveAccount}
-              disabled={isAccountLoading}
-            >
-              저장하기
-            </Button>
-          </CardFooter>
         </Card>
       )}
 
