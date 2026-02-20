@@ -57,7 +57,7 @@ export default function AdminHome() {
               <Link href="/admin/settlements">정산 리스트 열기</Link>
             </Button>
             <span className="text-muted-foreground text-xs">
-              병원 ID와 기간을 준비해 주세요.
+              병원명과 기간을 준비해 주세요.
             </span>
           </CardFooter>
         </Card>

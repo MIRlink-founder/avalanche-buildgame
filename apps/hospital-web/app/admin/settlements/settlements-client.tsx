@@ -1,11 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@mire/ui/components/badge';
 import { Button } from '@mire/ui/components/button';
 import { Input } from '@mire/ui/components/input';
-import { Label } from '@mire/ui/components/label';
 import { Select } from '@mire/ui/components/select';
 import {
   Table,
@@ -19,6 +18,11 @@ import {
 type SettlementRow = {
   id: number;
   hospitalId: string;
+  hospital?: {
+    id: string;
+    displayName: string | null;
+    officialName: string;
+  } | null;
   settlementPeriodStart: string;
   settlementPeriodEnd: string;
   totalVolume: string;
@@ -35,15 +39,53 @@ type SettlementsResponse = {
   nextCursor: number | null;
 };
 
+type SortKey =
+  | 'period'
+  | 'hospitalName'
+  | 'totalVolume'
+  | 'appliedRate'
+  | 'paybackAmount'
+  | 'nft'
+  | 'status'
+  | 'settledAt';
+
+type SortConfig = {
+  key: SortKey;
+  direction: 'asc' | 'desc';
+};
+
+type HospitalSearchItem = {
+  id: string;
+  displayName: string | null;
+  officialName: string;
+};
+
+type HospitalSearchResponse = {
+  hospitals: HospitalSearchItem[];
+};
+
 const STATUS_LABELS: Record<SettlementRow['status'], string> = {
   PENDING_PAYMENT: '정산 대기',
   SETTLED: '정산 완료',
 };
 
+const STATUS_ORDER: Record<SettlementRow['status'], number> = {
+  PENDING_PAYMENT: 0,
+  SETTLED: 1,
+};
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const MOCK_SETTLEMENTS: SettlementRow[] = [
   {
     id: 101,
     hospitalId: 'HOS-2026-001',
+    hospital: {
+      id: 'HOS-2026-001',
+      displayName: '김병원',
+      officialName: '김병원',
+    },
     settlementPeriodStart: '2026-02-01',
     settlementPeriodEnd: '2026-02-28',
     totalVolume: '12500000',
@@ -57,6 +99,11 @@ const MOCK_SETTLEMENTS: SettlementRow[] = [
   {
     id: 100,
     hospitalId: 'HOS-2026-014',
+    hospital: {
+      id: 'HOS-2026-014',
+      displayName: '어쩌구병원',
+      officialName: '어쩌구병원',
+    },
     settlementPeriodStart: '2026-01-01',
     settlementPeriodEnd: '2026-01-31',
     totalVolume: '9800000',
@@ -70,6 +117,11 @@ const MOCK_SETTLEMENTS: SettlementRow[] = [
   {
     id: 99,
     hospitalId: 'HOS-2025-032',
+    hospital: {
+      id: 'HOS-2025-032',
+      displayName: '멀쩡한병원',
+      officialName: '멀쩡한병원',
+    },
     settlementPeriodStart: '2025-12-01',
     settlementPeriodEnd: '2025-12-31',
     totalVolume: '15240000',
@@ -83,6 +135,11 @@ const MOCK_SETTLEMENTS: SettlementRow[] = [
   {
     id: 98,
     hospitalId: 'HOS-2025-007',
+    hospital: {
+      id: 'HOS-2025-007',
+      displayName: '샘플병원',
+      officialName: '샘플병원',
+    },
     settlementPeriodStart: '2025-11-01',
     settlementPeriodEnd: '2025-11-30',
     totalVolume: '7400000',
@@ -97,6 +154,12 @@ const MOCK_SETTLEMENTS: SettlementRow[] = [
 
 export function SettlementsClient() {
   const [hospitalId, setHospitalId] = useState('');
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(
+    null,
+  );
+  const [suggestions, setSuggestions] = useState<HospitalSearchItem[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const [status, setStatus] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
@@ -104,6 +167,7 @@ export function SettlementsClient() {
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   const totals = useMemo(() => {
     return items.reduce(
@@ -128,12 +192,174 @@ export function SettlementsClient() {
     );
   }, [items]);
 
-  const summary = useMemo(() => {
-    if (items.length === 0) {
-      return '조회된 정산 내역이 없습니다';
+  const totalLabel = useMemo(() => `총 ${items.length}건`, [items.length]);
+
+  const getHospitalLabel = (item: SettlementRow) =>
+    item.hospital?.displayName ||
+    item.hospital?.officialName ||
+    item.hospitalId;
+
+  const sortedItems = useMemo(() => {
+    if (!sortConfig) {
+      return items;
     }
-    return `총 ${items.length}건 · 대기 ${totals.pending}건 · 완료 ${totals.settled}건`;
-  }, [items.length, totals.pending, totals.settled]);
+
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+    const toNumber = (value: string) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const getValue = (item: SettlementRow) => {
+      switch (sortConfig.key) {
+        case 'period':
+          return new Date(item.settlementPeriodStart);
+        case 'hospitalName':
+          return getHospitalLabel(item);
+        case 'totalVolume':
+          return toNumber(item.totalVolume);
+        case 'appliedRate':
+          return toNumber(item.appliedRate);
+        case 'paybackAmount':
+          return toNumber(item.paybackAmount);
+        case 'nft':
+          return item.isNftBoosted ? 1 : 0;
+        case 'status':
+          return STATUS_ORDER[item.status] ?? 99;
+        case 'settledAt':
+          return item.settledAt ? new Date(item.settledAt) : null;
+        default:
+          return null;
+      }
+    };
+
+    const sorted = [...items];
+    sorted.sort((a, b) => {
+      const aValue = getValue(a);
+      const bValue = getValue(b);
+
+      if (aValue === null && bValue === null) return 0;
+      if (aValue === null) return 1;
+      if (bValue === null) return -1;
+
+      if (aValue instanceof Date && bValue instanceof Date) {
+        return (aValue.getTime() - bValue.getTime()) * direction;
+      }
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return (aValue - bValue) * direction;
+      }
+
+      return String(aValue).localeCompare(String(bValue), 'ko') * direction;
+    });
+
+    return sorted;
+  }, [items, sortConfig]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return {
+          key,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc',
+        };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const getSortIcon = (key: SortKey) => {
+    if (sortConfig?.key !== key) {
+      return (
+        <span
+          className="inline-flex flex-col items-center gap-[1px]"
+          aria-hidden
+        >
+          <span className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-b-[4px] border-b-muted-foreground/50" />
+          <span className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-t-[4px] border-t-muted-foreground/50" />
+        </span>
+      );
+    }
+
+    return sortConfig.direction === 'asc' ? (
+      <span
+        className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-b-[4px] border-b-muted-foreground"
+        aria-hidden
+      />
+    ) : (
+      <span
+        className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-t-[4px] border-t-muted-foreground"
+        aria-hidden
+      />
+    );
+  };
+
+  const getSortButtonClass = (align: 'left' | 'center' | 'right') => {
+    const alignClass =
+      align === 'center'
+        ? 'justify-center'
+        : align === 'right'
+          ? 'justify-end'
+          : 'justify-start';
+    return `inline-flex w-full items-center gap-1 ${alignClass}`;
+  };
+
+  useEffect(() => {
+    const query = hospitalId.trim();
+
+    if (!query || UUID_PATTERN.test(query)) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsSuggesting(true);
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          tab: 'all',
+          page: '1',
+          search: query,
+          scope: 'all',
+        });
+        const response = await fetch(
+          `/api/admin/hospitals?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as Partial<HospitalSearchResponse>;
+
+        if (!response.ok || hospitalId.trim() !== query) {
+          setSuggestions([]);
+          return;
+        }
+
+        const hospitals = payload.hospitals ?? [];
+        setSuggestions(hospitals);
+        setShowSuggestions(true);
+      } catch (suggestError) {
+        console.error(suggestError);
+        setSuggestions([]);
+      } finally {
+        setIsSuggesting(false);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [hospitalId]);
 
   const fetchSettlements = async (cursor?: number | null) => {
     setIsLoading(true);
@@ -146,13 +372,16 @@ export function SettlementsClient() {
         return;
       }
 
-      if (!hospitalId.trim()) {
-        setError('병원 ID를 입력해주세요');
-        return;
-      }
+      const hospitalQuery = hospitalId.trim();
 
       const params = new URLSearchParams();
-      params.set('hospitalId', hospitalId.trim());
+      if (selectedHospitalId) {
+        params.set('hospitalId', selectedHospitalId);
+      } else if (hospitalQuery && UUID_PATTERN.test(hospitalQuery)) {
+        params.set('hospitalId', hospitalQuery);
+      } else if (hospitalQuery) {
+        params.set('hospitalName', hospitalQuery);
+      }
       if (status) params.set('status', status);
       if (periodFrom) params.set('periodFrom', periodFrom);
       if (periodTo) params.set('periodTo', periodTo);
@@ -216,41 +445,87 @@ export function SettlementsClient() {
       </div>
 
       <div className="space-y-6 rounded-lg border bg-card p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">정산 필터</h2>
-            <p className="text-muted-foreground mt-1 text-xs">{summary}</p>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSearch}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-            disabled={isLoading}
-          >
-            조회하기
-          </Button>
+        <div>
+          <h2 className="text-lg font-semibold">정산 리스트</h2>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr_1fr_auto] mb-0.5">
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-xs font-semibold">
-              병원 ID
-            </Label>
-            <Input
-              value={hospitalId}
-              onChange={(event) => setHospitalId(event.target.value)}
-              placeholder="병원 ID 입력"
-              className="bg-background h-10 text-sm"
-            />
+            <span className="text-muted-foreground text-[11px] font-semibold pl-3">
+              병원명
+            </span>
+            <div className="relative">
+              <Input
+                value={hospitalId}
+                onChange={(event) => {
+                  setHospitalId(event.target.value);
+                  setSelectedHospitalId(null);
+                }}
+                onFocus={() => {
+                  if (suggestions.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                onBlur={() => {
+                  window.setTimeout(() => setShowSuggestions(false), 150);
+                }}
+                aria-label="병원명"
+                placeholder="병원명 입력"
+                className="bg-background h-10 text-sm"
+              />
+              {showSuggestions && (
+                <div className="border-border bg-background absolute left-0 top-full z-20 mt-2 w-full rounded-md border shadow-sm">
+                  {isSuggesting ? (
+                    <div className="text-muted-foreground px-3 py-2 text-xs">
+                      검색 중...
+                    </div>
+                  ) : suggestions.length === 0 ? (
+                    <div className="text-muted-foreground px-3 py-2 text-xs">
+                      검색 결과가 없습니다.
+                    </div>
+                  ) : (
+                    suggestions.map((hospital) => {
+                      const primaryLabel =
+                        hospital.displayName || hospital.officialName;
+                      const secondaryLabel =
+                        hospital.displayName &&
+                        hospital.displayName !== hospital.officialName
+                          ? hospital.officialName
+                          : '';
+                      return (
+                        <button
+                          key={hospital.id}
+                          type="button"
+                          className="hover:bg-secondary flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setHospitalId(primaryLabel);
+                            setSelectedHospitalId(hospital.id);
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <span className="font-medium">{primaryLabel}</span>
+                          {secondaryLabel && (
+                            <span className="text-muted-foreground text-xs">
+                              {secondaryLabel}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-xs font-semibold">
+            <span className="text-muted-foreground text-[11px] font-semibold pl-3">
               정산 상태
-            </Label>
+            </span>
             <Select
               value={status}
               onChange={(event) => setStatus(event.target.value)}
+              aria-label="정산 상태"
               className="bg-background text-sm"
             >
               <option value="">전체</option>
@@ -259,32 +534,44 @@ export function SettlementsClient() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-xs font-semibold">
+            <span className="text-muted-foreground text-[11px] font-semibold pl-3">
               정산 시작일
-            </Label>
+            </span>
             <Input
               type="date"
               value={periodFrom}
               onChange={(event) => setPeriodFrom(event.target.value)}
+              aria-label="정산 시작일"
               className="bg-background h-10 text-sm"
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-xs font-semibold">
+            <span className="text-muted-foreground text-[11px] font-semibold pl-3">
               정산 종료일
-            </Label>
+            </span>
             <Input
               type="date"
               value={periodTo}
               onChange={(event) => setPeriodTo(event.target.value)}
+              aria-label="정산 종료일"
               className="bg-background h-10 text-sm"
             />
           </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className="text-muted-foreground text-[11px] font-semibold opacity-0">
+              조회
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSearch}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6"
+              disabled={isLoading}
+            >
+              조회
+            </Button>
+          </div>
         </div>
-
-        <p className="text-muted-foreground text-xs">
-          병원 ID는 운영사 계정 조회 시 필요합니다.
-        </p>
 
         {error && (
           <div className="border-destructive/30 bg-destructive/10 rounded-lg border px-4 py-3 text-sm text-destructive">
@@ -292,30 +579,91 @@ export function SettlementsClient() {
           </div>
         )}
 
+        <p className="text-muted-foreground text-xs">{totalLabel}</p>
+
         <div className="rounded-lg border">
           <Table className="min-w-[860px]">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-muted-foreground h-11">
-                  기간
+                  <button
+                    type="button"
+                    onClick={() => handleSort('period')}
+                    className={getSortButtonClass('left')}
+                  >
+                    <span>기간</span>
+                    {getSortIcon('period')}
+                  </button>
                 </TableHead>
                 <TableHead className="text-muted-foreground h-11">
-                  병원
+                  <button
+                    type="button"
+                    onClick={() => handleSort('hospitalName')}
+                    className={getSortButtonClass('left')}
+                  >
+                    <span>병원명</span>
+                    {getSortIcon('hospitalName')}
+                  </button>
                 </TableHead>
                 <TableHead className="text-muted-foreground h-11 text-right">
-                  총액
+                  <button
+                    type="button"
+                    onClick={() => handleSort('totalVolume')}
+                    className={getSortButtonClass('right')}
+                  >
+                    <span>총액</span>
+                    {getSortIcon('totalVolume')}
+                  </button>
                 </TableHead>
                 <TableHead className="text-muted-foreground h-11 text-right">
-                  정산율
+                  <button
+                    type="button"
+                    onClick={() => handleSort('appliedRate')}
+                    className={getSortButtonClass('right')}
+                  >
+                    <span>정산율</span>
+                    {getSortIcon('appliedRate')}
+                  </button>
                 </TableHead>
                 <TableHead className="text-muted-foreground h-11 text-right">
-                  페이백
+                  <button
+                    type="button"
+                    onClick={() => handleSort('paybackAmount')}
+                    className={getSortButtonClass('right')}
+                  >
+                    <span>페이백</span>
+                    {getSortIcon('paybackAmount')}
+                  </button>
+                </TableHead>
+                <TableHead className="text-muted-foreground h-11 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('nft')}
+                    className={getSortButtonClass('center')}
+                  >
+                    <span>NFT 가산</span>
+                    {getSortIcon('nft')}
+                  </button>
                 </TableHead>
                 <TableHead className="text-muted-foreground h-11">
-                  상태
+                  <button
+                    type="button"
+                    onClick={() => handleSort('status')}
+                    className={getSortButtonClass('left')}
+                  >
+                    <span>상태</span>
+                    {getSortIcon('status')}
+                  </button>
                 </TableHead>
                 <TableHead className="text-muted-foreground h-11">
-                  정산일
+                  <button
+                    type="button"
+                    onClick={() => handleSort('settledAt')}
+                    className={getSortButtonClass('left')}
+                  >
+                    <span>정산일</span>
+                    {getSortIcon('settledAt')}
+                  </button>
                 </TableHead>
                 <TableHead className="text-muted-foreground h-11 text-center">
                   상세
@@ -333,7 +681,7 @@ export function SettlementsClient() {
                   </TableCell>
                 </TableRow>
               ) : (
-                items.map((item) => (
+                sortedItems.map((item) => (
                   <TableRow key={item.id} className="border-border">
                     <TableCell className="py-3">
                       {formatPeriod(
@@ -342,7 +690,7 @@ export function SettlementsClient() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground py-3 text-xs">
-                      {item.hospitalId}
+                      {getHospitalLabel(item)}
                     </TableCell>
                     <TableCell className="py-3 text-right font-semibold">
                       {formatAmount(item.totalVolume)}원
@@ -352,10 +700,14 @@ export function SettlementsClient() {
                     </TableCell>
                     <TableCell className="py-3 text-right">
                       {formatAmount(item.paybackAmount)}원
-                      {item.isNftBoosted && (
-                        <Badge className="bg-primary-subtle text-primary ml-2 text-[10px] font-semibold">
-                          NFT 가산
+                    </TableCell>
+                    <TableCell className="py-3 text-center">
+                      {item.isNftBoosted ? (
+                        <Badge className="bg-primary-subtle text-primary text-[10px] font-semibold">
+                          적용
                         </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
                     <TableCell className="py-3">

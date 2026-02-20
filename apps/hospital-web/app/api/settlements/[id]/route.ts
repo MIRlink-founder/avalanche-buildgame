@@ -1,38 +1,38 @@
-import { NextResponse } from "next/server"
-import { prisma } from "@mire/database"
-import { AuthError, assertHospitalAccess, requireAuth } from "@/lib/auth-guard"
+import { NextResponse } from 'next/server';
+import { prisma } from '@mire/database';
+import { AuthError, assertHospitalAccess, requireAuth } from '@/lib/auth-guard';
 
-export const runtime = "nodejs"
+export const runtime = 'nodejs';
 
 function getPositiveInt(value: string) {
   if (!/^[0-9]+$/.test(value.trim())) {
-    return null
+    return null;
   }
-  const parsed = Number.parseInt(value.trim(), 10)
-  return parsed > 0 ? parsed : null
+  const parsed = Number.parseInt(value.trim(), 10);
+  return parsed > 0 ? parsed : null;
 }
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { user } = await requireAuth(request)
-    const { id } = await context.params
-    const settlementId = getPositiveInt(id)
+    const { user } = await requireAuth(request);
+    const { id } = await context.params;
+    const settlementId = getPositiveInt(id);
 
     if (!settlementId) {
       return NextResponse.json(
-        { error: "정산 ID 형식이 올바르지 않습니다" },
-        { status: 400 }
-      )
+        { error: '정산 ID 형식이 올바르지 않습니다' },
+        { status: 400 },
+      );
     }
 
-    const { searchParams } = new URL(request.url)
-    const includePayments = searchParams.get("includePayments") === "true"
-    const includeTransfers = searchParams.get("includeTransfers") === "true"
+    const { searchParams } = new URL(request.url);
+    const includePayments = searchParams.get('includePayments') === 'true';
+    const includeTransfers = searchParams.get('includeTransfers') === 'true';
 
-    const include: Record<string, unknown> = {}
+    const include: Record<string, unknown> = {};
 
     if (includePayments) {
       include.payments = {
@@ -51,7 +51,7 @@ export async function GET(
           cancelledAt: true,
           createdAt: true,
         },
-      }
+      };
     }
 
     if (includeTransfers) {
@@ -67,36 +67,45 @@ export async function GET(
           transferredAt: true,
           createdAt: true,
         },
-      }
+      };
     }
 
     const settlement = await prisma.settlement.findUnique({
       where: { id: settlementId },
-      ...(Object.keys(include).length > 0 ? { include } : {}),
-    })
+      include: {
+        ...include,
+        hospital: {
+          select: {
+            id: true,
+            displayName: true,
+            officialName: true,
+          },
+        },
+      },
+    });
 
     if (!settlement) {
       return NextResponse.json(
-        { error: "정산 정보를 찾을 수 없습니다" },
-        { status: 404 }
-      )
+        { error: '정산 정보를 찾을 수 없습니다' },
+        { status: 404 },
+      );
     }
 
-    assertHospitalAccess(user, settlement.hospitalId)
+    assertHospitalAccess(user, settlement.hospitalId);
 
-    return NextResponse.json({ data: settlement })
+    return NextResponse.json({ data: settlement });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
-      )
+        { status: error.status },
+      );
     }
 
-    console.error("정산 상세 조회 오류:", error)
+    console.error('정산 상세 조회 오류:', error);
     return NextResponse.json(
-      { error: "정산 상세 조회 중 오류가 발생했습니다" },
-      { status: 500 }
-    )
+      { error: '정산 상세 조회 중 오류가 발생했습니다' },
+      { status: 500 },
+    );
   }
 }

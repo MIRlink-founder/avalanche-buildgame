@@ -66,6 +66,11 @@ type BankTransferRow = {
 type SettlementDetail = {
   id: number;
   hospitalId: string;
+  hospital?: {
+    id: string;
+    displayName: string | null;
+    officialName: string;
+  } | null;
   settlementPeriodStart: string;
   settlementPeriodEnd: string;
   totalVolume: string;
@@ -92,6 +97,29 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: '정산 대기',
   READY: '정산 대기',
   COMPLETED: '정산 완료',
+};
+
+const MOCK_HOSPITALS: Record<string, SettlementDetail['hospital']> = {
+  'HOS-2026-001': {
+    id: 'HOS-2026-001',
+    displayName: '김병원',
+    officialName: '김병원',
+  },
+  'HOS-2026-014': {
+    id: 'HOS-2026-014',
+    displayName: '어쩌구병원',
+    officialName: '어쩌구병원',
+  },
+  'HOS-2025-032': {
+    id: 'HOS-2025-032',
+    displayName: '멀쩡한병원',
+    officialName: '멀쩡한병원',
+  },
+  'HOS-2025-007': {
+    id: 'HOS-2025-007',
+    displayName: '샘플병원',
+    officialName: '샘플병원',
+  },
 };
 
 const MOCK_DETAILS: Record<string, SettlementDetail> = {
@@ -232,7 +260,12 @@ const FALLBACK_DETAIL = MOCK_DETAILS['101'];
 const FALLBACK_ACCOUNT = MOCK_ACCOUNTS['HOS-2026-001'];
 
 function getMockDetail(id: string) {
-  return MOCK_DETAILS[id] ?? FALLBACK_DETAIL;
+  const detail = MOCK_DETAILS[id] ?? FALLBACK_DETAIL;
+  if (detail.hospital) {
+    return detail;
+  }
+  const hospital = MOCK_HOSPITALS[detail.hospitalId] ?? null;
+  return hospital ? { ...detail, hospital } : detail;
 }
 
 function getMockAccount(hospitalId: string) {
@@ -281,6 +314,9 @@ export function SettlementDetailClient({
       : rawStatus.includes('SETTLED')
         ? '정산 완료'
         : rawStatus);
+  const hospitalName =
+    detail.hospital?.displayName || detail.hospital?.officialName || '';
+  const displayHospitalName = hospitalName || '-';
   const periodLabel = formatPeriod(
     detail.settlementPeriodStart,
     detail.settlementPeriodEnd,
@@ -678,7 +714,7 @@ export function SettlementDetailClient({
       </div>
 
       <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold">정산 ID #{detail.id}</h1>
+        <h1 className="text-2xl font-bold">{displayHospitalName}</h1>
         <Badge className={statusBadgeClass}>{statusLabel}</Badge>
       </div>
       <Tabs
@@ -735,7 +771,7 @@ export function SettlementDetailClient({
                 ))}
               </div>
               <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-                <span>병원 ID: {detail.hospitalId}</span>
+                <span>병원명: {displayHospitalName}</span>
                 <span>생성일: {formatDate(detail.createdAt)}</span>
                 <span>
                   정산일:{' '}
@@ -928,7 +964,7 @@ export function SettlementDetailClient({
               </div>
             </div>
             <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-              <span>병원 ID: {detail.hospitalId || '-'}</span>
+              <span>병원명: {displayHospitalName}</span>
             </div>
             {accountError && (
               <div className="text-destructive text-sm">{accountError}</div>
