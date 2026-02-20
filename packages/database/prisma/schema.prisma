@@ -29,9 +29,15 @@ model Hospital {
   ceoName String @db.VarChar(50) @map("ceo_name")
   /// 대표자 생년월일
   ceoBirthDate DateTime? @db.Date @map("ceo_birth_date")
-  /// 사업장 소재지 (단말기 설치 위치)
+  /// 사업장 소재지 (단말기 설치 위치) — 레거시, 우선 addressZipcode/addressRoad/addressDetail 사용
   businessAddress String @db.VarChar(500) @map("business_address")
-  
+  /// 우편번호 (다음 우편번호 API)
+  addressZipcode String? @db.VarChar(10) @map("address_zipcode")
+  /// 기본/도로명 주소 (다음 우편번호 API)
+  addressRoad String? @db.VarChar(500) @map("address_road")
+  /// 상세 주소 (사용자 입력)
+  addressDetail String? @db.VarChar(200) @map("address_detail")
+
   // 2. 의료기관 인증 정보 (Medical Authority)
   /// 의료기관 개설 허가증 번호
   medicalLicenseNumber String? @db.VarChar(50) @map("medical_license_number")
