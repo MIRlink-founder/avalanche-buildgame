@@ -405,11 +405,22 @@ export function SettlementDetailClient({
     ? draftPaybackValue
     : autoPayback;
 
-  const handleApplyAutoPayback = () => {
-    if (autoPayback === null || !Number.isFinite(autoPayback)) {
+  const handleRateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextRate = event.target.value;
+    setDraftRate(nextRate);
+
+    if (!nextRate.trim()) {
+      setDraftPayback('');
       return;
     }
-    setDraftPayback(autoPayback.toFixed(2));
+
+    const rateValue = parseNumber(nextRate);
+    if (!Number.isFinite(rateValue) || !Number.isFinite(totalVolumeValue)) {
+      return;
+    }
+
+    const nextPayback = (totalVolumeValue * rateValue) / 100;
+    setDraftPayback(nextPayback.toFixed(2));
   };
 
   const handleChangeStatus = async (
@@ -731,7 +742,7 @@ export function SettlementDetailClient({
                   </Label>
                   <Input
                     value={draftRate}
-                    onChange={(event) => setDraftRate(event.target.value)}
+                    onChange={handleRateChange}
                     inputMode="decimal"
                     className="h-10"
                   />
@@ -770,13 +781,6 @@ export function SettlementDetailClient({
               )}
             </CardContent>
             <CardFooter className="border-border flex flex-wrap items-center justify-end gap-2 border-t px-6 py-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleApplyAutoPayback}
-              >
-                자동 계산
-              </Button>
               <Button
                 type="button"
                 onClick={handleSaveAdjustment}

@@ -7,6 +7,7 @@ import { Tabs } from '@/components/layout/Tabs';
 import { Badge } from '@mire/ui/components/badge';
 import { Button } from '@mire/ui/components/button';
 import { Input } from '@mire/ui/components/input';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 type SettlementRow = {
   id: number;
@@ -164,6 +165,8 @@ export function SettlementsClient() {
   const [periodTo, setPeriodTo] = useState('');
   const [items, setItems] = useState<SettlementRow[]>(MOCK_SETTLEMENTS);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [pageIndex, setPageIndex] = useState(1);
+  const [cursorStack, setCursorStack] = useState<(number | null)[]>([null]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
@@ -185,45 +188,31 @@ export function SettlementsClient() {
     return items.filter((item) => item.status === statusFilter);
   }, [items, statusFilter]);
 
-  const totals = useMemo(() => {
-    return filteredItems.reduce(
+  const summaryTotals = useMemo(() => {
+    return items.reduce(
       (acc, item) => {
         const payback = Number(item.paybackAmount);
-        const totalVolume = Number(item.totalVolume);
         if (Number.isFinite(payback)) {
-          acc.payback += payback;
-        }
-        if (Number.isFinite(totalVolume)) {
-          acc.totalVolume += totalVolume;
-        }
-        if (item.status === 'PENDING_PAYMENT') {
-          acc.pending += 1;
-        }
-        if (item.status === 'SETTLED') {
-          acc.settled += 1;
+          acc.total += payback;
+          if (item.status === 'SETTLED') {
+            acc.settled += payback;
+          }
+          if (item.status === 'PENDING_PAYMENT') {
+            acc.pending += payback;
+          }
         }
         return acc;
       },
-      { payback: 0, totalVolume: 0, pending: 0, settled: 0 },
+      { total: 0, settled: 0, pending: 0 },
     );
-  }, [filteredItems]);
+  }, [items]);
 
-  const deduction = useMemo(() => {
-    const value = totals.totalVolume - totals.payback;
-    return value > 0 ? value : 0;
-  }, [totals.payback, totals.totalVolume]);
-
-  const averageRate = useMemo(() => {
-    if (totals.totalVolume <= 0) {
-      return null;
+  const totalLabel = useMemo(() => {
+    if (filteredItems.length === 0) {
+      return '총 0건 표시';
     }
-    return (totals.payback / totals.totalVolume) * 100;
-  }, [totals.payback, totals.totalVolume]);
-
-  const totalLabel = useMemo(
-    () => `총 ${filteredItems.length}건 표시`,
-    [filteredItems.length],
-  );
+    return `총 ${filteredItems.length}개 중 1-${filteredItems.length} 표시`;
+  }, [filteredItems.length]);
 
   const getHospitalLabel = (item: SettlementRow) =>
     item.hospital?.displayName ||
@@ -413,7 +402,6 @@ export function SettlementsClient() {
       } else if (hospitalQuery) {
         params.set('hospitalName', hospitalQuery);
       }
-      if (statusFilter) params.set('status', statusFilter);
       if (periodFrom) params.set('periodFrom', periodFrom);
       if (periodTo) params.set('periodTo', periodTo);
       params.set('limit', '20');
@@ -437,7 +425,7 @@ export function SettlementsClient() {
       }
 
       const newItems = payload.data ?? [];
-      setItems((prev) => (cursor ? [...prev, ...newItems] : newItems));
+      setItems(newItems);
       setNextCursor(payload.nextCursor ?? null);
     } catch (fetchError) {
       setError('정산 내역 조회 중 오류가 발생했습니다');
@@ -453,35 +441,68 @@ export function SettlementsClient() {
       setError('로그인이 필요합니다');
       return;
     }
+    setPageIndex(1);
+    setCursorStack([null]);
     setItems([]);
     setNextCursor(null);
     fetchSettlements(null);
   };
 
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      return;
+    }
+    setPageIndex(1);
+    setCursorStack([null]);
+    setItems([]);
+    setNextCursor(null);
+    fetchSettlements(null);
+  }, []);
+
+  const handlePrevPage = () => {
+    if (pageIndex === 1 || isLoading) {
+      return;
+    }
+    const prevCursor = cursorStack[pageIndex - 2] ?? null;
+    setPageIndex((prev) => Math.max(prev - 1, 1));
+    setCursorStack((prev) => prev.slice(0, -1));
+    fetchSettlements(prevCursor);
+  };
+
+  const handleNextPage = () => {
+    if (!nextCursor || isLoading) {
+      return;
+    }
+    setPageIndex((prev) => prev + 1);
+    setCursorStack((prev) => [...prev, nextCursor]);
+    fetchSettlements(nextCursor);
+  };
+
   return (
     <div className="space-y-6 p-6">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">정산 금액</p>
+          <p className="text-muted-foreground text-sm">전체 금액</p>
           <p className="mt-2 text-3xl font-semibold">
-            {formatAmount(String(totals.payback))}원
-          </p>
-          <p className="text-muted-foreground mt-2 text-xs">
-            차감액 {formatAmount(String(deduction))}원
+            {formatAmount(String(summaryTotals.total))}원
           </p>
         </div>
         <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">총 거래액</p>
+          <p className="text-muted-foreground text-sm">정산 완료 금액</p>
           <p className="mt-2 text-3xl font-semibold">
-            {formatAmount(String(totals.totalVolume))}원
+            {formatAmount(String(summaryTotals.settled))}원
           </p>
-          <p className="text-muted-foreground mt-2 text-xs">
-            정산율 평균 {averageRate ? averageRate.toFixed(2) : '-'}%
+        </div>
+        <div className="rounded-lg border bg-card p-6">
+          <p className="text-muted-foreground text-sm">정산 대기 금액</p>
+          <p className="mt-2 text-3xl font-semibold">
+            {formatAmount(String(summaryTotals.pending))}원
           </p>
         </div>
       </div>
 
-      <div className="space-y-5 rounded-lg border bg-card p-6">
+      <div className="space-y-6 rounded-lg border bg-card p-6">
         <Tabs
           tabs={[
             { id: 'all', label: '전체' },
@@ -600,10 +621,10 @@ export function SettlementsClient() {
 
         <div className="rounded-lg border">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px]">
+            <table className="w-full min-w-[820px] table-fixed">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[180px] whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => handleSort('period')}
@@ -613,7 +634,7 @@ export function SettlementsClient() {
                       {getSortIcon('period')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[150px]">
                     <button
                       type="button"
                       onClick={() => handleSort('hospitalName')}
@@ -623,27 +644,7 @@ export function SettlementsClient() {
                       {getSortIcon('hospitalName')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('totalVolume')}
-                      className={getSortButtonClass('right')}
-                    >
-                      <span>거래액</span>
-                      {getSortIcon('totalVolume')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('appliedRate')}
-                      className={getSortButtonClass('right')}
-                    >
-                      <span>정산율</span>
-                      {getSortIcon('appliedRate')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground w-[140px]">
                     <button
                       type="button"
                       onClick={() => handleSort('paybackAmount')}
@@ -653,17 +654,7 @@ export function SettlementsClient() {
                       {getSortIcon('paybackAmount')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-center font-medium text-muted-foreground">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('nft')}
-                      className={getSortButtonClass('center')}
-                    >
-                      <span>NFT 가산</span>
-                      {getSortIcon('nft')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[110px] whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => handleSort('status')}
@@ -673,7 +664,7 @@ export function SettlementsClient() {
                       {getSortIcon('status')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[110px] whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => handleSort('settledAt')}
@@ -683,16 +674,16 @@ export function SettlementsClient() {
                       {getSortIcon('settledAt')}
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-center font-medium text-muted-foreground">
+                  <th className="px-4 py-3 text-center font-medium text-muted-foreground w-[90px]">
                     관리
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {items.length === 0 && !isLoading ? (
+                {filteredItems.length === 0 && !isLoading ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={6}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
                       조회된 정산 내역이 없습니다.
@@ -701,24 +692,19 @@ export function SettlementsClient() {
                 ) : (
                   sortedItems.map((item) => (
                     <tr key={item.id}>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         {formatPeriod(
                           item.settlementPeriodStart,
                           item.settlementPeriodEnd,
                         )}
                       </td>
-                      <td className="px-4 py-3">{getHospitalLabel(item)}</td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {formatAmount(item.totalVolume)}원
+                      <td className="px-4 py-3">
+                        <span className="block max-w-[150px] truncate">
+                          {getHospitalLabel(item)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        {Number(item.appliedRate).toFixed(2)}%
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
                         {formatAmount(item.paybackAmount)}원
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {item.isNftBoosted ? <span>적용</span> : <span>-</span>}
                       </td>
                       <td className="px-4 py-3">
                         <Badge
@@ -731,7 +717,7 @@ export function SettlementsClient() {
                           {STATUS_LABELS[item.status]}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         {item.settledAt ? formatDate(item.settledAt) : '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -751,22 +737,39 @@ export function SettlementsClient() {
           </div>
         </div>
 
-        <div className="border-border flex items-center justify-between border-t pt-4">
+        <div className="flex min-h-10 items-center justify-between">
           <p className="text-muted-foreground text-sm">
             {isLoading ? '데이터를 불러오는 중입니다' : totalLabel}
           </p>
-          {nextCursor && (
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => fetchSettlements(nextCursor)}
-              className="border-border text-foreground hover:bg-secondary"
-              disabled={isLoading}
+              onClick={handlePrevPage}
+              disabled={pageIndex === 1 || isLoading}
             >
-              더 보기
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-w-[2.5rem] bg-gray-900 text-white hover:bg-gray-800 hover:text-white"
+              disabled
+            >
+              {pageIndex}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={!nextCursor || isLoading}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
