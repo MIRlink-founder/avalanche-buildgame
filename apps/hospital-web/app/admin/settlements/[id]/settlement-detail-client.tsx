@@ -627,7 +627,7 @@ export function SettlementDetailClient({
       {currentTab === 'settlement' && (
         <>
           <Card className="border-border bg-card shadow-none">
-            <CardHeader className="flex flex-wrap items-start justify-between gap-4">
+            <CardHeader className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <FontAwesomeIcon
@@ -636,10 +636,8 @@ export function SettlementDetailClient({
                   />
                   정산 요약
                 </CardTitle>
-                <CardDescription className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-                  <span>
-                    정산 ID #{detail.publicId ?? detail.id} · {periodLabel}
-                  </span>
+                <CardDescription className="text-muted-foreground text-xs">
+                  정산 기간: {periodLabel}
                 </CardDescription>
               </div>
             </CardHeader>
@@ -656,69 +654,53 @@ export function SettlementDetailClient({
                   </Card>
                 ))}
               </div>
-              <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-                <span>병원명: {displayHospitalName}</span>
-                <span>생성일: {formatDate(detail.createdAt)}</span>
-                <span>
-                  정산일:{' '}
-                  {detail.settledAt ? formatDate(detail.settledAt) : '-'}
-                </span>
-                {detail.isNftBoosted && (
-                  <Badge className="bg-primary-subtle text-primary text-[10px] font-semibold">
-                    NFT 가산 적용
-                  </Badge>
-                )}
-              </div>
             </CardContent>
           </Card>
           <Card className="border-border bg-card shadow-none">
-            <CardHeader className="border-border border-b">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FontAwesomeIcon
-                  icon={faCircleCheck}
-                  className="text-primary size-4"
-                />
-                정산 상태 변경
-              </CardTitle>
-              <CardDescription className="text-muted-foreground text-xs">
-                정산 완료 처리 또는 대기 상태로 되돌릴 수 있습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-6">
-              <div className="flex flex-wrap items-center gap-3 text-sm">
-                <Badge className={statusBadgeClass}>{statusLabel}</Badge>
-                <span className="text-muted-foreground text-xs">
-                  정산일:{' '}
-                  {detail.settledAt ? formatDate(detail.settledAt) : '-'}
-                </span>
+            <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon
+                    icon={faCircleCheck}
+                    className="text-primary size-4"
+                  />
+                  <p className="text-sm font-semibold">정산 상태</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <Badge className={statusBadgeClass}>{statusLabel}</Badge>
+                  <span className="text-muted-foreground text-xs">
+                    정산일:{' '}
+                    {detail.settledAt ? formatDate(detail.settledAt) : '-'}
+                  </span>
+                </div>
+                {statusError && (
+                  <div className="text-destructive text-sm">{statusError}</div>
+                )}
+                {statusMessage && (
+                  <div className="text-primary text-sm">{statusMessage}</div>
+                )}
               </div>
-              {statusError && (
-                <div className="text-destructive text-sm">{statusError}</div>
-              )}
-              {statusMessage && (
-                <div className="text-primary text-sm">{statusMessage}</div>
-              )}
+              <div className="flex items-center gap-2">
+                {isSettled ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleChangeStatus('PENDING_PAYMENT')}
+                    disabled={isStatusSaving}
+                  >
+                    정산 대기로 변경
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => handleChangeStatus('SETTLED')}
+                    disabled={isStatusSaving}
+                  >
+                    정산 완료 처리
+                  </Button>
+                )}
+              </div>
             </CardContent>
-            <CardFooter className="border-border flex flex-wrap items-center justify-end gap-2 border-t px-6 py-3">
-              {isSettled ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleChangeStatus('PENDING_PAYMENT')}
-                  disabled={isStatusSaving}
-                >
-                  정산 대기로 변경
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  onClick={() => handleChangeStatus('SETTLED')}
-                  disabled={isStatusSaving}
-                >
-                  정산 완료 처리
-                </Button>
-              )}
-            </CardFooter>
           </Card>
 
           <Card className="border-border bg-card shadow-none">
@@ -768,10 +750,6 @@ export function SettlementDetailClient({
                       : `${formatAmount(String(previewPayback))}원`}
                   </div>
                 </div>
-              </div>
-              <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-                <span>현재 정산율: {formatRate(detail.appliedRate)}%</span>
-                <span>현재 페이백: {formatAmount(detail.paybackAmount)}원</span>
               </div>
               {adjustError && (
                 <div className="text-destructive text-sm">{adjustError}</div>
