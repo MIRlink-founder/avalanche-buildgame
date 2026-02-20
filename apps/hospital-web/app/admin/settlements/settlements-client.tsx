@@ -65,8 +65,8 @@ type HospitalSearchResponse = {
 };
 
 const STATUS_LABELS: Record<SettlementRow['status'], string> = {
-  PENDING_PAYMENT: '정산 대기',
-  SETTLED: '정산 완료',
+  PENDING_PAYMENT: '대기',
+  SETTLED: '완료',
 };
 
 const STATUS_ORDER: Record<SettlementRow['status'], number> = {
@@ -191,6 +191,18 @@ export function SettlementsClient() {
       { payback: 0, totalVolume: 0, pending: 0, settled: 0 },
     );
   }, [items]);
+
+  const deduction = useMemo(() => {
+    const value = totals.totalVolume - totals.payback;
+    return value > 0 ? value : 0;
+  }, [totals.payback, totals.totalVolume]);
+
+  const averageRate = useMemo(() => {
+    if (totals.totalVolume <= 0) {
+      return null;
+    }
+    return (totals.payback / totals.totalVolume) * 100;
+  }, [totals.payback, totals.totalVolume]);
 
   const totalLabel = useMemo(() => `총 ${items.length}건`, [items.length]);
 
@@ -431,15 +443,21 @@ export function SettlementsClient() {
     <div className="space-y-6 p-6">
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">총 정산 금액</p>
+          <p className="text-muted-foreground text-sm">정산 금액</p>
           <p className="mt-2 text-3xl font-semibold">
             {formatAmount(String(totals.payback))}원
+          </p>
+          <p className="text-muted-foreground mt-2 text-xs">
+            차감액 {formatAmount(String(deduction))}원
           </p>
         </div>
         <div className="rounded-lg border bg-card p-6">
           <p className="text-muted-foreground text-sm">총 거래액</p>
           <p className="mt-2 text-3xl font-semibold">
             {formatAmount(String(totals.totalVolume))}원
+          </p>
+          <p className="text-muted-foreground mt-2 text-xs">
+            정산율 평균 {averageRate ? averageRate.toFixed(2) : '-'}%
           </p>
         </div>
       </div>
@@ -471,7 +489,7 @@ export function SettlementsClient() {
                 }}
                 aria-label="병원명"
                 placeholder="병원명 입력"
-                className="bg-background h-10 text-sm"
+                className="bg-background h-10 text-base"
               />
               {showSuggestions && (
                 <div className="border-border bg-background absolute left-0 top-full z-20 mt-2 w-full rounded-md border shadow-sm">
@@ -526,7 +544,7 @@ export function SettlementsClient() {
               value={status}
               onChange={(event) => setStatus(event.target.value)}
               aria-label="정산 상태"
-              className="bg-background text-sm"
+              className="bg-background text-base"
             >
               <option value="">전체</option>
               <option value="PENDING_PAYMENT">정산 대기</option>
@@ -542,7 +560,7 @@ export function SettlementsClient() {
               value={periodFrom}
               onChange={(event) => setPeriodFrom(event.target.value)}
               aria-label="정산 시작일"
-              className="bg-background h-10 text-sm"
+              className="bg-background h-10 text-base"
             />
           </div>
           <div className="space-y-2">
@@ -554,7 +572,7 @@ export function SettlementsClient() {
               value={periodTo}
               onChange={(event) => setPeriodTo(event.target.value)}
               aria-label="정산 종료일"
-              className="bg-background h-10 text-sm"
+              className="bg-background h-10 text-base"
             />
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -565,7 +583,7 @@ export function SettlementsClient() {
               type="button"
               size="sm"
               onClick={handleSearch}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 text-base"
               disabled={isLoading}
             >
               조회
@@ -579,13 +597,15 @@ export function SettlementsClient() {
           </div>
         )}
 
-        <p className="text-muted-foreground text-xs">{totalLabel}</p>
+        <p className="text-muted-foreground mt-3 mb-1 pl-3 text-xs">
+          {totalLabel}
+        </p>
 
         <div className="rounded-lg border">
-          <Table className="min-w-[860px]">
+          <Table className="min-w-[860px] text-base">
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="text-muted-foreground h-11">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium">
                   <button
                     type="button"
                     onClick={() => handleSort('period')}
@@ -595,7 +615,7 @@ export function SettlementsClient() {
                     {getSortIcon('period')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium">
                   <button
                     type="button"
                     onClick={() => handleSort('hospitalName')}
@@ -605,17 +625,17 @@ export function SettlementsClient() {
                     {getSortIcon('hospitalName')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11 text-right">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium text-right">
                   <button
                     type="button"
                     onClick={() => handleSort('totalVolume')}
                     className={getSortButtonClass('right')}
                   >
-                    <span>총액</span>
+                    <span>거래액</span>
                     {getSortIcon('totalVolume')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11 text-right">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium text-right">
                   <button
                     type="button"
                     onClick={() => handleSort('appliedRate')}
@@ -625,17 +645,17 @@ export function SettlementsClient() {
                     {getSortIcon('appliedRate')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11 text-right">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium text-right">
                   <button
                     type="button"
                     onClick={() => handleSort('paybackAmount')}
                     className={getSortButtonClass('right')}
                   >
-                    <span>페이백</span>
+                    <span>정산액</span>
                     {getSortIcon('paybackAmount')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11 text-center">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium text-center">
                   <button
                     type="button"
                     onClick={() => handleSort('nft')}
@@ -645,17 +665,17 @@ export function SettlementsClient() {
                     {getSortIcon('nft')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium">
                   <button
                     type="button"
                     onClick={() => handleSort('status')}
                     className={getSortButtonClass('left')}
                   >
-                    <span>상태</span>
+                    <span>정상 상태</span>
                     {getSortIcon('status')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11">
+                <TableHead className="text-muted-foreground h-11 text-base font-medium">
                   <button
                     type="button"
                     onClick={() => handleSort('settledAt')}
@@ -665,8 +685,8 @@ export function SettlementsClient() {
                     {getSortIcon('settledAt')}
                   </button>
                 </TableHead>
-                <TableHead className="text-muted-foreground h-11 text-center">
-                  상세
+                <TableHead className="text-muted-foreground h-11 text-base font-medium text-center">
+                  관리
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -689,7 +709,7 @@ export function SettlementsClient() {
                         item.settlementPeriodEnd,
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground py-3 text-xs">
+                    <TableCell className="py-3">
                       {getHospitalLabel(item)}
                     </TableCell>
                     <TableCell className="py-3 text-right font-semibold">
@@ -702,20 +722,14 @@ export function SettlementsClient() {
                       {formatAmount(item.paybackAmount)}원
                     </TableCell>
                     <TableCell className="py-3 text-center">
-                      {item.isNftBoosted ? (
-                        <Badge className="bg-primary-subtle text-primary text-[10px] font-semibold">
-                          적용
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">-</span>
-                      )}
+                      {item.isNftBoosted ? <span>적용</span> : <span>-</span>}
                     </TableCell>
                     <TableCell className="py-3">
                       <Badge
                         className={
                           item.status === 'SETTLED'
-                            ? 'border-primary/20 bg-primary-subtle text-primary'
-                            : 'bg-secondary text-muted-foreground'
+                            ? 'bg-blue-600 text-white hover:bg-blue-600'
+                            : 'bg-amber-400 text-amber-950 hover:bg-amber-400'
                         }
                       >
                         {STATUS_LABELS[item.status]}
@@ -729,10 +743,12 @@ export function SettlementsClient() {
                         asChild
                         variant="outline"
                         size="sm"
-                        className="border-border text-foreground hover:bg-secondary"
+                        className="border-border text-foreground hover:bg-secondary rounded-full px-4"
                       >
-                        <Link href={`/admin/settlements/${item.id}`}>
-                          상세보기
+                        <Link
+                          href={`/admin/settlements/${item.id}?hospitalId=${encodeURIComponent(item.hospitalId)}`}
+                        >
+                          상세
                         </Link>
                       </Button>
                     </TableCell>
