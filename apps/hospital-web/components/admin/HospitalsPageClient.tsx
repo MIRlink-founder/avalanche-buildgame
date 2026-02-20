@@ -123,9 +123,7 @@ export function HospitalsPageClient() {
   const hospitals = safeData.hospitals.map((h) => ({
     ...h,
     createdAt: new Date(h.createdAt),
-    accountCreatedAt: h.accountCreatedAt
-      ? new Date(h.accountCreatedAt)
-      : null,
+    accountCreatedAt: h.accountCreatedAt ? new Date(h.accountCreatedAt) : null,
   }));
 
   return (

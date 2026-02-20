@@ -1,6 +1,14 @@
-import { SettlementsClient } from './settlements-client';
+import { SettlementDetailClient } from './settlement-detail-client';
 
-export default function SettlementsPage() {
+interface SettlementDetailPageProps {
+  params: Promise<{ id: string }> | { id: string };
+}
+
+export default async function SettlementDetailPage({
+  params,
+}: SettlementDetailPageProps) {
+  const resolvedParams = await Promise.resolve(params);
+  const settlementId = resolvedParams.id?.trim?.() ?? '';
   return (
     <>
       <header className="sticky top-0 z-10 flex h-20 shrink-0 items-center border-b bg-background px-6">
@@ -12,7 +20,7 @@ export default function SettlementsPage() {
         </div>
       </header>
 
-      <SettlementsClient />
+      <SettlementDetailClient settlementId={settlementId} />
     </>
   );
 }

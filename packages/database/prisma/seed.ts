@@ -1,5 +1,6 @@
 // 데이터베이스 시드 스크립트
 
+import 'dotenv/config';
 import { prisma } from '../src/client.ts';
 import bcrypt from 'bcryptjs';
 
