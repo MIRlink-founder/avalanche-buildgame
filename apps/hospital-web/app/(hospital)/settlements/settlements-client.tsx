@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@mire/ui/components/badge';
 import { Button } from '@mire/ui/components/button';
@@ -24,7 +24,6 @@ import {
   TableRow,
 } from '@mire/ui/components/table';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
-import { getPayloadFromToken } from '@/lib/decode-token';
 
 interface SettlementRow {
   id: number;
@@ -82,7 +81,7 @@ type PaymentSortConfig = {
 
 const SETTLEMENT_STATUS_LABELS: Record<string, string> = {
   PENDING_PAYMENT: '대기',
-  SETTLED: '정산 완료',
+  SETTLED: '완료',
 };
 
 const SETTLEMENT_STATUS_COLORS: Record<string, string> = {
@@ -91,13 +90,13 @@ const SETTLEMENT_STATUS_COLORS: Record<string, string> = {
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  READY: '결제 대기',
-  PAID: '결제 완료',
-  SETTLED: '정산 완료',
-  CANCELLED: '결제 취소',
-  FAILED: '결제 실패',
-  PENDING: '결제 대기',
-  PARTIAL_CANCELLED: '부분 취소',
+  READY: '대기',
+  PENDING: '대기',
+  PAID: '완료',
+  SETTLED: '완료',
+  CANCELLED: '취소',
+  FAILED: '취소',
+  PARTIAL_CANCELLED: '취소',
 };
 
 const PAYMENT_STATUS_COLORS: Record<string, string> = {
@@ -105,9 +104,9 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
   PENDING: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
   PAID: 'bg-blue-600 text-white hover:bg-blue-600',
   SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
-  CANCELLED: 'bg-red-100 text-red-800 hover:bg-red-100',
-  FAILED: 'bg-red-100 text-red-800 hover:bg-red-100',
-  PARTIAL_CANCELLED: 'bg-red-100 text-red-800 hover:bg-red-100',
+  CANCELLED: 'bg-red-600 text-white hover:bg-red-600',
+  FAILED: 'bg-red-600 text-white hover:bg-red-600',
+  PARTIAL_CANCELLED: 'bg-red-600 text-white hover:bg-red-600',
 };
 
 const PAYMENT_STATUS_ORDER: Record<string, number> = {
@@ -119,8 +118,6 @@ const PAYMENT_STATUS_ORDER: Record<string, number> = {
   CANCELLED: 5,
   FAILED: 6,
 };
-
-const ADMIN_ROLES = new Set(['SUPER_ADMIN', 'SUB_ADMIN']);
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CARD: '카드',
@@ -135,7 +132,6 @@ const SETTLEMENT_PAGE_SIZE = 5;
 const PAYMENT_PAGE_SIZE = 5;
 
 export function SettlementsClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
   const currentTab =
@@ -145,12 +141,6 @@ export function SettlementsClient() {
       ? tabParam
       : 'settlements';
   const paymentStatusParam = searchParams.get('paymentStatus');
-  const hospitalIdParam = searchParams.get('hospitalId')?.trim() ?? '';
-  const [payload, setPayload] = useState<ReturnType<
-    typeof getPayloadFromToken
-  > | null>(null);
-  const [payloadReady, setPayloadReady] = useState(false);
-  const [hospitalIdInput, setHospitalIdInput] = useState(hospitalIdParam);
   const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [settlementsLoading, setSettlementsLoading] = useState(true);
   const [settlementsError, setSettlementsError] = useState<string | null>(null);
@@ -167,6 +157,7 @@ export function SettlementsClient() {
   const [accountLoading, setAccountLoading] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [settlementPage, setSettlementPage] = useState(1);
   const [paymentPage, setPaymentPage] = useState(1);
   const [paymentSearch, setPaymentSearch] = useState('');
@@ -178,28 +169,12 @@ export function SettlementsClient() {
   const [paymentSortConfig, setPaymentSortConfig] =
     useState<PaymentSortConfig | null>(null);
 
-  const isAdmin = payload?.role ? ADMIN_ROLES.has(payload.role) : false;
-  const requiresHospitalId = isAdmin && !hospitalIdParam;
-
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    setPayload(token ? getPayloadFromToken(token) : null);
-    setPayloadReady(true);
-  }, []);
-
-  useEffect(() => {
-    setHospitalIdInput(hospitalIdParam);
-  }, [hospitalIdParam]);
-
   const fetchSettlements = useCallback(async () => {
     setSettlementsLoading(true);
     setSettlementsError(null);
     try {
       const params = new URLSearchParams();
       params.set('limit', String(LIST_LIMIT));
-      if (isAdmin && hospitalIdParam) {
-        params.set('hospitalId', hospitalIdParam);
-      }
       const res = await fetch(`/api/settlements?${params.toString()}`, {
         headers: getAuthHeaders(),
       });
@@ -226,9 +201,6 @@ export function SettlementsClient() {
     try {
       const params = new URLSearchParams();
       params.set('limit', String(LIST_LIMIT));
-      if (isAdmin && hospitalIdParam) {
-        params.set('hospitalId', hospitalIdParam);
-      }
       const res = await fetch(`/api/payments?${params.toString()}`, {
         headers: getAuthHeaders(),
       });
@@ -252,19 +224,9 @@ export function SettlementsClient() {
     setAccountError(null);
     setAccountMessage(null);
     try {
-      const params = new URLSearchParams();
-      if (isAdmin && hospitalIdParam) {
-        params.set('hospitalId', hospitalIdParam);
-      }
-      const query = params.toString();
-      const res = await fetch(
-        query
-          ? `/api/hospitals/settlement-account?${query}`
-          : '/api/hospitals/settlement-account',
-        {
-          headers: getAuthHeaders(),
-        },
-      );
+      const res = await fetch('/api/hospitals/settlement-account', {
+        headers: getAuthHeaders(),
+      });
       if (redirectIfUnauthorized(res)) return;
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -289,31 +251,20 @@ export function SettlementsClient() {
   }, []);
 
   useEffect(() => {
-    if (!payloadReady) {
-      return;
-    }
-    if (requiresHospitalId) {
-      setSettlements([]);
-      setPayments([]);
-      setSettlementsError(null);
-      setPaymentsError(null);
-      setSettlementsLoading(false);
-      setPaymentsLoading(false);
-      setAccountError(null);
-      setAccountMessage(null);
-      setAccountLoading(false);
-      return;
-    }
     fetchSettlements();
     fetchPayments();
     fetchAccount();
-  }, [
-    payloadReady,
-    requiresHospitalId,
-    fetchSettlements,
-    fetchPayments,
-    fetchAccount,
-  ]);
+  }, [fetchSettlements, fetchPayments, fetchAccount]);
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [toastMessage]);
 
   const totalSettlements = settlements.length;
   const totalSettlementPages = Math.max(
@@ -539,15 +490,17 @@ export function SettlementsClient() {
     const bank = accountBank.trim();
     const number = accountNumber.trim();
     const holder = accountHolder.trim();
-    if (!initialAccount) return accountReady;
+    if (!initialAccount) {
+      return Boolean(bank || number || holder);
+    }
     return (
       bank !== (initialAccount.accountBank ?? '') ||
       number !== (initialAccount.accountNumber ?? '') ||
       holder !== (initialAccount.accountHolder ?? '')
     );
-  }, [accountBank, accountHolder, accountNumber, accountReady, initialAccount]);
+  }, [accountBank, accountHolder, accountNumber, initialAccount]);
 
-  const canSaveAccount = accountReady && isAccountDirty;
+  const canSaveAccount = isAccountDirty;
 
   const handleAccountSave = async () => {
     setAccountError(null);
@@ -562,35 +515,26 @@ export function SettlementsClient() {
     }
     setAccountLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (isAdmin && hospitalIdParam) {
-        params.set('hospitalId', hospitalIdParam);
-      }
-      const query = params.toString();
-      const res = await fetch(
-        query
-          ? `/api/hospitals/settlement-account?${query}`
-          : '/api/hospitals/settlement-account',
-        {
-          method: 'PATCH',
-          headers: {
-            ...getAuthHeaders(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            accountBank: accountBank.trim(),
-            accountNumber: accountNumber.trim(),
-            accountHolder: accountHolder.trim(),
-          }),
+      const res = await fetch('/api/hospitals/settlement-account', {
+        method: 'PATCH',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          accountBank: accountBank.trim(),
+          accountNumber: accountNumber.trim(),
+          accountHolder: accountHolder.trim(),
+        }),
+      });
       if (redirectIfUnauthorized(res)) return;
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         setAccountError(payload.error || '정산 계좌 저장에 실패했습니다.');
         return;
       }
-      setAccountMessage('정산 계좌가 저장되었습니다.');
+      setAccountMessage(null);
+      setToastMessage('정산 계좌가 저장되었습니다');
       setInitialAccount({
         accountBank: accountBank.trim(),
         accountNumber: accountNumber.trim(),
@@ -608,18 +552,6 @@ export function SettlementsClient() {
     setAppliedPaymentFrom(paymentFrom);
     setAppliedPaymentTo(paymentTo);
     setPaymentPage(1);
-  };
-
-  const handleHospitalApply = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    const nextHospitalId = hospitalIdInput.trim();
-    if (nextHospitalId) {
-      params.set('hospitalId', nextHospitalId);
-    } else {
-      params.delete('hospitalId');
-    }
-    const query = params.toString();
-    router.push(query ? `/settlements?${query}` : '/settlements');
   };
 
   const handlePaymentSort = (key: PaymentSortKey) => {
@@ -672,24 +604,10 @@ export function SettlementsClient() {
 
   return (
     <section className="space-y-6 p-6">
-      {isAdmin && (
-        <Card className="border-border">
-          <CardContent className="flex flex-wrap items-end gap-3 p-4">
-            <div className="min-w-[200px] flex-1 space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">
-                병원 ID
-              </Label>
-              <Input
-                value={hospitalIdInput}
-                onChange={(event) => setHospitalIdInput(event.target.value)}
-                placeholder="HOS-2026-001"
-              />
-            </div>
-            <Button type="button" size="sm" onClick={handleHospitalApply}>
-              적용
-            </Button>
-          </CardContent>
-        </Card>
+      {toastMessage && (
+        <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground shadow-lg">
+          {toastMessage}
+        </div>
       )}
       <div className="grid gap-4 lg:grid-cols-4">
         <Card className="border-border">
@@ -887,7 +805,7 @@ export function SettlementsClient() {
           <CardContent className="p-0">
             <div className="border-b px-4 py-4">
               <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-[200px] flex-1 space-y-2">
+                <div className="min-w-[200px] w-[280px] space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground">
                     승인번호/결제 ID
                   </Label>
@@ -922,9 +840,10 @@ export function SettlementsClient() {
                 </div>
                 <Button
                   type="button"
-                  size="sm"
+                  size="xl"
                   onClick={handlePaymentSearch}
                   disabled={paymentsLoading}
+                  className="w-full md:w-auto"
                 >
                   조회
                 </Button>
@@ -983,7 +902,7 @@ export function SettlementsClient() {
                       onClick={() => handlePaymentSort('status')}
                       className={getSortButtonClass('left')}
                     >
-                      <span>상태</span>
+                      <span>결제 상태</span>
                       {getPaymentSortIcon('status')}
                     </button>
                   </TableHead>
@@ -1120,7 +1039,11 @@ export function SettlementsClient() {
                 <Label className="text-sm text-muted-foreground">은행명</Label>
                 <Input
                   value={accountBank}
-                  onChange={(event) => setAccountBank(event.target.value)}
+                  onChange={(event) => {
+                    setAccountBank(event.target.value);
+                    setAccountError(null);
+                    setAccountMessage(null);
+                  }}
                   placeholder="은행명"
                 />
               </div>
@@ -1130,7 +1053,11 @@ export function SettlementsClient() {
                 </Label>
                 <Input
                   value={accountNumber}
-                  onChange={(event) => setAccountNumber(event.target.value)}
+                  onChange={(event) => {
+                    setAccountNumber(event.target.value);
+                    setAccountError(null);
+                    setAccountMessage(null);
+                  }}
                   placeholder="계좌번호"
                 />
               </div>
@@ -1138,25 +1065,23 @@ export function SettlementsClient() {
                 <Label className="text-sm text-muted-foreground">예금주</Label>
                 <Input
                   value={accountHolder}
-                  onChange={(event) => setAccountHolder(event.target.value)}
+                  onChange={(event) => {
+                    setAccountHolder(event.target.value);
+                    setAccountError(null);
+                    setAccountMessage(null);
+                  }}
                   placeholder="예금주명"
                 />
               </div>
               <div className="flex items-end gap-2">
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={fetchAccount}
-                  disabled={accountLoading}
-                >
-                  계좌 조회
-                </Button>
-                <Button
-                  type="button"
                   onClick={handleAccountSave}
                   disabled={accountLoading || !canSaveAccount}
+                  size="xl"
+                  className="w-full md:w-auto"
                 >
-                  저장하기
+                  저장
                 </Button>
               </div>
             </div>
