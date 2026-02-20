@@ -4,14 +4,6 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@mire/ui/components/badge';
 import { Button } from '@mire/ui/components/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@mire/ui/components/card';
 import { Input } from '@mire/ui/components/input';
 import { Label } from '@mire/ui/components/label';
 import { Select } from '@mire/ui/components/select';
@@ -208,134 +200,124 @@ export function SettlementsClient() {
 
   return (
     <div className="space-y-6 p-6">
-      <Card className="border-border bg-card">
-        <CardHeader className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-lg">정산 필터</CardTitle>
-            <CardDescription className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-              <span>{summary}</span>
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSearch}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              disabled={isLoading}
-            >
-              조회하기
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                병원 ID
-              </Label>
-              <Input
-                value={hospitalId}
-                onChange={(event) => setHospitalId(event.target.value)}
-                placeholder="병원 ID 입력"
-                className="bg-background h-10 text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                정산 상태
-              </Label>
-              <Select
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className="bg-background text-sm"
-              >
-                <option value="">전체</option>
-                <option value="PENDING_PAYMENT">정산 대기</option>
-                <option value="SETTLED">정산 완료</option>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                정산 시작일
-              </Label>
-              <Input
-                type="date"
-                value={periodFrom}
-                onChange={(event) => setPeriodFrom(event.target.value)}
-                className="bg-background h-10 text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-xs font-semibold">
-                정산 종료일
-              </Label>
-              <Input
-                type="date"
-                value={periodTo}
-                onChange={(event) => setPeriodTo(event.target.value)}
-                className="bg-background h-10 text-sm"
-              />
-            </div>
-          </div>
-
-          <p className="text-muted-foreground mt-4 text-xs">
-            병원 ID는 운영사 계정 조회 시 필요합니다.
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border bg-card p-6">
+          <p className="text-muted-foreground text-sm">총 정산 금액</p>
+          <p className="mt-2 text-3xl font-semibold">
+            {formatAmount(String(totals.payback))}원
           </p>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="rounded-lg border bg-card p-6">
+          <p className="text-muted-foreground text-sm">총 거래액</p>
+          <p className="mt-2 text-3xl font-semibold">
+            {formatAmount(String(totals.totalVolume))}원
+          </p>
+        </div>
+      </div>
 
-      {error && (
-        <Card className="border-destructive/30 bg-destructive/10">
-          <CardContent className="text-destructive pt-6 text-sm">
-            {error}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="border-border bg-card">
-        <CardHeader className="border-border border-b">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Card className="border-border shadow-none">
-              <CardContent className="p-4">
-                <p className="text-muted-foreground text-xs font-semibold">
-                  총 정산 금액
-                </p>
-                <p className="mt-2 text-xl font-semibold">
-                  {formatAmount(String(totals.payback))}원
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border shadow-none">
-              <CardContent className="p-4">
-                <p className="text-muted-foreground text-xs font-semibold">
-                  총 거래액
-                </p>
-                <p className="mt-2 text-xl font-semibold">
-                  {formatAmount(String(totals.totalVolume))}원
-                </p>
-              </CardContent>
-            </Card>
+      <div className="space-y-6 rounded-lg border bg-card p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">정산 필터</h2>
+            <p className="text-muted-foreground mt-1 text-xs">{summary}</p>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSearch}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            disabled={isLoading}
+          >
+            조회하기
+          </Button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-2">
+            <Label className="text-muted-foreground text-xs font-semibold">
+              병원 ID
+            </Label>
+            <Input
+              value={hospitalId}
+              onChange={(event) => setHospitalId(event.target.value)}
+              placeholder="병원 ID 입력"
+              className="bg-background h-10 text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-muted-foreground text-xs font-semibold">
+              정산 상태
+            </Label>
+            <Select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="bg-background text-sm"
+            >
+              <option value="">전체</option>
+              <option value="PENDING_PAYMENT">정산 대기</option>
+              <option value="SETTLED">정산 완료</option>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-muted-foreground text-xs font-semibold">
+              정산 시작일
+            </Label>
+            <Input
+              type="date"
+              value={periodFrom}
+              onChange={(event) => setPeriodFrom(event.target.value)}
+              className="bg-background h-10 text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-muted-foreground text-xs font-semibold">
+              정산 종료일
+            </Label>
+            <Input
+              type="date"
+              value={periodTo}
+              onChange={(event) => setPeriodTo(event.target.value)}
+              className="bg-background h-10 text-sm"
+            />
+          </div>
+        </div>
+
+        <p className="text-muted-foreground text-xs">
+          병원 ID는 운영사 계정 조회 시 필요합니다.
+        </p>
+
+        {error && (
+          <div className="border-destructive/30 bg-destructive/10 rounded-lg border px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <div className="rounded-lg border">
           <Table className="min-w-[860px]">
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="text-muted-foreground">기간</TableHead>
-                <TableHead className="text-muted-foreground">병원</TableHead>
-                <TableHead className="text-muted-foreground text-right">
+                <TableHead className="text-muted-foreground h-11">
+                  기간
+                </TableHead>
+                <TableHead className="text-muted-foreground h-11">
+                  병원
+                </TableHead>
+                <TableHead className="text-muted-foreground h-11 text-right">
                   총액
                 </TableHead>
-                <TableHead className="text-muted-foreground text-right">
+                <TableHead className="text-muted-foreground h-11 text-right">
                   정산율
                 </TableHead>
-                <TableHead className="text-muted-foreground text-right">
+                <TableHead className="text-muted-foreground h-11 text-right">
                   페이백
                 </TableHead>
-                <TableHead className="text-muted-foreground">상태</TableHead>
-                <TableHead className="text-muted-foreground">정산일</TableHead>
-                <TableHead className="text-muted-foreground text-center">
+                <TableHead className="text-muted-foreground h-11">
+                  상태
+                </TableHead>
+                <TableHead className="text-muted-foreground h-11">
+                  정산일
+                </TableHead>
+                <TableHead className="text-muted-foreground h-11 text-center">
                   상세
                 </TableHead>
               </TableRow>
@@ -353,22 +335,22 @@ export function SettlementsClient() {
               ) : (
                 items.map((item) => (
                   <TableRow key={item.id} className="border-border">
-                    <TableCell>
+                    <TableCell className="py-3">
                       {formatPeriod(
                         item.settlementPeriodStart,
                         item.settlementPeriodEnd,
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-muted-foreground py-3 text-xs">
                       {item.hospitalId}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">
+                    <TableCell className="py-3 text-right font-semibold">
                       {formatAmount(item.totalVolume)}원
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="py-3 text-right">
                       {Number(item.appliedRate).toFixed(2)}%
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="py-3 text-right">
                       {formatAmount(item.paybackAmount)}원
                       {item.isNftBoosted && (
                         <Badge className="bg-primary-subtle text-primary ml-2 text-[10px] font-semibold">
@@ -376,7 +358,7 @@ export function SettlementsClient() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
                       <Badge
                         className={
                           item.status === 'SETTLED'
@@ -387,10 +369,10 @@ export function SettlementsClient() {
                         {STATUS_LABELS[item.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
                       {item.settledAt ? formatDate(item.settledAt) : '-'}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="py-3 text-center">
                       <Button
                         asChild
                         variant="outline"
@@ -407,8 +389,9 @@ export function SettlementsClient() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-        <CardFooter className="border-border justify-between border-t px-6 py-4">
+        </div>
+
+        <div className="border-border flex items-center justify-between border-t pt-3">
           <p className="text-muted-foreground text-xs">
             {isLoading ? '데이터를 불러오는 중입니다' : ''}
           </p>
@@ -424,8 +407,8 @@ export function SettlementsClient() {
               더 보기
             </Button>
           )}
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

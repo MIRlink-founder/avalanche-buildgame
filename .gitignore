@@ -50,9 +50,11 @@ next-env.d.ts
 
 # 환경변수 (루트 .env만 무시, 앱별 .env.local은 커밋)
 .env
+packages/database/.env
 
 # Planning
 .planning/
 
 # Private session notes
 PRIVATE-SESSION-CONTEXT.md
+.vercel

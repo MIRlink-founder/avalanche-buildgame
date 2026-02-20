@@ -48,12 +48,14 @@ interface HospitalReviewDrawerProps {
   hospitalId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  previewHospital?: HospitalForDrawer | null;
 }
 
 export function HospitalReviewDrawer({
   hospitalId,
   open,
   onOpenChange,
+  previewHospital = null,
 }: HospitalReviewDrawerProps) {
   const router = useRouter();
   const [hospital, setHospital] = useState<HospitalForDrawer | null>(null);
@@ -64,7 +66,16 @@ export function HospitalReviewDrawer({
   const [memo, setMemo] = useState('');
 
   useEffect(() => {
-    if (!open || !hospitalId) {
+    if (!open) {
+      setHospital(null);
+      return;
+    }
+    if (previewHospital) {
+      setHospital(previewHospital);
+      setLoading(false);
+      return;
+    }
+    if (!hospitalId) {
       setHospital(null);
       return;
     }
