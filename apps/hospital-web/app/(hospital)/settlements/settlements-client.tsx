@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@mire/ui/components/badge';
 import { Button } from '@mire/ui/components/button';
@@ -24,6 +24,7 @@ import {
   TableRow,
 } from '@mire/ui/components/table';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
+import { getPayloadFromToken } from '@/lib/decode-token';
 
 interface SettlementRow {
   id: number;
@@ -119,6 +120,8 @@ const PAYMENT_STATUS_ORDER: Record<string, number> = {
   FAILED: 6,
 };
 
+const ADMIN_ROLES = new Set(['SUPER_ADMIN', 'SUB_ADMIN']);
+
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CARD: '카드',
   CASH: '현금',
@@ -132,6 +135,7 @@ const SETTLEMENT_PAGE_SIZE = 5;
 const PAYMENT_PAGE_SIZE = 5;
 
 export function SettlementsClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
   const currentTab =
@@ -141,6 +145,12 @@ export function SettlementsClient() {
       ? tabParam
       : 'settlements';
   const paymentStatusParam = searchParams.get('paymentStatus');
+  const hospitalIdParam = searchParams.get('hospitalId')?.trim() ?? '';
+  const [payload, setPayload] = useState<ReturnType<
+    typeof getPayloadFromToken
+  > | null>(null);
+  const [payloadReady, setPayloadReady] = useState(false);
+  const [hospitalIdInput, setHospitalIdInput] = useState(hospitalIdParam);
   const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [settlementsLoading, setSettlementsLoading] = useState(true);
   const [settlementsError, setSettlementsError] = useState<string | null>(null);
@@ -168,12 +178,28 @@ export function SettlementsClient() {
   const [paymentSortConfig, setPaymentSortConfig] =
     useState<PaymentSortConfig | null>(null);
 
+  const isAdmin = payload?.role ? ADMIN_ROLES.has(payload.role) : false;
+  const requiresHospitalId = isAdmin && !hospitalIdParam;
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    setPayload(token ? getPayloadFromToken(token) : null);
+    setPayloadReady(true);
+  }, []);
+
+  useEffect(() => {
+    setHospitalIdInput(hospitalIdParam);
+  }, [hospitalIdParam]);
+
   const fetchSettlements = useCallback(async () => {
     setSettlementsLoading(true);
     setSettlementsError(null);
     try {
       const params = new URLSearchParams();
       params.set('limit', String(LIST_LIMIT));
+      if (isAdmin && hospitalIdParam) {
+        params.set('hospitalId', hospitalIdParam);
+      }
       const res = await fetch(`/api/settlements?${params.toString()}`, {
         headers: getAuthHeaders(),
       });
@@ -200,6 +226,9 @@ export function SettlementsClient() {
     try {
       const params = new URLSearchParams();
       params.set('limit', String(LIST_LIMIT));
+      if (isAdmin && hospitalIdParam) {
+        params.set('hospitalId', hospitalIdParam);
+      }
       const res = await fetch(`/api/payments?${params.toString()}`, {
         headers: getAuthHeaders(),
       });
@@ -223,9 +252,19 @@ export function SettlementsClient() {
     setAccountError(null);
     setAccountMessage(null);
     try {
-      const res = await fetch('/api/hospitals/settlement-account', {
-        headers: getAuthHeaders(),
-      });
+      const params = new URLSearchParams();
+      if (isAdmin && hospitalIdParam) {
+        params.set('hospitalId', hospitalIdParam);
+      }
+      const query = params.toString();
+      const res = await fetch(
+        query
+          ? `/api/hospitals/settlement-account?${query}`
+          : '/api/hospitals/settlement-account',
+        {
+          headers: getAuthHeaders(),
+        },
+      );
       if (redirectIfUnauthorized(res)) return;
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -250,10 +289,31 @@ export function SettlementsClient() {
   }, []);
 
   useEffect(() => {
+    if (!payloadReady) {
+      return;
+    }
+    if (requiresHospitalId) {
+      setSettlements([]);
+      setPayments([]);
+      setSettlementsError(null);
+      setPaymentsError(null);
+      setSettlementsLoading(false);
+      setPaymentsLoading(false);
+      setAccountError(null);
+      setAccountMessage(null);
+      setAccountLoading(false);
+      return;
+    }
     fetchSettlements();
     fetchPayments();
     fetchAccount();
-  }, [fetchSettlements, fetchPayments, fetchAccount]);
+  }, [
+    payloadReady,
+    requiresHospitalId,
+    fetchSettlements,
+    fetchPayments,
+    fetchAccount,
+  ]);
 
   const totalSettlements = settlements.length;
   const totalSettlementPages = Math.max(
@@ -502,18 +562,28 @@ export function SettlementsClient() {
     }
     setAccountLoading(true);
     try {
-      const res = await fetch('/api/hospitals/settlement-account', {
-        method: 'PATCH',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json',
+      const params = new URLSearchParams();
+      if (isAdmin && hospitalIdParam) {
+        params.set('hospitalId', hospitalIdParam);
+      }
+      const query = params.toString();
+      const res = await fetch(
+        query
+          ? `/api/hospitals/settlement-account?${query}`
+          : '/api/hospitals/settlement-account',
+        {
+          method: 'PATCH',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            accountBank: accountBank.trim(),
+            accountNumber: accountNumber.trim(),
+            accountHolder: accountHolder.trim(),
+          }),
         },
-        body: JSON.stringify({
-          accountBank: accountBank.trim(),
-          accountNumber: accountNumber.trim(),
-          accountHolder: accountHolder.trim(),
-        }),
-      });
+      );
       if (redirectIfUnauthorized(res)) return;
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -538,6 +608,18 @@ export function SettlementsClient() {
     setAppliedPaymentFrom(paymentFrom);
     setAppliedPaymentTo(paymentTo);
     setPaymentPage(1);
+  };
+
+  const handleHospitalApply = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    const nextHospitalId = hospitalIdInput.trim();
+    if (nextHospitalId) {
+      params.set('hospitalId', nextHospitalId);
+    } else {
+      params.delete('hospitalId');
+    }
+    const query = params.toString();
+    router.push(query ? `/settlements?${query}` : '/settlements');
   };
 
   const handlePaymentSort = (key: PaymentSortKey) => {
@@ -590,6 +672,25 @@ export function SettlementsClient() {
 
   return (
     <section className="space-y-6 p-6">
+      {isAdmin && (
+        <Card className="border-border">
+          <CardContent className="flex flex-wrap items-end gap-3 p-4">
+            <div className="min-w-[200px] flex-1 space-y-2">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                병원 ID
+              </Label>
+              <Input
+                value={hospitalIdInput}
+                onChange={(event) => setHospitalIdInput(event.target.value)}
+                placeholder="HOS-2026-001"
+              />
+            </div>
+            <Button type="button" size="sm" onClick={handleHospitalApply}>
+              적용
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       <div className="grid gap-4 lg:grid-cols-4">
         <Card className="border-border">
           <CardContent className="p-4">
