@@ -34,7 +34,7 @@ const STAFF_TABS = [
   { id: 'all', label: '전체' },
   { id: 'active', label: '활성' },
   { id: 'inactive', label: '비활성/탈퇴' },
-  { id: 'pending', label: '초대 대기' },
+  { id: 'pending', label: '초대 수락 대기' },
 ];
 
 const ROLE_OPTIONS = [
@@ -418,7 +418,7 @@ export function HospitalStaffPanel() {
           </p>
         </div>
         <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">초대 대기</p>
+          <p className="text-muted-foreground text-sm">초대 수락 대기</p>
           <p className="mt-2 text-3xl font-semibold">
             {summary.pending.toLocaleString('ko-KR')}명
           </p>

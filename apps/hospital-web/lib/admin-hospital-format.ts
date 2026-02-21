@@ -89,26 +89,26 @@ export const USER_ROLE_COLORS: Record<string, string> = {
 /** 사용자 계정 상태 라벨 */
 export const USER_STATUS_LABELS: Record<string, string> = {
   ACTIVE: '활성',
-  PENDING: '초대 대기',
+  PENDING: '초대 수락 대기',
   DISABLED: '비활성',
   DELETED: '삭제됨',
   WITHDRAWN: '탈퇴',
 };
 
-/** 계정 관리 테이블 상태 표기 (정상/초대대기/비활성화) */
+/** 계정 관리 테이블 상태 표기 (활성/초대 수락 대기/비활성) */
 export const ACCOUNT_STATUS_LABELS: Record<string, string> = {
   ACTIVE: '활성',
   DISABLED: '비활성',
   DELETED: '삭제됨',
   WITHDRAWN: '탈퇴',
-  PENDING: '초대 대기',
+  PENDING: '대기',
 };
 
 /** 사용자 계정 상태 뱃지 색상 */
 export const USER_STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-blue-600 text-white hover:bg-blue-600',
   PENDING: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
-  DISABLED: 'bg-red-600 text-white hover:bg-red-600',
+  DISABLED: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
   DELETED: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  WITHDRAWN: 'bg-gray-400 text-white hover:bg-gray-400',
+  WITHDRAWN: 'bg-red-600 text-white hover:bg-red-600',
 };
