@@ -404,7 +404,7 @@ export function SettlementsClient() {
       }
       if (periodFrom) params.set('periodFrom', periodFrom);
       if (periodTo) params.set('periodTo', periodTo);
-      params.set('limit', '20');
+      params.set('limit', '10');
       if (cursor) params.set('cursor', String(cursor));
 
       const response = await fetch(`/api/settlements?${params.toString()}`, {
