@@ -16,7 +16,7 @@ export function SettingsAccountsPanel() {
 
       <section className="rounded-lg border bg-muted/30 px-4 py-4">
         <p className="text-muted-foreground text-sm">
-          계정 권한 관리 기능은 준비 중입니다.
+          부서 및 상세 권한 관리 기능은 준비 중입니다.
         </p>
       </section>
     </div>
