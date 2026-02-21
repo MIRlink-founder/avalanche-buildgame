@@ -1,28 +1,12 @@
-import Image from 'next/image';
-import { OnboardingCarousel } from '@/components/home/OnboardingCarousel';
+import Navigation from '@/components/layout/Navigation';
 import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm';
 
 export default function ResetPasswordPage() {
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden p-8 lg:flex lg:w-1/2">
-        <OnboardingCarousel />
-      </div>
-      <div className="flex w-full items-center justify-center p-8 lg:w-1/2">
-        <div className="w-full max-w-md space-y-8">
-          <div className="space-y-2 text-center">
-            <div className="mb-4 flex items-center justify-center">
-              <Image
-                src="/assets/Logo.svg"
-                alt="MI;Re Logo"
-                width={200}
-                height={40}
-                priority
-              />
-            </div>
-          </div>
-          <ResetPasswordForm />
-        </div>
+    <div className="flex min-h-screen flex-col items-center justify-center px-4">
+      <Navigation />
+      <div className="w-full max-w-4xl space-y-6 rounded-lg border bg-card p-12 shadow-sm">
+        <ResetPasswordForm />
       </div>
     </div>
   );

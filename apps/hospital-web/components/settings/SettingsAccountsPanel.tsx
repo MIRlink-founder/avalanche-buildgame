@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { Button } from '@mire/ui/components/button';
+import { ResetPasswordRequestPanel } from '@/components/auth/ResetPasswordRequestPanel';
 
 export function SettingsAccountsPanel() {
   return (
@@ -13,19 +12,7 @@ export function SettingsAccountsPanel() {
         </p>
       </section>
 
-      <section className="rounded-lg border bg-card px-4 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold">비밀번호 재설정</p>
-            <p className="text-muted-foreground text-xs">
-              재설정 링크를 메일로 받아 비밀번호를 변경합니다.
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/auth/reset-password">재설정하기</Link>
-          </Button>
-        </div>
-      </section>
+      <ResetPasswordRequestPanel />
 
       <section className="rounded-lg border bg-muted/30 px-4 py-4">
         <p className="text-muted-foreground text-sm">

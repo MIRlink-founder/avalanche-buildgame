@@ -1,15 +1,9 @@
 import { NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { prisma } from '@mire/database';
 import { sendResetPasswordEmail } from '@/lib/send-email';
 
 export const runtime = 'nodejs';
-
-type ResetTokenPayload = {
-  userId: string;
-  email: string;
-  purpose: 'password_reset';
-};
 
 export async function POST(request: Request) {
   try {
@@ -40,15 +34,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload: ResetTokenPayload = {
-      userId: user.id,
-      email: user.email,
-      purpose: 'password_reset',
-    };
+    const resetToken = randomUUID();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    const resetToken = jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: '1h',
-    });
+    await prisma.$transaction([
+      prisma.token.updateMany({
+        where: {
+          userId: user.id,
+          tokenType: 'PASSWORD_RESET',
+          isUsed: false,
+        },
+        data: { isUsed: true },
+      }),
+      prisma.token.create({
+        data: {
+          tokenType: 'PASSWORD_RESET',
+          token: resetToken,
+          userId: user.id,
+          email: user.email,
+          expiresAt,
+        },
+      }),
+    ]);
 
     let mailSent = false;
     try {
