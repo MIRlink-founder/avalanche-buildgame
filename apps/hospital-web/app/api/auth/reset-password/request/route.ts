@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@mire/database';
+import { sendResetPasswordEmail } from '@/lib/send-email';
 
 export const runtime = 'nodejs';
 
@@ -49,12 +50,24 @@ export async function POST(request: Request) {
       expiresIn: '1h',
     });
 
-    // TODO: SMTP 연동 시 여기서 resetLink 메일 발송 처리
+    let mailSent = false;
+    try {
+      await sendResetPasswordEmail({
+        to: user.email,
+        name: user.name,
+        token: resetToken,
+      });
+      mailSent = true;
+    } catch (mailError) {
+      console.error('비밀번호 재설정 메일 발송 실패:', mailError);
+    }
 
     return NextResponse.json({
       success: true,
-      resetToken,
-      resetLink: `/auth/reset-password?token=${resetToken}`,
+      mailSent,
+      resetLink: mailSent
+        ? undefined
+        : `/auth/reset-password?token=${resetToken}`,
     });
   } catch (error) {
     console.error('비밀번호 재설정 요청 오류:', error);

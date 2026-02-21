@@ -9,8 +9,8 @@ import { Label } from '@mire/ui/components/label';
 
 type RequestResponse = {
   success: boolean;
-  resetToken: string;
-  resetLink: string;
+  mailSent: boolean;
+  resetLink?: string;
 };
 
 type ConfirmResponse = {
@@ -30,6 +30,7 @@ export function ResetPasswordForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetToken, setResetToken] = useState(tokenParam);
   const [resetLink, setResetLink] = useState('');
+  const [mailSent, setMailSent] = useState(false);
 
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -130,7 +131,7 @@ export function ResetPasswordForm() {
         | RequestResponse
         | { error?: string };
 
-      if (!response.ok || !(data as RequestResponse).resetToken) {
+      if (!response.ok || !(data as RequestResponse).success) {
         setEmailError(
           (data as { error?: string }).error ||
             '재설정 링크 발송에 실패했습니다',
@@ -139,8 +140,8 @@ export function ResetPasswordForm() {
       }
 
       const payload = data as RequestResponse;
-      setResetToken(payload.resetToken);
-      setResetLink(payload.resetLink);
+      setMailSent(payload.mailSent);
+      setResetLink(payload.resetLink ?? '');
       setStep('sent');
     } catch (error) {
       console.error(error);
@@ -282,26 +283,29 @@ export function ResetPasswordForm() {
     return (
       <div className="space-y-6 text-center">
         <div>
-          <h1 className="text-2xl font-semibold">재설정 링크 생성 완료</h1>
+          <h1 className="text-2xl font-semibold">재설정 링크 발송 완료</h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            현재 메일 발송은 미연동 상태입니다. 아래 버튼으로 재설정 페이지를
-            열어주세요.
+            {mailSent
+              ? '이메일로 재설정 링크를 발송했습니다. 메일을 확인해주세요.'
+              : '메일 발송에 실패했습니다. 아래 버튼으로 재설정 페이지를 열어주세요.'}
           </p>
         </div>
-        <Button
-          size="xl"
-          className="w-full"
-          onClick={() => {
-            if (resetLink) {
-              window.location.href = resetLink;
-            }
-          }}
-        >
-          재설정 페이지로 이동
-        </Button>
-        <p className="text-muted-foreground text-xs">
-          프로덕션에서는 메일 발송으로 전환될 예정입니다.
-        </p>
+        {!mailSent && (
+          <Button
+            size="xl"
+            className="w-full"
+            onClick={() => {
+              if (resetLink) {
+                window.location.href = resetLink;
+              }
+            }}
+          >
+            재설정 페이지로 이동
+          </Button>
+        )}
+        <Link href="/" className="text-muted-foreground text-sm underline">
+          로그인으로 돌아가기
+        </Link>
       </div>
     );
   }

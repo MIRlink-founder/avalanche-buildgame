@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { Tabs } from '@/components/layout/Tabs';
 import { SettingsBasicForm } from '@/components/settings/SettingsBasicForm';
+import { SettingsAccountsPanel } from '@/components/settings/SettingsAccountsPanel';
 
 const SETTINGS_TABS = [
   { id: 'basic', label: '기본 정보' },
@@ -27,9 +28,7 @@ export default function SettingsPage() {
 
         <div className="mt-6">
           {currentTab === 'basic' && <SettingsBasicForm />}
-          {currentTab === 'accounts' && (
-            <p className="text-muted-foreground">준비 중입니다.</p>
-          )}
+          {currentTab === 'accounts' && <SettingsAccountsPanel />}
           {currentTab === 'items' && (
             <p className="text-muted-foreground">준비 중입니다.</p>
           )}
