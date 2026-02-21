@@ -578,13 +578,11 @@ export function HospitalStaffPanel() {
                             <span className="text-xs text-muted-foreground">
                               권한 없음
                             </span>
-                          ) : isSelf ? (
-                            <span className="text-xs text-muted-foreground">
-                              내 계정
-                            </span>
                           ) : (
                             <Button size="sm" variant="outline" asChild>
-                              <Link href={detailHref}>상세</Link>
+                              <Link href={detailHref}>
+                                {isSelf ? '내 정보' : '상세'}
+                              </Link>
                             </Button>
                           )}
                         </td>

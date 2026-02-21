@@ -122,7 +122,8 @@ export function HospitalStaffDetailPanel() {
   const isSelf = staff.email === currentUserEmail && currentUserEmail !== '';
   const isPending = staff.status === 'PENDING';
   const isMasterTarget = staff.role === 'MASTER_ADMIN';
-  const canEdit = canManage && !isSelf && !isMasterTarget && !isPending;
+  const canEditName = isSelf || (canManage && !isMasterTarget && !isPending);
+  const canEditRole = canManage && !isSelf && !isMasterTarget && !isPending;
   const canToggleStatus =
     canManage &&
     !isSelf &&
@@ -134,10 +135,12 @@ export function HospitalStaffDetailPanel() {
     !isMasterTarget &&
     !isPending &&
     staff.status !== 'WITHDRAWN';
-  const hasChanges = formName.trim() !== staff.name || formRole !== staff.role;
+  const nameChanged = formName.trim() !== staff.name;
+  const roleChanged = formRole !== staff.role;
+  const hasChanges = canEditRole ? nameChanged || roleChanged : nameChanged;
 
   const handleSave = async () => {
-    if (!canEdit) return;
+    if (!canEditName && !canEditRole) return;
     if (!formName.trim()) {
       setFormError('이름을 입력해주세요.');
       return;
@@ -146,13 +149,18 @@ export function HospitalStaffDetailPanel() {
     setFormError('');
 
     try {
+      const payload: { name?: string; role?: string } = {};
+      if (canEditName) {
+        payload.name = formName.trim();
+      }
+      if (canEditRole) {
+        payload.role = formRole;
+      }
+
       const res = await fetch(`/api/hospitals/staff/${staff.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({
-          name: formName.trim(),
-          role: formRole,
-        }),
+        body: JSON.stringify(payload),
       });
       if (redirectIfUnauthorized(res)) return;
       const result = await res.json();
@@ -261,9 +269,14 @@ export function HospitalStaffDetailPanel() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">기본 정보</h2>
-              {!canManage && (
+              {!canManage && !isSelf && (
                 <span className="text-xs text-muted-foreground">
                   마스터 관리자만 수정할 수 있습니다.
+                </span>
+              )}
+              {isSelf && (
+                <span className="text-xs text-muted-foreground">
+                  내 계정은 이름만 수정할 수 있습니다.
                 </span>
               )}
             </div>
@@ -274,7 +287,7 @@ export function HospitalStaffDetailPanel() {
                   id="staff-name"
                   value={formName}
                   onChange={(event) => setFormName(event.target.value)}
-                  disabled={!canEdit}
+                  disabled={!canEditName}
                 />
               </div>
               <div className="space-y-2">
@@ -287,7 +300,7 @@ export function HospitalStaffDetailPanel() {
                   id="staff-role"
                   value={formRole}
                   onChange={(event) => setFormRole(event.target.value)}
-                  disabled={!canEdit}
+                  disabled={!canEditRole}
                 >
                   {ROLE_OPTIONS.map((role) => (
                     <option key={role.value} value={role.value}>
@@ -312,16 +325,13 @@ export function HospitalStaffDetailPanel() {
               <Button
                 type="button"
                 onClick={handleSave}
-                disabled={!canEdit || saving || !hasChanges}
+                disabled={
+                  saving || !hasChanges || (!canEditName && !canEditRole)
+                }
               >
                 {saving ? '저장 중...' : '정보 수정'}
               </Button>
-              {isSelf && (
-                <span className="text-xs text-muted-foreground">
-                  내 계정은 직접 수정할 수 없습니다.
-                </span>
-              )}
-              {isMasterTarget && (
+              {isMasterTarget && !isSelf && (
                 <span className="text-xs text-muted-foreground">
                   마스터 관리자 계정은 수정할 수 없습니다.
                 </span>

@@ -102,13 +102,6 @@ export async function PATCH(
       );
     }
 
-    if (user.role !== 'MASTER_ADMIN') {
-      return NextResponse.json(
-        { error: '마스터 관리자만 수정할 수 있습니다.' },
-        { status: 403 },
-      );
-    }
-
     if (!user.hospitalId) {
       return NextResponse.json(
         { error: '병원 정보가 없습니다.' },
@@ -133,6 +126,14 @@ export async function PATCH(
     const status = body.status?.trim().toUpperCase();
     const role = body.role?.trim().toUpperCase();
     const name = body.name?.trim();
+    const isSelf = user.id === id;
+
+    if (!isSelf && user.role !== 'MASTER_ADMIN') {
+      return NextResponse.json(
+        { error: '마스터 관리자만 수정할 수 있습니다.' },
+        { status: 403 },
+      );
+    }
 
     if (status && !ALLOWED_STATUS.has(status)) {
       return NextResponse.json(
@@ -155,9 +156,9 @@ export async function PATCH(
       );
     }
 
-    if (user.id === id) {
+    if (isSelf && (status || role)) {
       return NextResponse.json(
-        { error: '내 계정은 직접 변경할 수 없습니다.' },
+        { error: '내 계정은 상태/권한을 변경할 수 없습니다.' },
         { status: 400 },
       );
     }
@@ -174,7 +175,7 @@ export async function PATCH(
       );
     }
 
-    if (targetUser.role === 'MASTER_ADMIN') {
+    if (targetUser.role === 'MASTER_ADMIN' && !isSelf) {
       return NextResponse.json(
         { error: '마스터 관리자 계정은 변경할 수 없습니다.' },
         { status: 403 },
