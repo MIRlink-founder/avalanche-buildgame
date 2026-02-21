@@ -128,8 +128,8 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 const LIST_LIMIT = 50;
-const SETTLEMENT_PAGE_SIZE = 5;
-const PAYMENT_PAGE_SIZE = 5;
+const SETTLEMENT_PAGE_SIZE = 10;
+const PAYMENT_PAGE_SIZE = 10;
 
 export function SettlementsClient() {
   const searchParams = useSearchParams();
