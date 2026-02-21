@@ -107,7 +107,7 @@ export const ACCOUNT_STATUS_LABELS: Record<string, string> = {
 /** 사용자 계정 상태 뱃지 색상 */
 export const USER_STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-blue-600 text-white hover:bg-blue-600',
-  PENDING: 'bg-orange-500 text-white hover:bg-orange-500',
+  PENDING: 'bg-orange-600 text-white hover:bg-orange-600',
   DISABLED: 'bg-yellow-500 text-black hover:bg-yellow-500',
   DELETED: 'bg-gray-500 text-white hover:bg-gray-500',
   WITHDRAWN: 'bg-red-600 text-white hover:bg-red-600',
