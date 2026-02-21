@@ -6,6 +6,89 @@ const HOSPITAL_ROLES = new Set(['MASTER_ADMIN', 'DEPT_ADMIN']);
 const ALLOWED_STATUS = new Set(['ACTIVE', 'DISABLED', 'WITHDRAWN']);
 const ALLOWED_ROLES = new Set(['MASTER_ADMIN', 'DEPT_ADMIN']);
 
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { user } = await requireAuth(request);
+    if (!HOSPITAL_ROLES.has(user.role)) {
+      return NextResponse.json(
+        { error: '병원 계정 권한이 필요합니다.' },
+        { status: 403 },
+      );
+    }
+
+    if (!user.hospitalId) {
+      return NextResponse.json(
+        { error: '병원 정보가 없습니다.' },
+        { status: 403 },
+      );
+    }
+
+    const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json(
+        { error: '직원 ID가 필요합니다.' },
+        { status: 400 },
+      );
+    }
+
+    const staff = await prisma.user.findFirst({
+      where: { id, hospitalId: user.hospitalId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        statusChangedAt: true,
+        createdAt: true,
+        department: { select: { name: true } },
+      },
+    });
+
+    if (!staff) {
+      return NextResponse.json(
+        { error: '직원 정보를 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
+    const lastAccess = await prisma.authSession.findFirst({
+      where: { userId: staff.id },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+
+    return NextResponse.json({
+      user: {
+        id: staff.id,
+        email: staff.email,
+        name: staff.name,
+        role: staff.role,
+        status: staff.status,
+        departmentName: staff.department?.name ?? null,
+        statusChangedAt: staff.statusChangedAt?.toISOString() ?? null,
+        createdAt: staff.createdAt.toISOString(),
+        lastAccessAt: lastAccess?.createdAt?.toISOString() ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    console.error('병원 직원 상세 조회 실패:', error);
+    return NextResponse.json(
+      { error: '직원 정보를 불러오는 중 오류가 발생했습니다.' },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
