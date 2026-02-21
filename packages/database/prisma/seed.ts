@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 
 async function main() {
   // SUPER_ADMIN 계정 생성
-  const passwordHash = bcrypt.hashSync('admin123', 10); // 비밀번호
+  const passwordHash = bcrypt.hashSync('admin123!', 10); // 비밀번호
 
   const superAdmin = await prisma.user.upsert({
     where: { email: 'admin@mire.com' }, // 아이디

@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@mire/database';
 
 export const runtime = 'nodejs';
 
-type ResetTokenPayload = {
-  userId: string;
-  email: string;
-  purpose: 'password_reset';
-};
+function isValidPassword(value: string): boolean {
+  if (value.length < 8) return false;
+  const hasLetter = /[A-Za-z]/.test(value);
+  const hasNumber = /\d/.test(value);
+  const hasSpecial = /[@$!%*#?&]/.test(value);
+  return hasLetter && hasNumber && hasSpecial;
+}
 
 export async function POST(request: Request) {
   try {
@@ -28,35 +29,79 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!password || password.length < 8) {
+    if (!password || !isValidPassword(password)) {
       return NextResponse.json(
-        { error: '비밀번호는 8자 이상이어야 합니다' },
+        {
+          error: '영문, 숫자, 특수문자를 포함하여 8자 이상 입력해주세요.',
+        },
         { status: 400 },
       );
     }
 
-    let payload: ResetTokenPayload;
-    try {
-      payload = jwt.verify(token, process.env.JWT_SECRET!) as ResetTokenPayload;
-    } catch (error) {
+    const tokenRecord = await prisma.token.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (
+      !tokenRecord ||
+      tokenRecord.tokenType !== 'PASSWORD_RESET' ||
+      tokenRecord.isUsed ||
+      !tokenRecord.userId
+    ) {
       return NextResponse.json(
         { error: '재설정 링크가 만료되었거나 올바르지 않습니다' },
         { status: 400 },
       );
     }
 
-    if (payload.purpose !== 'password_reset') {
+    if (new Date() > tokenRecord.expiresAt) {
       return NextResponse.json(
-        { error: '재설정 토큰이 올바르지 않습니다' },
+        { error: '재설정 링크가 만료되었거나 올바르지 않습니다' },
+        { status: 400 },
+      );
+    }
+
+    if (!tokenRecord.user) {
+      return NextResponse.json(
+        { error: '사용자 정보를 찾을 수 없습니다' },
+        { status: 404 },
+      );
+    }
+
+    if (tokenRecord.user.status !== 'ACTIVE') {
+      return NextResponse.json(
+        { error: '계정 상태가 올바르지 않습니다' },
+        { status: 403 },
+      );
+    }
+
+    const isSamePassword = bcrypt.compareSync(
+      password,
+      tokenRecord.user.passwordHash,
+    );
+    if (isSamePassword) {
+      return NextResponse.json(
+        { error: '기존 비밀번호와 동일합니다. 다른 비밀번호를 입력해주세요.' },
         { status: 400 },
       );
     }
 
     const hashed = bcrypt.hashSync(password, 10);
-    await prisma.user.update({
-      where: { id: payload.userId },
-      data: { passwordHash: hashed },
-    });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: tokenRecord.userId },
+        data: { passwordHash: hashed },
+      }),
+      prisma.authSession.updateMany({
+        where: { userId: tokenRecord.userId, isActive: true },
+        data: { isActive: false },
+      }),
+      prisma.token.update({
+        where: { id: tokenRecord.id },
+        data: { isUsed: true },
+      }),
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (error) {
