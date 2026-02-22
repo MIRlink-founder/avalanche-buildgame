@@ -54,12 +54,14 @@ export async function GET(request: NextRequest) {
     const email = tokenRecord.user?.email ?? tokenRecord.email ?? '';
     const name = tokenRecord.user?.name ?? '';
     const hospitalName = hospital.displayName ?? hospital.officialName;
+    const role = tokenRecord.user?.role ?? 'DEPT_ADMIN';
 
     return NextResponse.json({
       valid: true,
       hospitalName,
       email,
       name,
+      role,
     });
   } catch (error) {
     console.error('초대 토큰 검증 실패:', error);

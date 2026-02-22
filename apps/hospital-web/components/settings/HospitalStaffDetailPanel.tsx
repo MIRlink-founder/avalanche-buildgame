@@ -121,20 +121,14 @@ export function HospitalStaffDetailPanel() {
   const canManage = currentUserRole === 'MASTER_ADMIN';
   const isSelf = staff.email === currentUserEmail && currentUserEmail !== '';
   const isPending = staff.status === 'PENDING';
-  const isMasterTarget = staff.role === 'MASTER_ADMIN';
-  const canEditName = isSelf || (canManage && !isMasterTarget && !isPending);
-  const canEditRole = canManage && !isSelf && !isMasterTarget && !isPending;
+  const canEditName = isSelf || canManage;
+  const canEditRole = canManage;
   const canToggleStatus =
     canManage &&
     !isSelf &&
-    !isMasterTarget &&
     (staff.status === 'ACTIVE' || staff.status === 'DISABLED');
   const canWithdraw =
-    canManage &&
-    !isSelf &&
-    !isMasterTarget &&
-    !isPending &&
-    staff.status !== 'WITHDRAWN';
+    canManage && !isSelf && !isPending && staff.status !== 'WITHDRAWN';
   const nameChanged = formName.trim() !== staff.name;
   const roleChanged = formRole !== staff.role;
   const hasChanges = canEditRole ? nameChanged || roleChanged : nameChanged;
@@ -274,7 +268,7 @@ export function HospitalStaffDetailPanel() {
                   마스터 관리자만 수정할 수 있습니다.
                 </span>
               )}
-              {isSelf && (
+              {isSelf && !canManage && (
                 <span className="text-xs text-muted-foreground">
                   내 계정은 이름만 수정할 수 있습니다.
                 </span>
@@ -331,11 +325,6 @@ export function HospitalStaffDetailPanel() {
               >
                 {saving ? '저장 중...' : '정보 수정'}
               </Button>
-              {isMasterTarget && !isSelf && (
-                <span className="text-xs text-muted-foreground">
-                  마스터 관리자 계정은 수정할 수 없습니다.
-                </span>
-              )}
             </div>
           </div>
         </section>
@@ -393,11 +382,6 @@ export function HospitalStaffDetailPanel() {
               {isSelf && (
                 <span className="text-xs text-muted-foreground">
                   내 계정은 직접 변경할 수 없습니다.
-                </span>
-              )}
-              {isMasterTarget && (
-                <span className="text-xs text-muted-foreground">
-                  마스터 관리자 계정은 변경할 수 없습니다.
                 </span>
               )}
             </div>

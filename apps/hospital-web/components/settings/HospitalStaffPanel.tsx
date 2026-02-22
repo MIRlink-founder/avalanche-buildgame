@@ -104,6 +104,7 @@ export function HospitalStaffPanel() {
   const [searchFocused, setSearchFocused] = useState(false);
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteError, setInviteError] = useState('');
   const [inviteSending, setInviteSending] = useState(false);
@@ -249,6 +250,11 @@ export function HospitalStaffPanel() {
   };
 
   const handleInvite = async () => {
+    if (!inviteName.trim()) {
+      setInviteError('이름을 입력해주세요.');
+      return;
+    }
+
     if (!inviteEmail.trim()) {
       setInviteError('이메일을 입력해주세요.');
       return;
@@ -263,6 +269,7 @@ export function HospitalStaffPanel() {
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           email: inviteEmail.trim(),
+          name: inviteName.trim(),
         }),
       });
       if (redirectIfUnauthorized(res)) return;
@@ -278,6 +285,7 @@ export function HospitalStaffPanel() {
         );
       }
       setInviteOpen(false);
+      setInviteName('');
       setInviteEmail('');
       setInviteError('');
       setRefreshTrigger((prev) => prev + 1);
@@ -450,7 +458,7 @@ export function HospitalStaffPanel() {
           {canManage && (
             <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full md:w-auto" type="button">
+                <Button className="w-full md:w-auto md:ml-auto" type="button">
                   <UserPlus className="h-4 w-4" />
                   직원 추가
                 </Button>
@@ -463,6 +471,15 @@ export function HospitalStaffPanel() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-name">이름</Label>
+                    <Input
+                      id="invite-name"
+                      value={inviteName}
+                      onChange={(e) => setInviteName(e.target.value)}
+                      placeholder="이름을 입력해주세요"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="invite-email">이메일</Label>
                     <Input
@@ -490,7 +507,7 @@ export function HospitalStaffPanel() {
                     onClick={handleInvite}
                     disabled={inviteSending}
                   >
-                    {inviteSending ? '발송 중...' : '추가하기'}
+                    {inviteSending ? '발송 중...' : '링크 발송'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -500,7 +517,7 @@ export function HospitalStaffPanel() {
 
         <div className="rounded-lg border">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]">
+            <table className="w-full min-w-[640px]">
               <thead className="bg-muted/50">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
@@ -508,9 +525,6 @@ export function HospitalStaffPanel() {
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                     이메일
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    권한
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                     상태
@@ -524,7 +538,7 @@ export function HospitalStaffPanel() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={4}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
                       불러오는 중...
@@ -533,7 +547,7 @@ export function HospitalStaffPanel() {
                 ) : users.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={4}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
                       등록된 직원이 없습니다.
@@ -548,14 +562,16 @@ export function HospitalStaffPanel() {
                       (listQueryString ? `?${listQueryString}` : '');
                     return (
                       <tr key={u.id}>
-                        <td className="px-4 py-3">{u.name}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={USER_ROLE_COLORS[u.role] ?? ''}>
+                              {ACCOUNT_ROLE_LABELS[u.role] ?? u.role}
+                            </Badge>
+                            <span>{u.name}</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 font-mono text-sm">
                           {u.email}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge className={USER_ROLE_COLORS[u.role] ?? ''}>
-                            {ACCOUNT_ROLE_LABELS[u.role] ?? u.role}
-                          </Badge>
                         </td>
                         <td className="px-4 py-3">
                           <Badge className={USER_STATUS_COLORS[u.status] ?? ''}>
@@ -580,9 +596,7 @@ export function HospitalStaffPanel() {
                             </span>
                           ) : (
                             <Button size="sm" variant="outline" asChild>
-                              <Link href={detailHref}>
-                                {isSelf ? '내 정보' : '상세'}
-                              </Link>
+                              <Link href={detailHref}>상세</Link>
                             </Button>
                           )}
                         </td>

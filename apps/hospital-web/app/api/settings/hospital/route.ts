@@ -6,6 +6,12 @@ import { requireAuth } from '@/lib/auth-guard';
 export async function GET(request: Request) {
   try {
     const { user } = await requireAuth(request);
+    if (user.role !== 'MASTER_ADMIN') {
+      return NextResponse.json(
+        { error: '마스터 관리자만 접근할 수 있습니다.' },
+        { status: 403 },
+      );
+    }
     if (!user.hospitalId) {
       return NextResponse.json(
         { error: '병원 정보가 없습니다.' },
@@ -46,9 +52,10 @@ export async function GET(request: Request) {
       error && typeof (error as { message?: string }).message === 'string'
         ? (error as { message: string }).message
         : '인증이 필요합니다.';
-    const status = error && typeof (error as { status?: number }).status === 'number'
-      ? (error as { status: number }).status
-      : 401;
+    const status =
+      error && typeof (error as { status?: number }).status === 'number'
+        ? (error as { status: number }).status
+        : 401;
     return NextResponse.json({ error: message }, { status });
   }
 }
@@ -57,6 +64,12 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const { user } = await requireAuth(request);
+    if (user.role !== 'MASTER_ADMIN') {
+      return NextResponse.json(
+        { error: '마스터 관리자만 수정할 수 있습니다.' },
+        { status: 403 },
+      );
+    }
     if (!user.hospitalId) {
       return NextResponse.json(
         { error: '병원 정보가 없습니다.' },
@@ -99,13 +112,21 @@ export async function PATCH(request: Request) {
     const hospital = await prisma.hospital.update({
       where: { id: user.hospitalId },
       data: {
-        ...(accountBank !== undefined && { accountBank: accountBank?.trim() || null }),
+        ...(accountBank !== undefined && {
+          accountBank: accountBank?.trim() || null,
+        }),
         ...(accountNumber !== undefined && {
           accountNumber: accountNumber?.replace(/-/g, '').trim() || null,
         }),
-        ...(accountHolder !== undefined && { accountHolder: accountHolder?.trim() || null }),
-        ...(managerPhone !== undefined && { managerPhone: managerPhone?.trim() || null }),
-        ...(managerEmail !== undefined && { managerEmail: managerEmail?.trim() || null }),
+        ...(accountHolder !== undefined && {
+          accountHolder: accountHolder?.trim() || null,
+        }),
+        ...(managerPhone !== undefined && {
+          managerPhone: managerPhone?.trim() || null,
+        }),
+        ...(managerEmail !== undefined && {
+          managerEmail: managerEmail?.trim() || null,
+        }),
         addressZipcode: zip || null,
         addressRoad: road || null,
         addressDetail: detail || null,
@@ -119,9 +140,10 @@ export async function PATCH(request: Request) {
       error && typeof (error as { message?: string }).message === 'string'
         ? (error as { message: string }).message
         : '인증이 필요합니다.';
-    const status = error && typeof (error as { status?: number }).status === 'number'
-      ? (error as { status: number }).status
-      : 401;
+    const status =
+      error && typeof (error as { status?: number }).status === 'number'
+        ? (error as { status: number }).status
+        : 401;
     return NextResponse.json(
       { error: message },
       { status: status >= 400 ? status : 500 },

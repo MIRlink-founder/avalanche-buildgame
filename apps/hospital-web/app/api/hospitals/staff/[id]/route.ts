@@ -156,9 +156,16 @@ export async function PATCH(
       );
     }
 
-    if (isSelf && (status || role)) {
+    if (isSelf && status) {
       return NextResponse.json(
-        { error: '내 계정은 상태/권한을 변경할 수 없습니다.' },
+        { error: '내 계정은 상태를 변경할 수 없습니다.' },
+        { status: 400 },
+      );
+    }
+
+    if (isSelf && role && user.role !== 'MASTER_ADMIN') {
+      return NextResponse.json(
+        { error: '내 계정의 권한은 변경할 수 없습니다.' },
         { status: 400 },
       );
     }
@@ -172,13 +179,6 @@ export async function PATCH(
       return NextResponse.json(
         { error: '직원을 찾을 수 없습니다.' },
         { status: 404 },
-      );
-    }
-
-    if (targetUser.role === 'MASTER_ADMIN' && !isSelf) {
-      return NextResponse.json(
-        { error: '마스터 관리자 계정은 변경할 수 없습니다.' },
-        { status: 403 },
       );
     }
 

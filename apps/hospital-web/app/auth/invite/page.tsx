@@ -6,6 +6,7 @@ import { Button, Separator } from '@mire/ui';
 import { Input } from '@mire/ui';
 import { Label } from '@mire/ui';
 import Navigation from '@/components/layout/Navigation';
+import { ACCOUNT_ROLE_LABELS } from '@/lib/admin-hospital-format';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, XCircle } from 'lucide-react';
 
 function isValidPassword(value: string): boolean {
@@ -29,6 +30,7 @@ function InviteForm() {
   >(null);
   const [hospitalName, setHospitalName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
+  const [role, setRole] = useState<string>('DEPT_ADMIN');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -60,6 +62,7 @@ function InviteForm() {
           setHospitalName(data.hospitalName ?? '');
           setEmail(data.email ?? '');
           setName(data.name ?? '');
+          setRole(data.role ?? 'DEPT_ADMIN');
         } else {
           setStatus('invalid');
           setInvalidReason(data.reason === 'expired' ? 'expired' : 'invalid');
@@ -111,6 +114,9 @@ function InviteForm() {
         }
         setSubmitError(msg);
         return;
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
       }
       alert('계정 설정이 완료되었습니다. 로그인해주세요.');
       router.push('/');
@@ -167,7 +173,10 @@ function InviteForm() {
           <p className="text-muted-foreground">
             초대받은 계정의 비밀번호를 설정해주세요.
           </p>
-          <p className="text-lg text-muted-foreground">{hospitalName}</p>
+          <div className="space-y-1 text-muted-foreground">
+            <p className="text-lg">{hospitalName}</p>
+            <p className="text-sm">권한: {ACCOUNT_ROLE_LABELS[role] ?? role}</p>
+          </div>
         </div>
 
         <Separator />

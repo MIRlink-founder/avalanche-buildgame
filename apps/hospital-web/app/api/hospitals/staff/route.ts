@@ -184,6 +184,13 @@ export async function POST(request: Request) {
     const email = body.email?.trim().toLowerCase();
     const name = body.name?.trim();
 
+    if (!name) {
+      return NextResponse.json(
+        { error: '이름을 입력해주세요.' },
+        { status: 400 },
+      );
+    }
+
     if (!email) {
       return NextResponse.json(
         { error: '이메일을 입력해주세요.' },
@@ -222,7 +229,7 @@ export async function POST(request: Request) {
     if (existingUser) {
       if (existingUser.hospitalId !== user.hospitalId) {
         return NextResponse.json(
-          { error: '이미 다른 병원에서 사용 중인 이메일입니다.' },
+          { error: '이미 사용 중인 이메일입니다.' },
           { status: 409 },
         );
       }
@@ -235,6 +242,10 @@ export async function POST(request: Request) {
       }
 
       await prisma.$transaction([
+        prisma.user.update({
+          where: { id: existingUser.id },
+          data: { name },
+        }),
         prisma.token.updateMany({
           where: {
             userId: existingUser.id,
@@ -277,7 +288,7 @@ export async function POST(request: Request) {
     const invitedUser = await prisma.user.create({
       data: {
         email,
-        name: name || email.split('@')[0] || '병원 직원',
+        name,
         passwordHash,
         role: 'DEPT_ADMIN',
         status: 'PENDING',
