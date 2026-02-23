@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@mire/database';
 import { requireAuth, AuthError } from '@/lib/auth-guard';
 
-const HOSPITAL_ROLES = new Set(['MASTER_ADMIN', 'DEPT_ADMIN']);
-const ALLOWED_STATUS = new Set(['ACTIVE', 'DISABLED', 'WITHDRAWN']);
+const HOSPITAL_ROLES = new Set(['MASTER_ADMIN']);
+const ALLOWED_STATUS = new Set(['ACTIVE', 'DISABLED']);
 const ALLOWED_ROLES = new Set(['MASTER_ADMIN', 'DEPT_ADMIN']);
 
 export async function GET(
@@ -44,6 +44,7 @@ export async function GET(
         status: true,
         statusChangedAt: true,
         createdAt: true,
+        departmentId: true,
         department: { select: { name: true } },
       },
     });
@@ -68,6 +69,7 @@ export async function GET(
         name: staff.name,
         role: staff.role,
         status: staff.status,
+        departmentId: staff.departmentId ?? null,
         departmentName: staff.department?.name ?? null,
         statusChangedAt: staff.statusChangedAt?.toISOString() ?? null,
         createdAt: staff.createdAt.toISOString(),
@@ -121,11 +123,16 @@ export async function PATCH(
       status?: string;
       name?: string;
       role?: string;
+      departmentId?: number | null;
     };
 
     const status = body.status?.trim().toUpperCase();
     const role = body.role?.trim().toUpperCase();
-    const name = body.name?.trim();
+    const departmentIdRaw = body.departmentId;
+    const departmentId =
+      departmentIdRaw === undefined || departmentIdRaw === null
+        ? departmentIdRaw
+        : Number(departmentIdRaw);
     const isSelf = user.id === id;
 
     if (!isSelf && user.role !== 'MASTER_ADMIN') {
@@ -149,11 +156,20 @@ export async function PATCH(
       );
     }
 
-    if (body.name !== undefined && !name) {
+    if (body.name !== undefined) {
       return NextResponse.json(
-        { error: '이름을 입력해주세요.' },
+        { error: '이름은 수정할 수 없습니다.' },
         { status: 400 },
       );
+    }
+
+    if (departmentId !== undefined && departmentId !== null) {
+      if (Number.isNaN(departmentId)) {
+        return NextResponse.json(
+          { error: '부서 정보가 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
     }
 
     if (isSelf && status) {
@@ -185,8 +201,8 @@ export async function PATCH(
     const updateData: {
       status?: string;
       statusChangedAt?: Date;
-      name?: string;
       role?: string;
+      departmentId?: number | null;
     } = {};
 
     if (status) {
@@ -194,12 +210,26 @@ export async function PATCH(
       updateData.statusChangedAt = new Date();
     }
 
-    if (name) {
-      updateData.name = name;
-    }
-
     if (role) {
       updateData.role = role;
+    }
+
+    if (departmentId !== undefined) {
+      if (departmentId === null) {
+        updateData.departmentId = null;
+      } else {
+        const department = await prisma.department.findFirst({
+          where: { id: departmentId, hospitalId: user.hospitalId },
+          select: { id: true },
+        });
+        if (!department) {
+          return NextResponse.json(
+            { error: '부서 정보를 찾을 수 없습니다.' },
+            { status: 404 },
+          );
+        }
+        updateData.departmentId = department.id;
+      }
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -217,8 +247,8 @@ export async function PATCH(
           id: true,
           status: true,
           statusChangedAt: true,
-          name: true,
           role: true,
+          department: { select: { id: true, name: true } },
         },
       });
 
@@ -238,8 +268,9 @@ export async function PATCH(
         id: updated.id,
         status: updated.status,
         statusChangedAt: updated.statusChangedAt?.toISOString() ?? null,
-        name: updated.name,
         role: updated.role,
+        departmentId: updated.department?.id ?? null,
+        departmentName: updated.department?.name ?? null,
       },
     });
   } catch (error) {

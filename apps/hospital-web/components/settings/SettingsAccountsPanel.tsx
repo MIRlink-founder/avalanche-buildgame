@@ -1,9 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ResetPasswordRequestPanel } from '@/components/auth/ResetPasswordRequestPanel';
-import { Input } from '@mire/ui';
-import { Label } from '@mire/ui';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+} from '@mire/ui';
 import { ACCOUNT_ROLE_LABELS } from '@/lib/admin-hospital-format';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
 
@@ -21,9 +31,14 @@ type ProfileResponse = {
 };
 
 export function SettingsAccountsPanel() {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false);
+  const [withdrawSuccessOpen, setWithdrawSuccessOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +69,37 @@ export function SettingsAccountsPanel() {
       cancelled = true;
     };
   }, []);
+
+  const handleWithdraw = async () => {
+    setWithdrawLoading(true);
+    setWithdrawError('');
+
+    try {
+      const res = await fetch('/api/settings/withdraw', {
+        method: 'POST',
+        headers: { ...getAuthHeaders() },
+      });
+      if (redirectIfUnauthorized(res)) return;
+      const result = (await res.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!res.ok) {
+        setWithdrawError(result.error || '탈퇴 처리에 실패했습니다.');
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+      }
+      setWithdrawConfirmOpen(false);
+      setWithdrawSuccessOpen(true);
+    } catch (err) {
+      console.error(err);
+      setWithdrawError('탈퇴 처리 중 오류가 발생했습니다.');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -124,9 +170,79 @@ export function SettingsAccountsPanel() {
                 />
               </div>
             </div>
+            <div className="border-t pt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">계정 탈퇴</p>
+                  <p className="text-muted-foreground text-xs">
+                    탈퇴 시 계정은 비활성화되며 복구할 수 없습니다.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setWithdrawConfirmOpen(true)}
+                  disabled={withdrawLoading}
+                >
+                  {withdrawLoading ? '탈퇴 처리 중...' : '탈퇴하기'}
+                </Button>
+              </div>
+              {withdrawError && (
+                <p className="text-sm text-destructive">{withdrawError}</p>
+              )}
+            </div>
           </div>
         ) : null}
       </section>
+      <Dialog open={withdrawConfirmOpen} onOpenChange={setWithdrawConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>계정 탈퇴</DialogTitle>
+            <DialogDescription>
+              탈퇴하면 계정을 복구할 수 없습니다. 탈퇴하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setWithdrawConfirmOpen(false)}
+              disabled={withdrawLoading}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleWithdraw}
+              disabled={withdrawLoading}
+            >
+              {withdrawLoading ? '처리 중...' : '탈퇴하기'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={withdrawSuccessOpen} onOpenChange={setWithdrawSuccessOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>탈퇴 완료</DialogTitle>
+            <DialogDescription>
+              탈퇴 처리가 완료되었습니다. 로그인 화면으로 이동합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => {
+                setWithdrawSuccessOpen(false);
+                router.push('/');
+              }}
+            >
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

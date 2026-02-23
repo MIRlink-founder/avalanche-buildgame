@@ -126,7 +126,7 @@ export default function Navigation() {
                 />
               </Button>
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 min-w-[10rem] rounded-md border bg-popover py-1 shadow-md">
+                <div className="absolute right-0 top-full mt-0 min-w-[10rem] rounded-md border bg-popover py-1 shadow-md">
                   <button
                     type="button"
                     onClick={handleLogout}

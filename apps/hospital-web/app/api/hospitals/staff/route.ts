@@ -7,7 +7,7 @@ import { sendInvitationEmail } from '@/lib/send-email';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
-const HOSPITAL_ROLES = new Set(['MASTER_ADMIN', 'DEPT_ADMIN']);
+const HOSPITAL_ROLES = new Set(['MASTER_ADMIN']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INVITATION_TOKEN_EXPIRY_HOURS = 72;
 const STATUS_FILTERS = new Set(['ACTIVE', 'PENDING', 'DISABLED', 'WITHDRAWN']);

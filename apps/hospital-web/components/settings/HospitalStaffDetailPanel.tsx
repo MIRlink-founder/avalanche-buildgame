@@ -1,14 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Badge } from '@mire/ui';
 import { Button } from '@mire/ui';
 import { Input } from '@mire/ui';
 import { Label } from '@mire/ui';
-import { Select } from '@mire/ui';
-import { ChevronRight } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@mire/ui';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   ACCOUNT_ROLE_LABELS,
   ACCOUNT_STATUS_LABELS,
@@ -29,10 +36,104 @@ interface HospitalUserDetail {
   name: string;
   role: string;
   status: string;
+  departmentId: number | null;
   departmentName: string | null;
   statusChangedAt: string | null;
   createdAt: string;
   lastAccessAt: string | null;
+}
+
+interface DepartmentOption {
+  id: number;
+  name: string;
+}
+
+interface InlineSelectOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+function InlineSelect({
+  id,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  options: InlineSelectOption[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selectedLabel =
+    options.find((option) => option.value === value)?.label ?? '선택';
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        id={id}
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] flex h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+      {open && !disabled && (
+        <div className="border-border bg-background absolute left-0 top-full z-20 mt-0 w-full rounded-md border shadow-sm">
+          <div className="max-h-60 overflow-auto py-1">
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                disabled={option.disabled}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted ${
+                  option.disabled
+                    ? 'text-muted-foreground cursor-not-allowed'
+                    : ''
+                }`}
+              >
+                <span
+                  className={
+                    option.value === value ? 'font-semibold' : 'font-normal'
+                  }
+                >
+                  {option.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface StaffDetailResponse {
@@ -47,14 +148,18 @@ export function HospitalStaffDetailPanel() {
   const [staff, setStaff] = useState<HospitalUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [formName, setFormName] = useState('');
   const [formRole, setFormRole] = useState('DEPT_ADMIN');
+  const [formDepartmentId, setFormDepartmentId] = useState('');
   const [formError, setFormError] = useState('');
   const [statusError, setStatusError] = useState('');
   const [saving, setSaving] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState('');
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [departmentsError, setDepartmentsError] = useState('');
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -80,8 +185,10 @@ export function HospitalStaffDetailPanel() {
       .then((data: StaffDetailResponse | null) => {
         if (!cancelled && data?.user) {
           setStaff(data.user);
-          setFormName(data.user.name);
           setFormRole(data.user.role);
+          setFormDepartmentId(
+            data.user.departmentId ? String(data.user.departmentId) : '',
+          );
         }
       })
       .catch((err) => {
@@ -110,6 +217,41 @@ export function HospitalStaffDetailPanel() {
     return `/hospital/staff${query ? `?${query}` : ''}`;
   }, [searchParams]);
 
+  useEffect(() => {
+    if (currentUserRole !== 'MASTER_ADMIN') return;
+    let cancelled = false;
+    setDepartmentsLoading(true);
+    setDepartmentsError('');
+
+    fetch('/api/hospitals/departments', {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => {
+        if (redirectIfUnauthorized(res)) return null;
+        if (!res.ok) throw new Error('부서 목록을 불러오지 못했습니다.');
+        return res.json();
+      })
+      .then((data: { departments?: DepartmentOption[] } | null) => {
+        if (!cancelled) {
+          setDepartments(data?.departments ?? []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setDepartmentsError(
+            err.message || '부서 목록을 불러오지 못했습니다.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDepartmentsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserRole]);
+
   if (loading || !staff) {
     return (
       <div className="flex min-h-[400px] items-center justify-center p-6 text-muted-foreground">
@@ -121,34 +263,43 @@ export function HospitalStaffDetailPanel() {
   const canManage = currentUserRole === 'MASTER_ADMIN';
   const isSelf = staff.email === currentUserEmail && currentUserEmail !== '';
   const isPending = staff.status === 'PENDING';
-  const canEditName = isSelf || canManage;
-  const canEditRole = canManage;
+  const canEditRole = canManage && !isSelf;
+  const canEditDepartment = canManage && !isSelf;
   const canToggleStatus =
     canManage &&
     !isSelf &&
     (staff.status === 'ACTIVE' || staff.status === 'DISABLED');
-  const canWithdraw =
-    canManage && !isSelf && !isPending && staff.status !== 'WITHDRAWN';
-  const nameChanged = formName.trim() !== staff.name;
   const roleChanged = formRole !== staff.role;
-  const hasChanges = canEditRole ? nameChanged || roleChanged : nameChanged;
+  const departmentChanged =
+    String(staff.departmentId ?? '') !== formDepartmentId;
+  const hasChanges =
+    (canEditRole && roleChanged) || (canEditDepartment && departmentChanged);
+  const roleOptions: InlineSelectOption[] = ROLE_OPTIONS.map((role) => ({
+    value: role.value,
+    label: role.label,
+  }));
+  const departmentOptions: InlineSelectOption[] = [
+    { value: '', label: '미지정' },
+    ...departments.map((department) => ({
+      value: String(department.id),
+      label: department.name,
+    })),
+  ];
 
   const handleSave = async () => {
-    if (!canEditName && !canEditRole) return;
-    if (!formName.trim()) {
-      setFormError('이름을 입력해주세요.');
-      return;
-    }
+    if (!canEditRole && !canEditDepartment) return;
     setSaving(true);
     setFormError('');
 
     try {
-      const payload: { name?: string; role?: string } = {};
-      if (canEditName) {
-        payload.name = formName.trim();
-      }
-      if (canEditRole) {
+      const payload: { role?: string; departmentId?: number | null } = {};
+      if (canEditRole && roleChanged) {
         payload.role = formRole;
+      }
+      if (canEditDepartment && departmentChanged) {
+        payload.departmentId = formDepartmentId
+          ? Number(formDepartmentId)
+          : null;
       }
 
       const res = await fetch(`/api/hospitals/staff/${staff.id}`, {
@@ -166,8 +317,13 @@ export function HospitalStaffDetailPanel() {
         prev
           ? {
               ...prev,
-              name: result.user?.name ?? formName.trim(),
               role: result.user?.role ?? formRole,
+              departmentId:
+                result.user?.departmentId ??
+                payload.departmentId ??
+                prev.departmentId,
+              departmentName:
+                result.user?.departmentName ?? prev.departmentName,
             }
           : prev,
       );
@@ -258,31 +414,26 @@ export function HospitalStaffDetailPanel() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <section className="rounded-lg border bg-card p-6">
-          <div className="space-y-4">
+      <section className="rounded-lg border bg-card p-6">
+        <div className="space-y-6">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">기본 정보</h2>
               {!canManage && !isSelf && (
                 <span className="text-xs text-muted-foreground">
-                  마스터 관리자만 수정할 수 있습니다.
+                  마스터 관리자만 권한/부서를 수정할 수 있습니다.
                 </span>
               )}
-              {isSelf && !canManage && (
+              {isSelf && (
                 <span className="text-xs text-muted-foreground">
-                  내 계정은 이름만 수정할 수 있습니다.
+                  내 계정은 권한/부서를 수정할 수 없습니다.
                 </span>
               )}
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="staff-name">이름</Label>
-                <Input
-                  id="staff-name"
-                  value={formName}
-                  onChange={(event) => setFormName(event.target.value)}
-                  disabled={!canEditName}
-                />
+                <Input id="staff-name" value={staff.name} disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="staff-email">이메일</Label>
@@ -290,26 +441,42 @@ export function HospitalStaffDetailPanel() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="staff-role">권한</Label>
-                <Select
-                  id="staff-role"
-                  value={formRole}
-                  onChange={(event) => setFormRole(event.target.value)}
-                  disabled={!canEditRole}
-                >
-                  {ROLE_OPTIONS.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </Select>
+                {canEditRole ? (
+                  <InlineSelect
+                    id="staff-role"
+                    value={formRole}
+                    options={roleOptions}
+                    disabled={!canEditRole}
+                    onChange={setFormRole}
+                  />
+                ) : (
+                  <Input
+                    id="staff-role"
+                    value={ACCOUNT_ROLE_LABELS[staff.role] ?? staff.role}
+                    disabled
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="staff-department">부서</Label>
-                <Input
-                  id="staff-department"
-                  value={staff.departmentName ?? '-'}
-                  disabled
-                />
+                {canEditDepartment ? (
+                  <InlineSelect
+                    id="staff-department"
+                    value={formDepartmentId}
+                    options={departmentOptions}
+                    disabled={departmentsLoading}
+                    onChange={setFormDepartmentId}
+                  />
+                ) : (
+                  <Input
+                    id="staff-department"
+                    value={staff.departmentName ?? '-'}
+                    disabled
+                  />
+                )}
+                {departmentsError && canEditDepartment && (
+                  <p className="text-xs text-destructive">{departmentsError}</p>
+                )}
               </div>
             </div>
             {formError && (
@@ -320,60 +487,45 @@ export function HospitalStaffDetailPanel() {
                 type="button"
                 onClick={handleSave}
                 disabled={
-                  saving || !hasChanges || (!canEditName && !canEditRole)
+                  saving || !hasChanges || (!canEditRole && !canEditDepartment)
                 }
               >
                 {saving ? '저장 중...' : '정보 수정'}
               </Button>
             </div>
           </div>
-        </section>
 
-        <section className="rounded-lg border bg-card p-6">
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold">상태 관리</h2>
-            <p className="text-sm text-muted-foreground">
-              상태 변경은 즉시 반영되며, 비활성 또는 탈퇴 시 로그인이
-              제한됩니다.
-            </p>
-            {statusError && (
-              <p className="text-sm text-destructive">{statusError}</p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {canToggleStatus && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    handleStatusChange(
-                      staff.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE',
-                    )
-                  }
-                  disabled={statusSaving}
-                >
-                  {statusSaving
-                    ? '처리 중...'
-                    : staff.status === 'ACTIVE'
-                      ? '비활성화'
-                      : '활성화'}
-                </Button>
+          <div className="border-t pt-6">
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold">상태 관리</h2>
+              {statusError && (
+                <p className="text-sm text-destructive">{statusError}</p>
               )}
-              {canWithdraw && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => {
-                    const confirmed =
-                      window.confirm('해당 직원을 탈퇴 처리할까요?');
-                    if (confirmed) {
-                      handleStatusChange('WITHDRAWN');
-                    }
-                  }}
-                  disabled={statusSaving}
-                >
-                  {statusSaving ? '처리 중...' : '탈퇴 처리'}
-                </Button>
-              )}
+              <div className="flex flex-wrap items-center gap-3">
+                {canToggleStatus && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (staff.status === 'ACTIVE') {
+                        setDisableConfirmOpen(true);
+                        return;
+                      }
+                      void handleStatusChange('ACTIVE');
+                    }}
+                    disabled={statusSaving}
+                  >
+                    {statusSaving
+                      ? '처리 중...'
+                      : staff.status === 'ACTIVE'
+                        ? '비활성화'
+                        : '활성화'}
+                  </Button>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  상태 변경은 즉시 반영되며, 비활성 시 로그인이 제한됩니다.
+                </p>
+              </div>
               {!canManage && (
                 <span className="text-xs text-muted-foreground">
                   마스터 관리자만 변경할 수 있습니다.
@@ -386,8 +538,39 @@ export function HospitalStaffDetailPanel() {
               )}
             </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <Dialog open={disableConfirmOpen} onOpenChange={setDisableConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>직원 비활성화</DialogTitle>
+            <DialogDescription>
+              비활성화하면 해당 계정은 로그인할 수 없습니다. 계속 진행할까요?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDisableConfirmOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={async () => {
+                await handleStatusChange('DISABLED');
+                setDisableConfirmOpen(false);
+              }}
+              disabled={statusSaving}
+            >
+              {statusSaving ? '처리 중...' : '비활성화'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
