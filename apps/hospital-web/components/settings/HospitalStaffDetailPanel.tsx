@@ -138,6 +138,7 @@ function InlineSelect({
 
 interface StaffDetailResponse {
   user: HospitalUserDetail;
+  activeAdminCount?: number;
 }
 
 export function HospitalStaffDetailPanel() {
@@ -156,10 +157,12 @@ export function HospitalStaffDetailPanel() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState('');
+  const [activeAdminCount, setActiveAdminCount] = useState<number | null>(null);
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [departmentsError, setDepartmentsError] = useState('');
   const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
+  const [adminGuardOpen, setAdminGuardOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -188,6 +191,11 @@ export function HospitalStaffDetailPanel() {
           setFormRole(data.user.role);
           setFormDepartmentId(
             data.user.departmentId ? String(data.user.departmentId) : '',
+          );
+          setActiveAdminCount(
+            typeof data.activeAdminCount === 'number'
+              ? data.activeAdminCount
+              : null,
           );
         }
       })
@@ -263,11 +271,17 @@ export function HospitalStaffDetailPanel() {
   const canManage = currentUserRole === 'MASTER_ADMIN';
   const isSelf = staff.email === currentUserEmail && currentUserEmail !== '';
   const isPending = staff.status === 'PENDING';
-  const canEditRole = canManage && !isSelf;
-  const canEditDepartment = canManage && !isSelf;
+  const isWithdrawn = staff.status === 'WITHDRAWN';
+  const isLastActiveAdmin =
+    staff.role === 'MASTER_ADMIN' &&
+    staff.status === 'ACTIVE' &&
+    activeAdminCount === 1;
+  const canEditRole = canManage && !isWithdrawn;
+  const canEditDepartment = canManage && !isWithdrawn;
   const canToggleStatus =
     canManage &&
     !isSelf &&
+    !isWithdrawn &&
     (staff.status === 'ACTIVE' || staff.status === 'DISABLED');
   const roleChanged = formRole !== staff.role;
   const departmentChanged =
@@ -286,8 +300,20 @@ export function HospitalStaffDetailPanel() {
     })),
   ];
 
+  const handleRoleChange = (nextRole: string) => {
+    if (isLastActiveAdmin && nextRole !== 'MASTER_ADMIN') {
+      setAdminGuardOpen(true);
+      return;
+    }
+    setFormRole(nextRole);
+  };
+
   const handleSave = async () => {
     if (!canEditRole && !canEditDepartment) return;
+    if (isLastActiveAdmin && formRole !== 'MASTER_ADMIN') {
+      setAdminGuardOpen(true);
+      return;
+    }
     setSaving(true);
     setFormError('');
 
@@ -313,6 +339,11 @@ export function HospitalStaffDetailPanel() {
         setFormError(result.error || '직원 정보 수정에 실패했습니다.');
         return;
       }
+      const wasActiveAdmin =
+        staff.role === 'MASTER_ADMIN' && staff.status === 'ACTIVE';
+      const nextRole = result.user?.role ?? formRole;
+      const willBeActiveAdmin =
+        nextRole === 'MASTER_ADMIN' && staff.status === 'ACTIVE';
       setStaff((prev) =>
         prev
           ? {
@@ -327,6 +358,15 @@ export function HospitalStaffDetailPanel() {
             }
           : prev,
       );
+      if (activeAdminCount !== null) {
+        if (wasActiveAdmin && !willBeActiveAdmin) {
+          setActiveAdminCount((prev) =>
+            prev === null ? prev : Math.max(0, prev - 1),
+          );
+        } else if (!wasActiveAdmin && willBeActiveAdmin) {
+          setActiveAdminCount((prev) => (prev === null ? prev : prev + 1));
+        }
+      }
     } catch (err) {
       console.error(err);
       setFormError('직원 정보 수정 중 오류가 발생했습니다.');
@@ -337,6 +377,10 @@ export function HospitalStaffDetailPanel() {
 
   const handleStatusChange = async (nextStatus: string) => {
     if (!canManage) return;
+    if (nextStatus === 'DISABLED' && isLastActiveAdmin) {
+      setAdminGuardOpen(true);
+      return;
+    }
     setStatusSaving(true);
     setStatusError('');
 
@@ -352,6 +396,10 @@ export function HospitalStaffDetailPanel() {
         setStatusError(result.error || '상태 변경에 실패했습니다.');
         return;
       }
+      const wasActiveAdmin =
+        staff.role === 'MASTER_ADMIN' && staff.status === 'ACTIVE';
+      const willBeActiveAdmin =
+        staff.role === 'MASTER_ADMIN' && nextStatus === 'ACTIVE';
       setStaff((prev) =>
         prev
           ? {
@@ -362,6 +410,15 @@ export function HospitalStaffDetailPanel() {
             }
           : prev,
       );
+      if (activeAdminCount !== null) {
+        if (wasActiveAdmin && !willBeActiveAdmin) {
+          setActiveAdminCount((prev) =>
+            prev === null ? prev : Math.max(0, prev - 1),
+          );
+        } else if (!wasActiveAdmin && willBeActiveAdmin) {
+          setActiveAdminCount((prev) => (prev === null ? prev : prev + 1));
+        }
+      }
     } catch (err) {
       console.error(err);
       setStatusError('상태 변경 중 오류가 발생했습니다.');
@@ -399,7 +456,6 @@ export function HospitalStaffDetailPanel() {
             {ACCOUNT_ROLE_LABELS[staff.role] ?? staff.role}
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">{staff.email}</p>
       </div>
 
       {error && (
@@ -419,14 +475,9 @@ export function HospitalStaffDetailPanel() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">기본 정보</h2>
-              {!canManage && !isSelf && (
+              {isWithdrawn && (
                 <span className="text-xs text-muted-foreground">
-                  마스터 관리자만 권한/부서를 수정할 수 있습니다.
-                </span>
-              )}
-              {isSelf && (
-                <span className="text-xs text-muted-foreground">
-                  내 계정은 권한/부서를 수정할 수 없습니다.
+                  탈퇴한 계정은 권한/부서를 수정할 수 없습니다.
                 </span>
               )}
             </div>
@@ -447,7 +498,7 @@ export function HospitalStaffDetailPanel() {
                     value={formRole}
                     options={roleOptions}
                     disabled={!canEditRole}
-                    onChange={setFormRole}
+                    onChange={handleRoleChange}
                   />
                 ) : (
                   <Input
@@ -482,62 +533,64 @@ export function HospitalStaffDetailPanel() {
             {formError && (
               <p className="text-sm text-destructive">{formError}</p>
             )}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={
-                  saving || !hasChanges || (!canEditRole && !canEditDepartment)
-                }
-              >
-                {saving ? '저장 중...' : '정보 수정'}
-              </Button>
-            </div>
+            {!isWithdrawn && (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={
+                    saving ||
+                    !hasChanges ||
+                    (!canEditRole && !canEditDepartment)
+                  }
+                >
+                  {saving ? '저장 중...' : '정보 수정'}
+                </Button>
+              </div>
+            )}
           </div>
 
-          <div className="border-t pt-6">
-            <div className="space-y-3">
-              <h2 className="text-lg font-semibold">상태 관리</h2>
-              {statusError && (
-                <p className="text-sm text-destructive">{statusError}</p>
-              )}
-              <div className="flex flex-wrap items-center gap-3">
-                {canToggleStatus && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      if (staff.status === 'ACTIVE') {
-                        setDisableConfirmOpen(true);
-                        return;
-                      }
-                      void handleStatusChange('ACTIVE');
-                    }}
-                    disabled={statusSaving}
-                  >
-                    {statusSaving
-                      ? '처리 중...'
-                      : staff.status === 'ACTIVE'
-                        ? '비활성화'
-                        : '활성화'}
-                  </Button>
+          {!isWithdrawn && (
+            <div className="border-t pt-6">
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold">상태 관리</h2>
+                {statusError && (
+                  <p className="text-sm text-destructive">{statusError}</p>
                 )}
-                <p className="text-sm text-muted-foreground">
-                  상태 변경은 즉시 반영되며, 비활성 시 로그인이 제한됩니다.
-                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  {canToggleStatus && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (staff.status === 'ACTIVE') {
+                          if (isLastActiveAdmin) {
+                            setAdminGuardOpen(true);
+                            return;
+                          }
+                          setDisableConfirmOpen(true);
+                          return;
+                        }
+                        void handleStatusChange('ACTIVE');
+                      }}
+                      disabled={statusSaving}
+                    >
+                      {statusSaving
+                        ? '처리 중...'
+                        : staff.status === 'ACTIVE'
+                          ? '비활성화'
+                          : '활성화'}
+                    </Button>
+                  )}
+                  {isSelf && (
+                    <p className="text-sm text-muted-foreground">
+                      내 계정은 직접 변경할 수 없습니다.
+                    </p>
+                  )}
+                </div>
               </div>
-              {!canManage && (
-                <span className="text-xs text-muted-foreground">
-                  마스터 관리자만 변경할 수 있습니다.
-                </span>
-              )}
-              {isSelf && (
-                <span className="text-xs text-muted-foreground">
-                  내 계정은 직접 변경할 수 없습니다.
-                </span>
-              )}
             </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -567,6 +620,21 @@ export function HospitalStaffDetailPanel() {
               disabled={statusSaving}
             >
               {statusSaving ? '처리 중...' : '비활성화'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={adminGuardOpen} onOpenChange={setAdminGuardOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>변경할 수 없습니다</DialogTitle>
+            <DialogDescription>
+              관리자는 최소 1명 이상 유지되어야 합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => setAdminGuardOpen(false)}>
+              확인
             </Button>
           </DialogFooter>
         </DialogContent>

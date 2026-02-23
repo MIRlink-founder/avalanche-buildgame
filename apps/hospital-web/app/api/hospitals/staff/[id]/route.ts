@@ -56,6 +56,14 @@ export async function GET(
       );
     }
 
+    const activeAdminCount = await prisma.user.count({
+      where: {
+        hospitalId: user.hospitalId,
+        role: 'MASTER_ADMIN',
+        status: 'ACTIVE',
+      },
+    });
+
     const lastAccess = await prisma.authSession.findFirst({
       where: { userId: staff.id },
       orderBy: { createdAt: 'desc' },
@@ -75,6 +83,7 @@ export async function GET(
         createdAt: staff.createdAt.toISOString(),
         lastAccessAt: lastAccess?.createdAt?.toISOString() ?? null,
       },
+      activeAdminCount,
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -196,6 +205,31 @@ export async function PATCH(
         { error: '직원을 찾을 수 없습니다.' },
         { status: 404 },
       );
+    }
+
+    const nextRole = role ?? targetUser.role;
+    const nextStatus = status ?? targetUser.status;
+    const isActiveAdmin =
+      targetUser.role === 'MASTER_ADMIN' && targetUser.status === 'ACTIVE';
+    const willRemainActiveAdmin =
+      nextRole === 'MASTER_ADMIN' && nextStatus === 'ACTIVE';
+
+    if (isActiveAdmin && !willRemainActiveAdmin) {
+      const remainingAdmins = await prisma.user.count({
+        where: {
+          hospitalId: user.hospitalId,
+          role: 'MASTER_ADMIN',
+          status: 'ACTIVE',
+          id: { not: targetUser.id },
+        },
+      });
+
+      if (remainingAdmins === 0) {
+        return NextResponse.json(
+          { error: '관리자는 최소 1명 이상 유지되어야 합니다.' },
+          { status: 400 },
+        );
+      }
     }
 
     const updateData: {
