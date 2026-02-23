@@ -14,6 +14,7 @@ const HOSPITAL_MENU_PATHS = [
   '/settlements',
   '/reports',
   '/support',
+  '/hospital/staff',
   '/settings',
 ];
 
@@ -27,6 +28,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +42,7 @@ export default function Navigation() {
     const token = localStorage.getItem('accessToken');
     const payload = token ? getPayloadFromToken(token) : null;
     setUserName(payload?.name ?? null);
+    setUserRole(payload?.role ?? null);
   }, [pathname]);
 
   useEffect(() => {
@@ -91,6 +94,14 @@ export default function Navigation() {
             <NavLink href="/support" current={pathname === '/support'}>
               고객지원
             </NavLink>
+            {userRole === 'MASTER_ADMIN' && (
+              <NavLink
+                href="/hospital/staff"
+                current={pathname === '/hospital/staff'}
+              >
+                직원 관리
+              </NavLink>
+            )}
             <NavLink href="/settings" current={pathname === '/settings'}>
               설정
             </NavLink>
@@ -101,7 +112,12 @@ export default function Navigation() {
                 onClick={() => setUserMenuOpen((v) => !v)}
                 className="text-foreground hover:text-primary hover:bg-transparent"
               >
-                {userName ?? '사용자'}님
+                <div className="flex items-center gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-foreground">
+                    {userName?.slice(0, 1) ?? 'U'}
+                  </span>
+                  <span>{userName ?? '사용자'}</span>
+                </div>
                 <ChevronDown
                   className={cn(
                     'ml-1 h-4 w-4 transition-transform',
@@ -110,7 +126,7 @@ export default function Navigation() {
                 />
               </Button>
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 min-w-[10rem] rounded-md border bg-popover py-1 shadow-md">
+                <div className="absolute right-0 top-full mt-0 min-w-[10rem] rounded-md border bg-popover py-1 shadow-md">
                   <button
                     type="button"
                     onClick={handleLogout}

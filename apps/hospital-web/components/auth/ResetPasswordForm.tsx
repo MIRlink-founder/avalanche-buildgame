@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@mire/ui/components/button';
@@ -45,6 +45,7 @@ export function ResetPasswordForm() {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [samePasswordError, setSamePasswordError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
@@ -66,7 +67,86 @@ export function ResetPasswordForm() {
     () => password.length > 0 && password === passwordConfirm,
     [password, passwordConfirm],
   );
-  const canReset = passwordValid && passwordMatch && !isSubmitting;
+  const canReset =
+    passwordValid && passwordMatch && !isSubmitting && !samePasswordError;
+  const samePasswordCheckRef = useRef(0);
+  const samePasswordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const lastCheckedPasswordRef = useRef('');
+
+  const checkSamePassword = async (value: string) => {
+    if (!resetToken) return;
+    const trimmed = value.trim();
+    if (!trimmed || !isValidPassword(trimmed)) {
+      setSamePasswordError(false);
+      return;
+    }
+
+    const checkId = samePasswordCheckRef.current + 1;
+    samePasswordCheckRef.current = checkId;
+
+    try {
+      const response = await fetch('/api/auth/reset-password/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, password: value }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as {
+        same?: boolean;
+      };
+
+      if (samePasswordCheckRef.current !== checkId) return;
+      if (!response.ok) {
+        setSamePasswordError(false);
+        return;
+      }
+
+      setSamePasswordError(Boolean(data.same));
+    } catch (error) {
+      if (samePasswordCheckRef.current === checkId) {
+        setSamePasswordError(false);
+      }
+      console.error(error);
+    }
+  };
+
+  const scheduleSamePasswordCheck = (value: string) => {
+    if (samePasswordTimeoutRef.current) {
+      clearTimeout(samePasswordTimeoutRef.current);
+    }
+    const trimmed = value.trim();
+    if (!trimmed || !isValidPassword(trimmed)) {
+      setSamePasswordError(false);
+      return;
+    }
+
+    samePasswordTimeoutRef.current = setTimeout(() => {
+      if (lastCheckedPasswordRef.current === value) return;
+      lastCheckedPasswordRef.current = value;
+      void checkSamePassword(value);
+    }, 350);
+  };
+
+  useEffect(() => {
+    if (!resetToken) return;
+    if (!passwordValid) {
+      if (samePasswordTimeoutRef.current) {
+        clearTimeout(samePasswordTimeoutRef.current);
+      }
+      setSamePasswordError(false);
+      return;
+    }
+
+    scheduleSamePasswordCheck(password);
+
+    return () => {
+      if (samePasswordTimeoutRef.current) {
+        clearTimeout(samePasswordTimeoutRef.current);
+      }
+    };
+  }, [password, passwordValid, resetToken]);
 
   const handleCheckEmail = async () => {
     if (!email) {
@@ -163,16 +243,19 @@ export function ResetPasswordForm() {
 
     if (!passwordValid) {
       setSubmitError('영문, 숫자, 특수문자를 포함하여 8자 이상 입력해주세요.');
+      setSamePasswordError(false);
       return;
     }
 
     if (!passwordMatch) {
       setSubmitError('비밀번호가 일치하지 않습니다.');
+      setSamePasswordError(false);
       return;
     }
 
     setIsSubmitting(true);
     setSubmitError('');
+    setSamePasswordError(false);
 
     try {
       const response = await fetch('/api/auth/reset-password/confirm', {
@@ -186,10 +269,14 @@ export function ResetPasswordForm() {
         | { error?: string };
 
       if (!response.ok || !(data as ConfirmResponse).success) {
-        setSubmitError(
+        const errorMessage =
           (data as { error?: string }).error ||
-            '비밀번호 재설정에 실패했습니다',
-        );
+          '비밀번호 재설정에 실패했습니다';
+        if (errorMessage.includes('기존 비밀번호')) {
+          setSamePasswordError(true);
+          return;
+        }
+        setSubmitError(errorMessage);
         return;
       }
 
@@ -259,6 +346,7 @@ export function ResetPasswordForm() {
                 onChange={(event) => {
                   setPassword(event.target.value);
                   setSubmitError('');
+                  setSamePasswordError(false);
                 }}
                 placeholder="영문, 숫자, 특수문자 포함 8자 이상"
                 required
@@ -282,10 +370,17 @@ export function ResetPasswordForm() {
             {password.length > 0 && (
               <p
                 className={`flex items-center gap-1 text-sm ${
-                  passwordValid ? 'text-green-600' : 'text-destructive'
+                  samePasswordError || !passwordValid
+                    ? 'text-destructive'
+                    : 'text-green-600'
                 }`}
               >
-                {passwordValid ? (
+                {samePasswordError ? (
+                  <>
+                    <XCircle className="h-4 w-4 shrink-0" />
+                    기존에 사용하던 비밀번호는 사용할 수 없습니다.
+                  </>
+                ) : passwordValid ? (
                   <>
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
                     사용 가능한 비밀번호입니다.

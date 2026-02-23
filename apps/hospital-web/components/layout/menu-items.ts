@@ -31,5 +31,6 @@ export const hospitalMenuItems: SidebarMenuItem[] = [
   { title: '예약 관리', icon: CalendarCheck2, href: '/appointments' },
   { title: '진료 기록', icon: NotebookPen, href: '/records' },
   { title: '재고 관리', icon: Package, href: '/inventories' },
+  { title: '직원 관리', icon: User, href: '/hospital/staff' },
   { title: '설정', icon: Settings, href: '/settings' },
 ];

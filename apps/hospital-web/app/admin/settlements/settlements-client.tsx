@@ -536,7 +536,7 @@ export function SettlementsClient() {
                   className="bg-background"
                 />
                 {showSuggestions && (
-                  <div className="border-border bg-background absolute left-0 top-full z-20 mt-2 w-full rounded-md border shadow-sm">
+                  <div className="border-border bg-background absolute left-0 top-full z-20 mt-0 w-full rounded-md border shadow-sm">
                     {isSuggesting ? (
                       <div className="text-muted-foreground px-3 py-2 text-xs">
                         검색 중...

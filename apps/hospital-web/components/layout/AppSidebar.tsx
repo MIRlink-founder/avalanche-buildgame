@@ -137,7 +137,7 @@ export function AppSidebar({
               <MoreVertical className="h-4 w-4" />
             </button>
             {menuOpen && (
-              <div className="z-100 absolute bottom-full mb-1 min-w-[140px] rounded-md border bg-popover py-1 shadow-md">
+              <div className="z-100 absolute bottom-full mb-0 min-w-[140px] rounded-md border bg-popover py-1 shadow-md">
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
