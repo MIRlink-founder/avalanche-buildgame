@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Dialog, DialogContent } from '@mire/ui';
+import { Button, Dialog, DialogContent, DialogTitle } from '@mire/ui';
 import { getAuthHeaders } from '@/lib/get-auth-headers';
 import { redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
@@ -72,18 +72,25 @@ export function BarcodeScanModal({
 
   const handleClose = () => {
     onOpenChange(false);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem(
-        SESSION_KEY_RECORD_PATIENT_ID,
-        encodeURIComponent(DUMMY_BARCODE),
-      );
-      router.push('/records/create');
-    }
+    // if (typeof window !== 'undefined') {
+    //   sessionStorage.setItem(
+    //     SESSION_KEY_RECORD_PATIENT_ID,
+    //     encodeURIComponent(DUMMY_BARCODE),
+    //   );
+    //   router.push('/records/create');
+    // }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent
+        showCloseButton={false}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
+        <DialogTitle></DialogTitle>
         <p className="text-center text-foreground">
           환자 카드의 바코드를 리더기로 스캔해주세요.
         </p>
