@@ -327,6 +327,23 @@ async function main() {
     });
   }
 
+  // SystemConfig 초기값 시드
+  const systemConfigSeeds = [
+    { key: 'DEFAULT_PAYBACK_RATE', value: '5.00', description: '기본 페이백 비율 (%)' },
+    { key: 'POS_FEE_RATE', value: '1.50', description: 'POS 수수료율 (%)' },
+    { key: 'FIXED_PAYMENT_PER_CASE', value: '30000', description: '건당 고정 금액 (원)' },
+  ];
+
+  for (const config of systemConfigSeeds) {
+    await prisma.systemConfig.upsert({
+      where: { key: config.key },
+      update: { value: config.value, description: config.description },
+      create: config,
+    });
+  }
+
+  console.log('✅ SystemConfig 초기값 생성 완료');
+
   console.log('✅ 병원 테스트 계정 생성 완료:', {
     hospitalId: hospital.id,
     userId: hospitalUser.id,

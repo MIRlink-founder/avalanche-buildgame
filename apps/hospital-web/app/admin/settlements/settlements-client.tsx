@@ -1,797 +1,713 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Tabs } from '@/components/layout/Tabs';
 import { Badge } from '@mire/ui/components/badge';
 import { Button } from '@mire/ui/components/button';
 import { Input } from '@mire/ui/components/input';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@mire/ui/components/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@mire/ui/components/table';
+import { Select } from '@mire/ui/components/select';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
-type SettlementRow = {
-  id: number;
-  publicId?: string;
-  hospitalId: string;
-  hospital?: {
-    id: string;
-    displayName: string | null;
-    officialName: string;
-  } | null;
-  settlementPeriodStart: string;
-  settlementPeriodEnd: string;
-  totalVolume: string;
-  appliedRate: string;
-  paybackAmount: string;
-  isNftBoosted: boolean;
-  status: 'PENDING_PAYMENT' | 'SETTLED';
-  settledAt: string | null;
-  createdAt: string;
-};
+/* ------------------------------------------------------------------ */
+/*  타입 정의                                                          */
+/* ------------------------------------------------------------------ */
 
-type SettlementsResponse = {
-  data: SettlementRow[];
-  nextCursor: number | null;
-};
-
-type SortKey =
-  | 'period'
-  | 'hospitalName'
-  | 'totalVolume'
-  | 'appliedRate'
-  | 'paybackAmount'
-  | 'nft'
-  | 'status'
-  | 'settledAt';
-
-type SortConfig = {
-  key: SortKey;
-  direction: 'asc' | 'desc';
-};
-
-type HospitalSearchItem = {
+interface SettlementHospital {
   id: string;
   displayName: string | null;
   officialName: string;
-};
+  businessNumber: string;
+  accountBank: string | null;
+  accountNumber: string | null;
+  accountHolder: string | null;
+}
 
-type HospitalSearchResponse = {
-  hospitals: HospitalSearchItem[];
-};
+interface SettlementRow {
+  id: number;
+  publicId: string;
+  hospitalId: string;
+  settlementPeriodStart: string;
+  settlementPeriodEnd: string;
+  totalVolume: string;
+  caseCount: number;
+  appliedRate: string;
+  paybackAmount: string;
+  status: string;
+  hospital: SettlementHospital;
+}
 
-const STATUS_LABELS: Record<SettlementRow['status'], string> = {
-  PENDING_PAYMENT: '대기',
-  SETTLED: '완료',
-};
+interface SettlementSummary {
+  totalVolume: number;
+  avgRate: number;
+  totalPayback: number;
+  hospitalCount: number;
+}
 
-const STATUS_ORDER: Record<SettlementRow['status'], number> = {
-  PENDING_PAYMENT: 0,
-  SETTLED: 1,
-};
+interface SettlementsResponse {
+  data: SettlementRow[];
+  total: number;
+  page: number;
+  limit: number;
+  summary: SettlementSummary;
+}
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+interface PaybackSettingRow {
+  id: string;
+  displayName: string | null;
+  officialName: string;
+  ceoName: string | null;
+  paybackRate: string;
+  paybackRateUpdatedAt: string | null;
+  status: string;
+}
 
-const MOCK_SETTLEMENTS: SettlementRow[] = [
-  {
-    id: 101,
-    publicId: '2f6fb07c-2f5e-4c55-9be3-1d22d3f4d8e2',
-    hospitalId: 'HOS-2026-001',
-    hospital: {
-      id: 'HOS-2026-001',
-      displayName: '김병원',
-      officialName: '김병원',
-    },
-    settlementPeriodStart: '2026-02-01',
-    settlementPeriodEnd: '2026-02-28',
-    totalVolume: '12500000',
-    appliedRate: '92.50',
-    paybackAmount: '11562500',
-    isNftBoosted: true,
-    status: 'PENDING_PAYMENT',
-    settledAt: null,
-    createdAt: '2026-03-01T09:00:00.000Z',
-  },
-  {
-    id: 100,
-    publicId: '6c7c9a0e-3e1b-4d73-9bdf-8e4b6a3b1a70',
-    hospitalId: 'HOS-2026-014',
-    hospital: {
-      id: 'HOS-2026-014',
-      displayName: '어쩌구병원',
-      officialName: '어쩌구병원',
-    },
-    settlementPeriodStart: '2026-01-01',
-    settlementPeriodEnd: '2026-01-31',
-    totalVolume: '9800000',
-    appliedRate: '90.00',
-    paybackAmount: '8820000',
-    isNftBoosted: false,
-    status: 'SETTLED',
-    settledAt: '2026-02-05T10:30:00.000Z',
-    createdAt: '2026-02-01T08:10:00.000Z',
-  },
-  {
-    id: 99,
-    publicId: 'a85f5d7b-8e54-4f89-9df1-2d746f6e0e9e',
-    hospitalId: 'HOS-2025-032',
-    hospital: {
-      id: 'HOS-2025-032',
-      displayName: '멀쩡한병원',
-      officialName: '멀쩡한병원',
-    },
-    settlementPeriodStart: '2025-12-01',
-    settlementPeriodEnd: '2025-12-31',
-    totalVolume: '15240000',
-    appliedRate: '91.20',
-    paybackAmount: '13970880',
-    isNftBoosted: true,
-    status: 'SETTLED',
-    settledAt: '2026-01-06T11:10:00.000Z',
-    createdAt: '2026-01-02T09:45:00.000Z',
-  },
-  {
-    id: 98,
-    publicId: 'c314a2b1-9c86-4a6d-8b69-5b3b4b2e9f77',
-    hospitalId: 'HOS-2025-007',
-    hospital: {
-      id: 'HOS-2025-007',
-      displayName: '샘플병원',
-      officialName: '샘플병원',
-    },
-    settlementPeriodStart: '2025-11-01',
-    settlementPeriodEnd: '2025-11-30',
-    totalVolume: '7400000',
-    appliedRate: '88.50',
-    paybackAmount: '6549000',
-    isNftBoosted: false,
-    status: 'PENDING_PAYMENT',
-    settledAt: null,
-    createdAt: '2025-12-02T07:20:00.000Z',
-  },
-];
+interface SystemConfigResponse {
+  data: Record<string, string>;
+}
 
-export function SettlementsClient() {
-  const searchParams = useSearchParams();
-  const currentTab = searchParams.get('tab') || 'all';
-  const [hospitalId, setHospitalId] = useState('');
-  const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(
-    null,
-  );
-  const [suggestions, setSuggestions] = useState<HospitalSearchItem[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSuggesting, setIsSuggesting] = useState(false);
-  const [periodFrom, setPeriodFrom] = useState('');
-  const [periodTo, setPeriodTo] = useState('');
-  const [items, setItems] = useState<SettlementRow[]>(MOCK_SETTLEMENTS);
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
-  const [pageIndex, setPageIndex] = useState(1);
-  const [cursorStack, setCursorStack] = useState<(number | null)[]>([null]);
-  const [error, setError] = useState<string | null>(null);
+/* ------------------------------------------------------------------ */
+/*  유틸리티 함수                                                       */
+/* ------------------------------------------------------------------ */
+
+/** 금액을 한국어 쉼표 형식으로 포맷 */
+function formatAmount(value: string | number): string {
+  const amount = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(amount)) return String(value);
+  return new Intl.NumberFormat('ko-KR').format(amount);
+}
+
+/** 비율을 소수점 2자리로 포맷 */
+function formatRate(value: string | number): string {
+  const rate = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(rate)) return String(value);
+  return rate.toFixed(2);
+}
+
+/** 인증 헤더 생성 */
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('accessToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** 월(YYYY-MM) 형식에서 N월 추출 */
+function extractMonthLabel(month: string): string {
+  const parts = month.split('-');
+  if (parts.length < 2) return month;
+  const m = Number(parts[1]);
+  return Number.isFinite(m) ? `${m}월` : month;
+}
+
+/* ------------------------------------------------------------------ */
+/*  정산 내역 탭 컴포넌트                                                */
+/* ------------------------------------------------------------------ */
+
+const ITEMS_PER_PAGE = 20;
+
+function SettlementListTab() {
+  /* 월 드롭다운 데이터 */
+  const [months, setMonths] = useState<string[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState('');
+
+  /* 검색 */
+  const [search, setSearch] = useState('');
+
+  /* 정산 데이터 */
+  const [rows, setRows] = useState<SettlementRow[]>([]);
+  const [summary, setSummary] = useState<SettlementSummary>({
+    totalVolume: 0,
+    avgRate: 0,
+    totalPayback: 0,
+    hospitalCount: 0,
+  });
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const statusFilter = useMemo(() => {
-    if (currentTab === 'settled') {
-      return 'SETTLED';
-    }
-    if (currentTab === 'pending') {
-      return 'PENDING_PAYMENT';
-    }
-    return '';
-  }, [currentTab]);
-
-  const filteredItems = useMemo(() => {
-    if (!statusFilter) {
-      return items;
-    }
-    return items.filter((item) => item.status === statusFilter);
-  }, [items, statusFilter]);
-
-  const summaryTotals = useMemo(() => {
-    return items.reduce(
-      (acc, item) => {
-        const payback = Number(item.paybackAmount);
-        if (Number.isFinite(payback)) {
-          acc.total += payback;
-          if (item.status === 'SETTLED') {
-            acc.settled += payback;
-          }
-          if (item.status === 'PENDING_PAYMENT') {
-            acc.pending += payback;
-          }
-        }
-        return acc;
-      },
-      { total: 0, settled: 0, pending: 0 },
-    );
-  }, [items]);
-
-  const totalLabel = useMemo(() => {
-    if (filteredItems.length === 0) {
-      return '총 0건 표시';
-    }
-    return `총 ${filteredItems.length}개 중 1-${filteredItems.length} 표시`;
-  }, [filteredItems.length]);
-
-  const getHospitalLabel = (item: SettlementRow) =>
-    item.hospital?.displayName ||
-    item.hospital?.officialName ||
-    item.hospitalId;
-
-  const sortedItems = useMemo(() => {
-    if (!sortConfig) {
-      return filteredItems;
-    }
-
-    const direction = sortConfig.direction === 'asc' ? 1 : -1;
-    const toNumber = (value: string) => {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
-
-    const getValue = (item: SettlementRow) => {
-      switch (sortConfig.key) {
-        case 'period':
-          return new Date(item.settlementPeriodStart);
-        case 'hospitalName':
-          return getHospitalLabel(item);
-        case 'totalVolume':
-          return toNumber(item.totalVolume);
-        case 'appliedRate':
-          return toNumber(item.appliedRate);
-        case 'paybackAmount':
-          return toNumber(item.paybackAmount);
-        case 'nft':
-          return item.isNftBoosted ? 1 : 0;
-        case 'status':
-          return STATUS_ORDER[item.status] ?? 99;
-        case 'settledAt':
-          return item.settledAt ? new Date(item.settledAt) : null;
-        default:
-          return null;
-      }
-    };
-
-    const sorted = [...filteredItems];
-    sorted.sort((a, b) => {
-      const aValue = getValue(a);
-      const bValue = getValue(b);
-
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-
-      if (aValue instanceof Date && bValue instanceof Date) {
-        return (aValue.getTime() - bValue.getTime()) * direction;
-      }
-
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return (aValue - bValue) * direction;
-      }
-
-      return String(aValue).localeCompare(String(bValue), 'ko') * direction;
-    });
-
-    return sorted;
-  }, [filteredItems, sortConfig]);
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig((prev) => {
-      if (prev?.key === key) {
-        return {
-          key,
-          direction: prev.direction === 'asc' ? 'desc' : 'asc',
-        };
-      }
-      return { key, direction: 'asc' };
-    });
-  };
-
-  const getSortIcon = (key: SortKey) => {
-    if (sortConfig?.key !== key) {
-      return (
-        <span
-          className="inline-flex flex-col items-center gap-[1px]"
-          aria-hidden
-        >
-          <span className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-b-[4px] border-b-muted-foreground/50" />
-          <span className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-t-[4px] border-t-muted-foreground/50" />
-        </span>
-      );
-    }
-
-    return sortConfig.direction === 'asc' ? (
-      <span
-        className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-b-[4px] border-b-muted-foreground"
-        aria-hidden
-      />
-    ) : (
-      <span
-        className="inline-block h-0 w-0 border-x-[4px] border-x-transparent border-t-[4px] border-t-muted-foreground"
-        aria-hidden
-      />
-    );
-  };
-
-  const getSortButtonClass = (align: 'left' | 'center' | 'right') => {
-    const alignClass =
-      align === 'center'
-        ? 'justify-center'
-        : align === 'right'
-          ? 'justify-end'
-          : 'justify-start';
-    return `inline-flex w-full items-center gap-1 ${alignClass}`;
-  };
-
+  /* 월 목록 로드 */
   useEffect(() => {
-    const query = hospitalId.trim();
-
-    if (!query || UUID_PATTERN.test(query)) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    setIsSuggesting(true);
-    const timeoutId = window.setTimeout(async () => {
+    async function loadMonths() {
       try {
-        const params = new URLSearchParams({
-          tab: 'all',
-          page: '1',
-          search: query,
-          scope: 'all',
+        const res = await fetch('/api/admin/settlements/months', {
+          headers: getAuthHeaders(),
         });
-        const response = await fetch(
-          `/api/admin/hospitals?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
+        if (!res.ok) return;
+        const json = (await res.json()) as { data: string[] };
+        setMonths(json.data ?? []);
+      } catch {
+        /* 월 목록 실패 시 무시 */
+      }
+    }
+    loadMonths();
+  }, []);
+
+  /* 정산 내역 로드 */
+  const fetchSettlements = useCallback(
+    async (pageNum: number) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const params = new URLSearchParams();
+        if (selectedMonth) params.set('month', selectedMonth);
+        if (search.trim()) params.set('search', search.trim());
+        params.set('page', String(pageNum));
+        params.set('limit', String(ITEMS_PER_PAGE));
+
+        const res = await fetch(
+          `/api/settlements?${params.toString()}`,
+          { headers: getAuthHeaders() },
         );
 
-        const payload = (await response
-          .json()
-          .catch(() => ({}))) as Partial<HospitalSearchResponse>;
+        const json = (await res.json().catch(() => ({}))) as Partial<
+          SettlementsResponse & { error?: string }
+        >;
 
-        if (!response.ok || hospitalId.trim() !== query) {
-          setSuggestions([]);
+        if (!res.ok) {
+          setError(json.error ?? '정산 내역 조회에 실패했습니다');
           return;
         }
 
-        const hospitals = payload.hospitals ?? [];
-        setSuggestions(hospitals);
-        setShowSuggestions(true);
-      } catch (suggestError) {
-        console.error(suggestError);
-        setSuggestions([]);
+        setRows(json.data ?? []);
+        setTotal(json.total ?? 0);
+        setPage(json.page ?? pageNum);
+        if (json.summary) setSummary(json.summary);
+      } catch {
+        setError('정산 내역 조회 중 오류가 발생했습니다');
       } finally {
-        setIsSuggesting(false);
+        setIsLoading(false);
       }
-    }, 250);
+    },
+    [selectedMonth, search],
+  );
 
-    return () => window.clearTimeout(timeoutId);
-  }, [hospitalId]);
-
-  const fetchSettlements = async (cursor?: number | null) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        setError('로그인이 필요합니다');
-        return;
-      }
-
-      const hospitalQuery = hospitalId.trim();
-
-      const params = new URLSearchParams();
-      if (selectedHospitalId) {
-        params.set('hospitalId', selectedHospitalId);
-      } else if (hospitalQuery && UUID_PATTERN.test(hospitalQuery)) {
-        params.set('hospitalId', hospitalQuery);
-      } else if (hospitalQuery) {
-        params.set('hospitalName', hospitalQuery);
-      }
-      if (periodFrom) params.set('periodFrom', periodFrom);
-      if (periodTo) params.set('periodTo', periodTo);
-      params.set('limit', '10');
-      if (cursor) params.set('cursor', String(cursor));
-
-      const response = await fetch(`/api/settlements?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const payload = (await response
-        .json()
-        .catch(() => ({}))) as Partial<SettlementsResponse> & {
-        error?: string;
-      };
-
-      if (!response.ok) {
-        setError(payload.error || '정산 내역 조회에 실패했습니다');
-        return;
-      }
-
-      const newItems = payload.data ?? [];
-      setItems(newItems);
-      setNextCursor(payload.nextCursor ?? null);
-    } catch (fetchError) {
-      setError('정산 내역 조회 중 오류가 발생했습니다');
-      console.error(fetchError);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearch = () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setError('로그인이 필요합니다');
-      return;
-    }
-    setPageIndex(1);
-    setCursorStack([null]);
-    setItems([]);
-    setNextCursor(null);
-    fetchSettlements(null);
-  };
-
+  /* 초기 로드 및 월 변경 시 재조회 */
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      return;
-    }
-    setPageIndex(1);
-    setCursorStack([null]);
-    setItems([]);
-    setNextCursor(null);
-    fetchSettlements(null);
-  }, []);
+    fetchSettlements(1);
+  }, [fetchSettlements]);
 
-  const handlePrevPage = () => {
-    if (pageIndex === 1 || isLoading) {
-      return;
-    }
-    const prevCursor = cursorStack[pageIndex - 2] ?? null;
-    setPageIndex((prev) => Math.max(prev - 1, 1));
-    setCursorStack((prev) => prev.slice(0, -1));
-    fetchSettlements(prevCursor);
+  /* 검색 실행 */
+  const handleSearch = () => {
+    setPage(1);
+    fetchSettlements(1);
   };
 
-  const handleNextPage = () => {
-    if (!nextCursor || isLoading) {
-      return;
+  /* 엑셀 다운로드 */
+  const handleExport = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (selectedMonth) params.set('month', selectedMonth);
+
+      const res = await fetch(
+        `/api/admin/settlements/export?${params.toString()}`,
+        { headers: getAuthHeaders() },
+      );
+
+      if (!res.ok) {
+        setError('엑셀 다운로드에 실패했습니다');
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `정산내역_${selectedMonth || '전체'}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('엑셀 다운로드 중 오류가 발생했습니다');
     }
-    setPageIndex((prev) => prev + 1);
-    setCursorStack((prev) => [...prev, nextCursor]);
-    fetchSettlements(nextCursor);
   };
+
+  /* 페이지네이션 계산 */
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const startIndex = (page - 1) * ITEMS_PER_PAGE + 1;
+  const endIndex = Math.min(page * ITEMS_PER_PAGE, total);
+
+  /* 월 라벨 */
+  const monthLabel = selectedMonth
+    ? extractMonthLabel(selectedMonth)
+    : '전체';
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">전체 금액</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {formatAmount(String(summaryTotals.total))}원
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">정산 완료 금액</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {formatAmount(String(summaryTotals.settled))}원
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">정산 대기 금액</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {formatAmount(String(summaryTotals.pending))}원
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* 필터 영역 */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="w-full md:w-[200px]"
+          aria-label="월 선택"
+        >
+          <option value="">전체</option>
+          {months.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </Select>
 
-      <div className="space-y-6 rounded-lg border bg-card p-6">
-        <Tabs
-          tabs={[
-            { id: 'all', label: '전체' },
-            { id: 'settled', label: '정산 완료' },
-            { id: 'pending', label: '정산 대기' },
-          ]}
-          basePath="/admin/settlements"
-          defaultTab="all"
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSearch();
+          }}
+          placeholder="병원명 / 계좌 예금주 검색"
+          className="w-full bg-background md:w-[300px]"
+          aria-label="검색"
         />
 
-        <div className="max-w-[980px]">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="w-full md:w-[360px]">
-              <div className="relative">
-                <Input
-                  value={hospitalId}
-                  onChange={(event) => {
-                    setHospitalId(event.target.value);
-                    setSelectedHospitalId(null);
-                  }}
-                  onFocus={() => {
-                    if (suggestions.length > 0) {
-                      setShowSuggestions(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    window.setTimeout(() => setShowSuggestions(false), 150);
-                  }}
-                  aria-label="병원명"
-                  placeholder="병원명을 입력해주세요"
-                  className="bg-background"
-                />
-                {showSuggestions && (
-                  <div className="border-border bg-background absolute left-0 top-full z-20 mt-0 w-full rounded-md border shadow-sm">
-                    {isSuggesting ? (
-                      <div className="text-muted-foreground px-3 py-2 text-xs">
-                        검색 중...
-                      </div>
-                    ) : suggestions.length === 0 ? (
-                      <div className="text-muted-foreground px-3 py-2 text-xs">
-                        검색 결과가 없습니다.
-                      </div>
-                    ) : (
-                      suggestions.map((hospital) => {
-                        const primaryLabel =
-                          hospital.displayName || hospital.officialName;
-                        const secondaryLabel =
-                          hospital.displayName &&
-                          hospital.displayName !== hospital.officialName
-                            ? hospital.officialName
-                            : '';
-                        return (
-                          <button
-                            key={hospital.id}
-                            type="button"
-                            className="hover:bg-secondary flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => {
-                              setHospitalId(primaryLabel);
-                              setSelectedHospitalId(hospital.id);
-                              setShowSuggestions(false);
-                            }}
-                          >
-                            <span className="font-medium">{primaryLabel}</span>
-                            {secondaryLabel && (
-                              <span className="text-muted-foreground text-xs">
-                                {secondaryLabel}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="w-full md:w-auto">
-              <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  type="date"
-                  value={periodFrom}
-                  onChange={(event) => setPeriodFrom(event.target.value)}
-                  aria-label="정산 시작일"
-                  className="bg-background w-full md:w-[200px]"
-                />
-                <span className="text-muted-foreground text-xs">~</span>
-                <Input
-                  type="date"
-                  value={periodTo}
-                  onChange={(event) => setPeriodTo(event.target.value)}
-                  aria-label="정산 종료일"
-                  className="bg-background w-full md:w-[200px]"
-                />
-              </div>
-            </div>
-            <div className="w-full md:w-auto">
-              <Button
-                type="button"
-                size="xl"
-                onClick={handleSearch}
-                disabled={isLoading}
-                className="w-full md:w-auto"
+        <Button type="button" onClick={handleSearch} disabled={isLoading}>
+          조회
+        </Button>
+      </div>
+
+      {/* 요약 카드 */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {monthLabel} 총 연동 매출액
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">
+              {formatAmount(summary.totalVolume)}원
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              평균 페이백 비율
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">
+              {formatRate(summary.avgRate)}%
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              개별 설정 비율이 우선 적용
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              이번 달 지급 예정액
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">
+              {formatAmount(summary.totalPayback)}원
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              지급 대상 {summary.hospitalCount}곳
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 에러 메시지 */}
+      {error && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {/* 테이블 */}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>병원명 (사업자번호)</TableHead>
+            <TableHead className="text-right">연동 매출액</TableHead>
+            <TableHead className="text-right">적용 비율(%)</TableHead>
+            <TableHead className="text-right">지급액</TableHead>
+            <TableHead>입금 계좌</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 && !isLoading ? (
+            <TableRow>
+              <TableCell
+                colSpan={5}
+                className="py-8 text-center text-muted-foreground"
               >
-                조회
-              </Button>
-            </div>
-          </div>
-        </div>
+                조회된 정산 내역이 없습니다.
+              </TableCell>
+            </TableRow>
+          ) : (
+            rows.map((row) => {
+              const hospitalName =
+                row.hospital.displayName || row.hospital.officialName;
+              const accountInfo =
+                row.hospital.accountBank && row.hospital.accountNumber
+                  ? `${row.hospital.accountBank} ${row.hospital.accountNumber}`
+                  : '-';
 
-        {error && (
-          <div className="border-destructive/30 bg-destructive/10 rounded-lg border px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
+              return (
+                <TableRow key={row.id}>
+                  <TableCell>
+                    <div>
+                      <span className="font-medium">{hospitalName}</span>
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({row.hospital.businessNumber})
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    {formatAmount(row.totalVolume)}원
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    {formatRate(row.appliedRate)}%
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    {formatAmount(row.paybackAmount)}원
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {accountInfo}
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
 
-        <div className="rounded-lg border">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] table-fixed">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[180px] whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('period')}
-                      className={getSortButtonClass('left')}
-                    >
-                      <span>기간</span>
-                      {getSortIcon('period')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[150px]">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('hospitalName')}
-                      className={getSortButtonClass('left')}
-                    >
-                      <span>병원명</span>
-                      {getSortIcon('hospitalName')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground w-[140px]">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('paybackAmount')}
-                      className={getSortButtonClass('right')}
-                    >
-                      <span>페이백</span>
-                      {getSortIcon('paybackAmount')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[110px] whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('status')}
-                      className={getSortButtonClass('left')}
-                    >
-                      <span>정산 상태</span>
-                      {getSortIcon('status')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-[110px] whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('settledAt')}
-                      className={getSortButtonClass('left')}
-                    >
-                      <span>정산일</span>
-                      {getSortIcon('settledAt')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-center font-medium text-muted-foreground w-[90px]">
-                    관리
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredItems.length === 0 && !isLoading ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-8 text-center text-muted-foreground"
-                    >
-                      조회된 정산 내역이 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  sortedItems.map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {formatPeriod(
-                          item.settlementPeriodStart,
-                          item.settlementPeriodEnd,
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="block max-w-[150px] truncate">
-                          {getHospitalLabel(item)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        {formatAmount(item.paybackAmount)}원
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          className={
-                            item.status === 'SETTLED'
-                              ? 'bg-blue-600 text-white hover:bg-blue-600'
-                              : 'bg-amber-400 text-amber-950 hover:bg-amber-400'
-                          }
-                        >
-                          {STATUS_LABELS[item.status]}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {item.settledAt ? formatDate(item.settledAt) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Button asChild variant="outline" size="sm">
-                          <Link
-                            href={`/admin/settlements/${item.publicId ?? item.id}`}
-                          >
-                            상세
-                          </Link>
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="flex min-h-10 items-center justify-between">
-          <p className="text-muted-foreground text-sm">
-            {isLoading ? '데이터를 불러오는 중입니다' : totalLabel}
+      {/* 하단: 엑셀 다운로드 + 페이지네이션 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+          >
+            <Download className="mr-1 h-4 w-4" />
+            엑셀 다운로드
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            {isLoading
+              ? '데이터를 불러오는 중입니다'
+              : total > 0
+                ? `총 ${total}건 중 ${startIndex}-${endIndex} 표시`
+                : '총 0건'}
           </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handlePrevPage}
-              disabled={pageIndex === 1 || isLoading}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="min-w-[2.5rem] bg-gray-900 text-white hover:bg-gray-800 hover:text-white"
-              disabled
-            >
-              {pageIndex}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={!nextCursor || isLoading}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fetchSettlements(page - 1)}
+            disabled={page <= 1 || isLoading}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-w-[2.5rem] bg-gray-900 text-white hover:bg-gray-800 hover:text-white"
+            disabled
+          >
+            {page}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fetchSettlements(page + 1)}
+            disabled={page >= totalPages || isLoading}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-function formatAmount(value: string) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) {
-    return value;
-  }
-  return new Intl.NumberFormat('ko-KR').format(amount);
+/* ------------------------------------------------------------------ */
+/*  페이백 설정 탭 컴포넌트                                              */
+/* ------------------------------------------------------------------ */
+
+function PaybackSettingsTab() {
+  /* 전체 비율 설정 */
+  const [defaultRate, setDefaultRate] = useState('');
+  const [isSavingRate, setIsSavingRate] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
+  const [rateSuccess, setRateSuccess] = useState<string | null>(null);
+
+  /* 개별 설정 병원 리스트 */
+  const [hospitals, setHospitals] = useState<PaybackSettingRow[]>([]);
+  const [isLoadingHospitals, setIsLoadingHospitals] = useState(false);
+  const [hospitalsError, setHospitalsError] = useState<string | null>(null);
+
+  /* 전체 비율 로드 */
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/admin/system-config', {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as SystemConfigResponse;
+        const rate = json.data?.DEFAULT_PAYBACK_RATE;
+        if (rate) setDefaultRate(rate);
+      } catch {
+        /* 로드 실패 시 무시 */
+      }
+    }
+    loadConfig();
+  }, []);
+
+  /* 전체 비율 저장 */
+  const handleSaveRate = async () => {
+    setIsSavingRate(true);
+    setRateError(null);
+    setRateSuccess(null);
+
+    try {
+      const res = await fetch('/api/admin/system-config', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ DEFAULT_PAYBACK_RATE: defaultRate }),
+      });
+
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setRateError(json.error ?? '저장에 실패했습니다');
+        return;
+      }
+
+      setRateSuccess('저장되었습니다');
+      setTimeout(() => setRateSuccess(null), 3000);
+    } catch {
+      setRateError('저장 중 오류가 발생했습니다');
+    } finally {
+      setIsSavingRate(false);
+    }
+  };
+
+  /* 개별 설정 병원 리스트 로드 */
+  useEffect(() => {
+    async function loadHospitals() {
+      setIsLoadingHospitals(true);
+      setHospitalsError(null);
+
+      try {
+        const res = await fetch('/api/admin/settlements/payback-settings', {
+          headers: getAuthHeaders(),
+        });
+
+        if (!res.ok) {
+          setHospitalsError('개별 설정 목록을 불러오는 데 실패했습니다');
+          return;
+        }
+
+        const json = (await res.json()) as { data: PaybackSettingRow[] };
+        setHospitals(json.data ?? []);
+      } catch {
+        setHospitalsError('개별 설정 목록 조회 중 오류가 발생했습니다');
+      } finally {
+        setIsLoadingHospitals(false);
+      }
+    }
+    loadHospitals();
+  }, []);
+
+  /** 상태 뱃지 스타일 */
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return (
+          <Badge className="bg-green-600 text-white hover:bg-green-600">
+            활성
+          </Badge>
+        );
+      case 'PENDING':
+        return (
+          <Badge className="bg-amber-400 text-amber-950 hover:bg-amber-400">
+            대기
+          </Badge>
+        );
+      case 'SUSPENDED':
+        return (
+          <Badge className="bg-red-600 text-white hover:bg-red-600">
+            정지
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-gray-400 text-white hover:bg-gray-400">
+            {status}
+          </Badge>
+        );
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* 전체 비율 설정 카드 */}
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle>전체 리워드 비율 설정</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-3">
+            <div className="w-[200px]">
+              <label
+                htmlFor="default-payback-rate"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
+                리워드 비율 (%)
+              </label>
+              <Input
+                id="default-payback-rate"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={defaultRate}
+                onChange={(e) => setDefaultRate(e.target.value)}
+                className="bg-background"
+                placeholder="예: 5.00"
+              />
+            </div>
+            <Button
+              type="button"
+              onClick={handleSaveRate}
+              disabled={isSavingRate || !defaultRate.trim()}
+            >
+              {isSavingRate ? '저장 중...' : '저장'}
+            </Button>
+          </div>
+          {rateError && (
+            <p className="mt-2 text-sm text-destructive">{rateError}</p>
+          )}
+          {rateSuccess && (
+            <p className="mt-2 text-sm text-green-600">{rateSuccess}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 개별 설정 병원 리스트 */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">개별 설정 병원</h3>
+
+        {hospitalsError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {hospitalsError}
+          </div>
+        )}
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>병원명</TableHead>
+              <TableHead>대표자명</TableHead>
+              <TableHead className="text-right">적용 비율(%)</TableHead>
+              <TableHead>상태</TableHead>
+              <TableHead className="text-center">관리</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {hospitals.length === 0 && !isLoadingHospitals ? (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="py-8 text-center text-muted-foreground"
+                >
+                  개별 설정된 병원이 없습니다.
+                </TableCell>
+              </TableRow>
+            ) : (
+              hospitals.map((h) => {
+                const hospitalName = h.displayName || h.officialName;
+                return (
+                  <TableRow key={h.id}>
+                    <TableCell className="font-medium">
+                      {hospitalName}
+                    </TableCell>
+                    <TableCell>{h.ceoName ?? '-'}</TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      {formatRate(h.paybackRate)}%
+                    </TableCell>
+                    <TableCell>{getStatusBadge(h.status)}</TableCell>
+                    <TableCell className="text-center">
+                      <Button asChild variant="outline" size="sm">
+                        <Link
+                          href={`/admin/hospitals/${h.id}?detailTab=settlement`}
+                        >
+                          관리
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleDateString('ko-KR');
-}
+/* ------------------------------------------------------------------ */
+/*  메인 컴포넌트                                                       */
+/* ------------------------------------------------------------------ */
 
-function formatPeriod(start: string, end: string) {
-  return `${formatDate(start)} ~ ${formatDate(end)}`;
+export function SettlementsClient() {
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'history';
+
+  return (
+    <div className="space-y-6 p-6">
+      <Tabs
+        tabs={[
+          { id: 'history', label: '정산 내역' },
+          { id: 'payback', label: '페이백 설정' },
+        ]}
+        basePath="/admin/settlements"
+        paramName="tab"
+        defaultTab="history"
+      />
+
+      {currentTab === 'payback' ? (
+        <PaybackSettingsTab />
+      ) : (
+        <SettlementListTab />
+      )}
+    </div>
+  );
 }

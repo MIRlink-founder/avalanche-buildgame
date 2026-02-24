@@ -1,5 +1,3 @@
-'use client';
-
 import { SettlementsClient } from './settlements-client';
 
 export default function SettlementsPage() {
