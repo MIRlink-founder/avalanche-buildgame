@@ -98,4 +98,91 @@ export const erc20Abi = [
       { name: 'value', type: 'uint256', indexed: false },
     ],
   },
-] as const
+] as const;
+
+/**
+ * 진료 기록 이벤트 저장 컨트랙트 ABI
+ *
+ * as const 필수 — wagmi/viem 타입 추론에 필요
+ */
+export const medicalRecordStoreAbi = [
+  {
+    inputs: [],
+    stateMutability: 'nonpayable',
+    type: 'constructor',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'uint256',
+        name: 'medicalRecordId',
+        type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'bytes32',
+        name: 'dataHash',
+        type: 'bytes32',
+      },
+      {
+        indexed: false,
+        internalType: 'bytes',
+        name: 'encryptedPayload',
+        type: 'bytes',
+      },
+    ],
+    name: 'MedicalRecordStored',
+    type: 'event',
+  },
+  {
+    inputs: [],
+    name: 'owner',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: 'medicalRecordId',
+        type: 'uint256',
+      },
+      {
+        internalType: 'bytes32',
+        name: 'dataHash',
+        type: 'bytes32',
+      },
+      {
+        internalType: 'bytes',
+        name: 'encryptedPayload',
+        type: 'bytes',
+      },
+    ],
+    name: 'storeRecord',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'newOwner',
+        type: 'address',
+      },
+    ],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+] as const;
