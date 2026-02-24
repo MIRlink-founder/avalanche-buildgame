@@ -1,3 +1,4 @@
+import Footer from '@/components/layout/Footer';
 import Navigation from '@/components/layout/Navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 

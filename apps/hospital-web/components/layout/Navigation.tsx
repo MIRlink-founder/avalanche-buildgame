@@ -11,6 +11,7 @@ import { ChevronDown } from 'lucide-react';
 
 const HOSPITAL_MENU_PATHS = [
   '/dashboard',
+  '/records',
   '/settlements',
   '/reports',
   '/support',
