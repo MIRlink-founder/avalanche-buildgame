@@ -224,3 +224,48 @@ export async function sendRejectionEmail(
     html,
   });
 }
+
+export interface SendWalletLowBalanceEmailParams {
+  to: string;
+  balanceAvax: string;
+  thresholdAvax: string;
+  networkName: string;
+}
+
+// 지갑 잔액 부족 알림 메일 발송
+export async function sendWalletLowBalanceEmail(
+  params: SendWalletLowBalanceEmailParams,
+): Promise<void> {
+  const { to, balanceAvax, thresholdAvax, networkName } = params;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+  <p>안녕하세요, 미르링크(Mirlink) 운영팀입니다.</p>
+
+  <p><strong>가스비 대납용 마스터 지갑 잔액이 설정하신 기준보다 낮습니다.</strong></p>
+
+  <ul>
+    <li>네트워크: ${networkName}</li>
+    <li>현재 잔액: <strong>${balanceAvax} AVAX</strong></li>
+    <li>알림 기준: ${thresholdAvax} AVAX</li>
+  </ul>
+
+  <p>잔액을 보충해 주시지 않으면 병원 진료 데이터 블록체인 등록이 실패할 수 있습니다.<br>
+  관리자 지갑 관리 페이지에서 잔액을 확인하고 AVAX를 충전해 주세요.</p>
+
+  <p>문의처: help@mirlink.com</p>
+</body>
+</html>
+`;
+
+  const transporter = getTransport();
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    to,
+    subject: '[미르링크] 지갑 잔액 부족 알림',
+    html,
+  });
+}
