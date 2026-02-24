@@ -77,8 +77,8 @@ function formatDateTime(iso: string): string {
 export function WalletClient() {
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [settings, setSettings] = useState<WalletSettings>({
-    minBalanceAvax: '100',
-    notificationEmail: 'admin@mirlink.io',
+    minBalanceAvax: '',
+    notificationEmail: '',
   });
   const [txList, setTxList] = useState<TxRow[]>([]);
   const [txTotalCount, setTxTotalCount] = useState(0);

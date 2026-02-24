@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, AuthError, isAdminRole } from '@/lib/auth-guard';
 import { createPublicViemClient } from '@mire/blockchain/viem/clients';
-import { avalanche } from '@mire/blockchain/wagmi/chains';
+import { avalanche, avalancheFuji } from '@mire/blockchain/wagmi/chains';
 import { formatEther } from 'viem';
 
 /** 지갑 연결 정보 및 현재 잔액 조회 (운영사 관리자 전용) */
@@ -19,8 +19,14 @@ export async function GET(request: Request) {
       | `0x${string}`
       | undefined;
 
-    const networkName = 'Avalanche';
-    const symbol = avalanche.nativeCurrency.symbol;
+    const chainId = process.env.NEXT_PUBLIC_CHAIN_ID;
+    const networkName =
+      chainId === '43113'
+        ? 'Avalanche Fuji Testnet'
+        : chainId === '43114'
+          ? 'Avalanche C-Chain'
+          : 'Avalanche C-Chain';
+    const symbol = avalancheFuji.nativeCurrency.symbol;
 
     if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
       return NextResponse.json({
@@ -32,7 +38,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const client = createPublicViemClient(avalanche);
+    const client = createPublicViemClient(avalancheFuji);
     const balance = await client.getBalance({ address: walletAddress });
     const balanceFormatted = formatEther(balance);
 
