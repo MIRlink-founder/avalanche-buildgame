@@ -1,6 +1,8 @@
 // 진료 기록 view/create 에서 사용하는 세션 키
 export const SESSION_KEY_RECORD_PATIENT_ID = 'recordPatientId';
 export const SESSION_KEY_RECORD_PIN_CODE = 'recordPinCode';
+// view → create 편집 시 전달용
+export const SESSION_KEY_RECORD_EDIT_PAYLOAD = 'recordEditPayload';
 
 // 구분자
 export const BARCODE_PATIENT_PIN_SEPARATOR = '#';

@@ -55,13 +55,13 @@ export function BarcodeScanModal({
       sessionStorage.setItem(SESSION_KEY_RECORD_PIN_CODE, parsed.pin);
     }
     setChecking(true);
-    fetch('/api/records/patient', {
+    fetch('/api/records/latest', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({ patientId: parsed.patientId }),
+      body: JSON.stringify({ patientId: parsed.patientId, metaOnly: true }),
     })
       .then((res) => {
         if (redirectIfUnauthorized(res)) return null;

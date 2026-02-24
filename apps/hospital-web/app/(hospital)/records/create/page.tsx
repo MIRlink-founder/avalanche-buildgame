@@ -8,6 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@mire/ui';
 import { AlertModal } from '@/components/layout/AlertModal';
 import {
@@ -30,6 +31,7 @@ import { redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
   SESSION_KEY_RECORD_PATIENT_ID,
   SESSION_KEY_RECORD_PIN_CODE,
+  SESSION_KEY_RECORD_EDIT_PAYLOAD,
 } from '@/lib/records-session';
 import { encryptWithPin } from '@/lib/records-encrypt-client';
 import { BookSearch, ClipboardClock, ClipboardPen, Copy } from 'lucide-react';
@@ -71,6 +73,7 @@ function CreateContent() {
   const [savedRecords, setSavedRecords] = useState<SavedTreatmentRecord[]>([]); // 임시 저장 데이터
   const [activeSheetId, setActiveSheetId] = useState<string | 'add'>('add'); // 현재 선택된 진료 시트 탭
   const consumedSessionRef = useRef(false);
+  const fromEditPayloadRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -78,6 +81,9 @@ function CreateContent() {
       SESSION_KEY_RECORD_PATIENT_ID,
     );
     const storedPin = sessionStorage.getItem(SESSION_KEY_RECORD_PIN_CODE);
+    const editPayloadRaw = sessionStorage.getItem(
+      SESSION_KEY_RECORD_EDIT_PAYLOAD,
+    );
     if (!storedPatientId) {
       if (!consumedSessionRef.current) {
         alert('환자 카드의 바코드를 먼저 스캔해주세요.');
@@ -87,8 +93,45 @@ function CreateContent() {
     }
     setPatientId(storedPatientId);
     setPinCode(storedPin ?? '');
-    sessionStorage.removeItem(SESSION_KEY_RECORD_PATIENT_ID);
-    sessionStorage.removeItem(SESSION_KEY_RECORD_PIN_CODE);
+    // session(patientId, pinCode)은 remove 하지 않음 — view↔create 이동 시 조회/편집에 필요
+    if (editPayloadRaw) {
+      fromEditPayloadRef.current = true;
+      try {
+        const { preInfo: editPreInfo, treatmentSheets: editSheets } =
+          JSON.parse(editPayloadRaw) as {
+            preInfo?: PreInfo;
+            treatmentSheets?: TreatmentSheet[];
+          };
+        sessionStorage.removeItem(SESSION_KEY_RECORD_EDIT_PAYLOAD);
+        if (editPreInfo) setPreInfo(editPreInfo);
+        if (Array.isArray(editSheets) && editSheets.length > 0) {
+          const asSaved: SavedTreatmentRecord[] = editSheets.map((s) => ({
+            id: s.id,
+            tooth: s.tooth,
+            type: s.type,
+            formData: s.formData,
+            date: new Date(),
+          }));
+          setSavedRecords(asSaved);
+          const first = editSheets[0];
+          setSelectedTeeth(first.tooth);
+          const sheetsForFirst = editSheets
+            .filter((r) => r.tooth === first.tooth)
+            .map((r) => ({
+              id: r.id,
+              tooth: r.tooth,
+              type: r.type,
+              formData: r.formData,
+            }));
+          setTreatmentSheets(sheetsForFirst);
+          setActiveSheetId(first.id);
+        }
+      } catch {
+        sessionStorage.removeItem(SESSION_KEY_RECORD_EDIT_PAYLOAD);
+      }
+      consumedSessionRef.current = true;
+      return;
+    }
     consumedSessionRef.current = true;
   }, [router]);
 
@@ -96,13 +139,13 @@ function CreateContent() {
     if (!patientId) return;
     let cancelled = false;
     setPatientLoading(true);
-    fetch('/api/records/patient', {
+    fetch('/api/records/latest', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({ patientId }),
+      body: JSON.stringify({ patientId, metaOnly: true }),
     })
       .then((res) => {
         if (redirectIfUnauthorized(res)) return null;
@@ -110,6 +153,7 @@ function CreateContent() {
       })
       .then((data: PatientCheckResult | null) => {
         if (cancelled) return;
+        if (fromEditPayloadRef.current) return; // view 편집으로 들어온 경우 모달 스킵
         if (data?.exists) {
           setModalMode('dateOnly');
           setExistingPatientGender(data.patientGender === 'F' ? 'F' : 'M');
@@ -119,7 +163,8 @@ function CreateContent() {
         setPreInfoModalOpen(true);
       })
       .catch(() => {
-        if (!cancelled) setPreInfoModalOpen(true);
+        if (cancelled || fromEditPayloadRef.current) return;
+        setPreInfoModalOpen(true);
         setModalMode('full');
       })
       .finally(() => {
@@ -279,7 +324,22 @@ function CreateContent() {
       alert('사전 정보를 입력해주세요.');
       return;
     }
-    if (treatmentSheets.length === 0) {
+    // 등록 시 전체 진료 목록 사용 (savedRecords가 있으면 전체, 없으면 현재 치아 시트만)
+    const sheetsToSend =
+      savedRecords.length > 0
+        ? savedRecords.map((r) => ({
+            id: r.id,
+            tooth: r.tooth,
+            type: r.type,
+            formData: r.formData,
+          }))
+        : treatmentSheets.map((s) => ({
+            id: s.id,
+            tooth: s.tooth,
+            type: s.type,
+            formData: s.formData,
+          }));
+    if (sheetsToSend.length === 0) {
       alert(
         '추가된 진료 시트가 없습니다. 치아를 선택한 뒤 진료 타입을 추가해주세요.',
       );
@@ -295,12 +355,7 @@ function CreateContent() {
       const payload = {
         version: 1,
         preInfo,
-        treatmentSheets: treatmentSheets.map((s) => ({
-          id: s.id,
-          tooth: s.tooth,
-          type: s.type,
-          formData: s.formData,
-        })),
+        treatmentSheets: sheetsToSend,
       };
       const encryptedPayload = await encryptWithPin(
         JSON.stringify(payload),
@@ -361,8 +416,10 @@ function CreateContent() {
     <div className="min-h-[calc(100vh-80px)] flex flex-col px-4 pt-6 sm:px-6 lg:px-8 gap-4">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-foreground">진료 기록 생성</h1>
-        <Button variant="ghost">
-          <BookSearch /> 진료 기록 조회
+        <Button variant="ghost" asChild>
+          <Link href="/records/view">
+            <BookSearch /> 진료 기록 조회
+          </Link>
         </Button>
       </header>
 
@@ -797,12 +854,12 @@ function CreateContent() {
                 label: '확인',
                 onClick: () => {
                   setRegisterResult(null);
-                  // if (
-                  //   registerResult !== null &&
-                  //   registerResult.status === 'success'
-                  // ) {
-                  //   router.push('/dashboard');
-                  // }
+                  if (
+                    registerResult !== null &&
+                    registerResult.status === 'success'
+                  ) {
+                    router.push('/records/view');
+                  }
                 },
               }
         }
