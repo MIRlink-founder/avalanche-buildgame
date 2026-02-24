@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  Suspense,
+  useRef,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@mire/ui';
 import { AlertModal } from '@/components/layout/AlertModal';
@@ -11,9 +17,6 @@ import {
 } from '@/components/records/PreInfoModal';
 import { PatientInfoBar } from '@/components/records/PatientInfoBar';
 import { ToothChart } from '@/components/records/ToothChart';
-import { ImplantPlacementSheet } from '@/components/records/ImplantPlacementSheet';
-import { ImplantProsthesisSheet } from '@/components/records/ImplantProsthesisSheet';
-import { LaminateSheet } from '@/components/records/LaminateSheet';
 import {
   type TreatmentSheet,
   type TreatmentSheetType,
@@ -26,9 +29,10 @@ import { getAuthHeaders } from '@/lib/get-auth-headers';
 import { redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
   SESSION_KEY_RECORD_PATIENT_ID,
-  DUMMY_BARCODE,
+  SESSION_KEY_RECORD_PIN_CODE,
 } from '@/lib/records-session';
-import { BookSearch, ClipboardClock, ClipboardPen } from 'lucide-react';
+import { encryptWithPin } from '@/lib/records-encrypt-client';
+import { BookSearch, ClipboardClock, ClipboardPen, Copy } from 'lucide-react';
 import { ToothQuadrantCell } from '@/components/records/ToothQuadrantCell';
 
 function generateSheetId() {
@@ -43,6 +47,7 @@ interface PatientCheckResult {
 function CreateContent() {
   const router = useRouter();
   const [patientId, setPatientId] = useState<string | null>(null);
+  const [pinCode, setPinCode] = useState<string | null>(null);
   const [patientLoading, setPatientLoading] = useState(true);
   const [modalMode, setModalMode] = useState<PreInfoModalMode>('full');
   const [existingPatientGender, setExistingPatientGender] = useState<'M' | 'F'>(
@@ -53,32 +58,51 @@ function CreateContent() {
   const [isEditingPreInfo, setIsEditingPreInfo] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [registerConfirmOpen, setRegisterConfirmOpen] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [registerResult, setRegisterResult] = useState<
+    | null
+    | { status: 'signing' }
+    | { status: 'success'; txHash: string }
+    | { status: 'error'; message: string }
+  >(null);
   const [selectedTeeth, setSelectedTeeth] = useState<number | null>(null);
   const [treatmentSheets, setTreatmentSheets] = useState<TreatmentSheet[]>([]);
   const [savedRecords, setSavedRecords] = useState<SavedTreatmentRecord[]>([]); // 임시 저장 데이터
   const [activeSheetId, setActiveSheetId] = useState<string | 'add'>('add'); // 현재 선택된 진료 시트 탭
+  const consumedSessionRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const stored = sessionStorage.getItem(SESSION_KEY_RECORD_PATIENT_ID);
-    if (!stored) {
-      alert('환자 카드의 바코드를 먼저 스캔해주세요.');
-      router.replace('/dashboard');
+    const storedPatientId = sessionStorage.getItem(
+      SESSION_KEY_RECORD_PATIENT_ID,
+    );
+    const storedPin = sessionStorage.getItem(SESSION_KEY_RECORD_PIN_CODE);
+    if (!storedPatientId) {
+      if (!consumedSessionRef.current) {
+        alert('환자 카드의 바코드를 먼저 스캔해주세요.');
+        router.replace('/dashboard');
+      }
       return;
     }
-    try {
-      setPatientId(decodeURIComponent(stored));
-    } catch {
-      setPatientId(DUMMY_BARCODE);
-    }
+    setPatientId(storedPatientId);
+    setPinCode(storedPin ?? '');
+    sessionStorage.removeItem(SESSION_KEY_RECORD_PATIENT_ID);
+    sessionStorage.removeItem(SESSION_KEY_RECORD_PIN_CODE);
+    consumedSessionRef.current = true;
   }, [router]);
 
   useEffect(() => {
     if (!patientId) return;
     let cancelled = false;
     setPatientLoading(true);
-    fetch(`/api/records/patient?patientId=${encodeURIComponent(patientId)}`, {
-      headers: getAuthHeaders(),
+    fetch('/api/records/patient', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ patientId }),
     })
       .then((res) => {
         if (redirectIfUnauthorized(res)) return null;
@@ -244,9 +268,87 @@ function CreateContent() {
     router.push('/dashboard');
   };
 
-  const handleRegisterConfirm = () => {
-    setRegisterConfirmOpen(false); // TODO: 등록
-    alert('진료 기록이 등록되었습니다.');
+  const handleRegisterConfirmClick = () => {
+    setRegisterConfirmOpen(false);
+    setPaymentConfirmOpen(true);
+  };
+
+  const handleRegisterConfirm = async () => {
+    setPaymentConfirmOpen(false);
+    if (!preInfo) {
+      alert('사전 정보를 입력해주세요.');
+      return;
+    }
+    if (treatmentSheets.length === 0) {
+      alert(
+        '추가된 진료 시트가 없습니다. 치아를 선택한 뒤 진료 타입을 추가해주세요.',
+      );
+      return;
+    }
+    if (!patientId || !pinCode) {
+      alert('환자 정보가 없습니다. 바코드를 다시 스캔해주세요.');
+      return;
+    }
+    setRegisterLoading(true);
+    setRegisterResult({ status: 'signing' });
+    try {
+      const payload = {
+        version: 1,
+        preInfo,
+        treatmentSheets: treatmentSheets.map((s) => ({
+          id: s.id,
+          tooth: s.tooth,
+          type: s.type,
+          formData: s.formData,
+        })),
+      };
+      const encryptedPayload = await encryptWithPin(
+        JSON.stringify(payload),
+        pinCode,
+      );
+      const res = await fetch('/api/records/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          patientId,
+          encryptedPayload,
+        }),
+      });
+      if (redirectIfUnauthorized(res)) {
+        setRegisterResult(null);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        setRegisterResult({
+          status: 'error',
+          message: data?.error ?? '진료 기록 등록에 실패했습니다.',
+        });
+        return;
+      }
+      if (data.success) {
+        setRegisterResult({
+          status: 'success',
+          txHash: data.txHash ?? '',
+        });
+      } else {
+        setRegisterResult({
+          status: 'error',
+          message: `블록체인 전송이 실패했습니다. (txHash: ${data.txHash ?? '없음'})`,
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setRegisterResult({
+        status: 'error',
+        message: '진료 기록 등록 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setRegisterLoading(false);
+    }
   };
 
   if (!patientId) {
@@ -295,7 +397,10 @@ function CreateContent() {
           >
             <ClipboardClock /> 임시 저장
           </Button>
-          <Button onClick={() => setRegisterConfirmOpen(true)}>
+          <Button
+            onClick={() => setRegisterConfirmOpen(true)}
+            disabled={registerLoading}
+          >
             <ClipboardPen /> 진료 기록 등록
           </Button>
         </div>
@@ -581,8 +686,126 @@ function CreateContent() {
         }}
         primaryButton={{
           label: '등록',
-          onClick: handleRegisterConfirm,
+          onClick: handleRegisterConfirmClick,
         }}
+      />
+
+      <AlertModal
+        open={paymentConfirmOpen}
+        onOpenChange={setPaymentConfirmOpen}
+        title="결제를 진행해주세요"
+        message={
+          <div>
+            포스기에서 결제를 진행한 뒤,
+            <br />
+            결제가 완료되면 확인 버튼을 눌러주세요.
+          </div>
+        }
+        secondaryButton={{
+          label: '취소',
+          onClick: () => setPaymentConfirmOpen(false),
+        }}
+        primaryButton={{
+          label: registerLoading ? '등록 중…' : '확인',
+          onClick: handleRegisterConfirm,
+          disabled: registerLoading,
+        }}
+      />
+
+      <AlertModal
+        open={registerResult !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRegisterResult(null);
+            // if (
+            //   registerResult !== null &&
+            //   registerResult.status === 'success'
+            // ) {
+            //   router.push('/dashboard');
+            // }
+          }
+        }}
+        title={
+          registerResult?.status === 'signing'
+            ? '지갑 서명 중'
+            : registerResult?.status === 'success'
+              ? '진료 기록 등록 완료'
+              : registerResult?.status === 'error'
+                ? '등록 실패'
+                : ''
+        }
+        message={
+          registerResult?.status === 'signing' ? (
+            <div>블록체인에 기록을 저장하고 있습니다.</div>
+          ) : registerResult?.status === 'success' ? (
+            <>
+              <span className="block">
+                진료 기록을 안전하게 <br />
+                블록체인 네트워크에 등록 하였습니다.
+              </span>
+              {registerResult.txHash && (
+                <span className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+                  <span className="text-sm break-all font-mono text-muted-foreground">
+                    TXID:{' '}
+                    {registerResult.txHash.length <= 12
+                      ? registerResult.txHash
+                      : `${registerResult.txHash.slice(0, 4)}...${registerResult.txHash.slice(-4)}`}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        registerResult.txHash ?? '',
+                      );
+                    }}
+                    title="주소 복사"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </span>
+              )}
+            </>
+          ) : registerResult?.status === 'error' ? (
+            <div>{registerResult.message}</div>
+          ) : (
+            <div />
+          )
+        }
+        secondaryButton={
+          registerResult?.status === 'signing'
+            ? undefined
+            : {
+                label: '홈으로',
+                onClick: () => {
+                  setRegisterResult(null);
+                  if (
+                    registerResult !== null &&
+                    registerResult.status === 'success'
+                  ) {
+                    router.push('/dashboard');
+                  }
+                },
+              }
+        }
+        primaryButton={
+          registerResult?.status === 'signing'
+            ? undefined
+            : {
+                label: '확인',
+                onClick: () => {
+                  setRegisterResult(null);
+                  // if (
+                  //   registerResult !== null &&
+                  //   registerResult.status === 'success'
+                  // ) {
+                  //   router.push('/dashboard');
+                  // }
+                },
+              }
+        }
       />
     </div>
   );

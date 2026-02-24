@@ -14,7 +14,11 @@ export interface AlertModalProps {
   onOpenChange: (open: boolean) => void;
   title?: string;
   message: ReactNode;
-  primaryButton?: { label: string; onClick: () => void };
+  primaryButton?: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+  };
   secondaryButton?: { label: string; onClick: () => void };
 }
 
@@ -47,7 +51,12 @@ export function AlertModal({
             </Button>
           )}
           {primaryButton && (
-            <Button className="w-1/2" size="xl" onClick={primaryButton.onClick}>
+            <Button
+              className="w-1/2"
+              size="xl"
+              onClick={primaryButton.onClick}
+              disabled={primaryButton.disabled}
+            >
               {primaryButton.label}
             </Button>
           )}
