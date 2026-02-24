@@ -13,6 +13,7 @@ declare namespace NodeJS {
     SMTP_USER?: string;
     SMTP_PASS?: string;
     SMTP_FROM?: string;
+    CRON_SECRET?: string;
 
     // 클라이언트 노출 가능 (NEXT_PUBLIC_ 접두사)
     NEXT_PUBLIC_CHAIN_ID: string;

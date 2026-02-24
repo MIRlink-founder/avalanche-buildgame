@@ -772,6 +772,8 @@ model WalletNotificationSetting {
   minBalanceAvax String @db.VarChar(50) @map("min_balance_avax")
   /// 알림 수신 이메일
   notificationEmail String @db.VarChar(100) @map("notification_email")
+  /// 마지막 잔액 부족 알림 발송 시각 (같은 저잔액 구간에서 중복 발송 방지)
+  lastLowBalanceAlertedAt DateTime? @map("last_low_balance_alerted_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("wallet_notification_settings")

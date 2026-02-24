@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/wallet-balance-alert",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
