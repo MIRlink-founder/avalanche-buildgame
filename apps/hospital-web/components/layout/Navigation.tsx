@@ -8,6 +8,8 @@ import { Button } from '@mire/ui/components/button';
 import { cn } from '@mire/ui';
 import { getPayloadFromToken } from '@/lib/decode-token';
 import { ChevronDown } from 'lucide-react';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { FEATURES } from '@/lib/permissions/features';
 
 const HOSPITAL_MENU_PATHS = [
   '/dashboard',
@@ -37,6 +39,9 @@ export default function Navigation() {
     pathname === '/' || (pathname?.startsWith('/auth') ?? false);
   const showMenu =
     pathname != null && !showLogin && isHospitalMenuPath(pathname);
+
+  // Reports 기능 접근 권한 체크
+  const { allowed: canAccessReports } = useFeatureAccess(FEATURES.REPORTS);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -89,9 +94,11 @@ export default function Navigation() {
             <NavLink href="/settlements" current={pathname === '/settlements'}>
               정산 관리
             </NavLink>
-            <NavLink href="/reports" current={pathname === '/reports'}>
-              데이터 리포트
-            </NavLink>
+            {canAccessReports && (
+              <NavLink href="/reports" current={pathname === '/reports'}>
+                데이터 리포트
+              </NavLink>
+            )}
             <NavLink href="/support" current={pathname === '/support'}>
               고객지원
             </NavLink>

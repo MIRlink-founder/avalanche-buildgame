@@ -98,6 +98,32 @@ async function main() {
     },
   });
 
+  // 같은 병원의 추가 의사 계정 (테스트용)
+  const doctor2PasswordHash = bcrypt.hashSync('doctor123', 10);
+  const doctor2User = await prisma.user.upsert({
+    where: { email: 'doctor2@mire.com' },
+    update: {
+      hospitalId: hospital.id,
+      role: 'DEPT_ADMIN',
+      status: 'ACTIVE',
+      name: '미르치과 진료의사2',
+    },
+    create: {
+      email: 'doctor2@mire.com',
+      passwordHash: doctor2PasswordHash,
+      name: '미르치과 진료의사2',
+      role: 'DEPT_ADMIN',
+      status: 'ACTIVE',
+      hospitalId: hospital.id,
+      departmentId: null,
+    },
+  });
+
+  console.log('✅ DEPT_ADMIN 계정 생성 완료:', {
+    doctor1: { email: doctorUser.email, password: 'doctor123' },
+    doctor2: { email: doctor2User.email, password: 'doctor123' },
+  });
+
   const settlementSeeds = [
     {
       publicId: '3e1eb70d-9c7d-4b1b-b504-14fc35d76c4b',
