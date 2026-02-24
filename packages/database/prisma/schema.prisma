@@ -65,6 +65,18 @@ model Hospital {
   existingVanCompany String? @db.VarChar(50) @map("existing_van_company")
   /// 기존 단말기 ID
   existingTerminalId String? @db.VarChar(50) @map("existing_terminal_id")
+  /// POS 모델명
+  posModelName String? @db.VarChar(50) @map("pos_model_name")
+  /// POS 제조사
+  posManufacturer String? @db.VarChar(50) @map("pos_manufacturer")
+  /// POS 통신 프로토콜
+  posProtocol String? @db.VarChar(50) @map("pos_protocol")
+  /// POS PG사
+  posPgCompany String? @db.VarChar(50) @map("pos_pg_company")
+  /// POS 납품사
+  posInstallerCompany String? @db.VarChar(50) @map("pos_installer_company")
+  /// POS 가맹점 MID
+  posMerchantId String? @db.VarChar(50) @map("pos_merchant_id")
   
   // 5. 시스템 관련 정보
   /// GENERAL(일반), UNIVERSITY(대학병원)
@@ -215,6 +227,7 @@ model User {
   inquiriesCreated Inquiry[] @relation("InquiryAuthor")
   inquiriesAnswered Inquiry[] @relation("InquiryAnswerer")
   tokens Token[]
+  securityLogs SecurityLog[]
   updates User[] @relation("UserUpdater")
 
   @@index([email])
@@ -788,4 +801,26 @@ model Token {
   department Department? @relation(fields: [departmentId], references: [id])
 
   @@map("tokens")
+}
+
+// ============================================================
+// 보안 로그
+// ============================================================
+
+model SecurityLog {
+  id Int @id @default(autoincrement())
+  userId String @db.Uuid @map("user_id")
+  /// PASSWORD_RESET 등
+  action String @db.VarChar(50)
+  ipAddress String? @db.VarChar(45) @map("ip_address")
+  userAgent String? @db.Text @map("user_agent")
+  metadata Json? @map("metadata")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("security_logs")
 }
