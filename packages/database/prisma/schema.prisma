@@ -453,6 +453,7 @@ model TestPaymentSession {
 
 model Settlement {
   id Int @id @default(autoincrement())
+  publicId String @unique @default(uuid()) @db.Uuid @map("public_id")
   hospitalId String @db.Uuid @map("hospital_id")
   settlementPeriodStart DateTime @db.Date @map("settlement_period_start")
   settlementPeriodEnd DateTime @db.Date @map("settlement_period_end")

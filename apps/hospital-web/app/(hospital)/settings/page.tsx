@@ -1,8 +1,11 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Tabs } from '@/components/layout/Tabs';
 import { SettingsBasicForm } from '@/components/settings/SettingsBasicForm';
+import { SettingsAccountsPanel } from '@/components/settings/SettingsAccountsPanel';
+import { getPayloadFromToken } from '@/lib/decode-token';
 
 const SETTINGS_TABS = [
   { id: 'basic', label: '기본 정보' },
@@ -11,8 +14,30 @@ const SETTINGS_TABS = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const currentTab = searchParams.get('tab') ?? SETTINGS_TABS[0]?.id ?? 'basic';
+  const [currentRole, setCurrentRole] = useState('');
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    const payload = token ? getPayloadFromToken(token) : null;
+    setCurrentRole(payload?.role ?? '');
+  }, []);
+
+  const availableTabs = useMemo(() => {
+    if (currentRole === 'MASTER_ADMIN') return SETTINGS_TABS;
+    return SETTINGS_TABS.filter((tab) => tab.id === 'accounts');
+  }, [currentRole]);
+  const fallbackTab = availableTabs[0]?.id ?? 'accounts';
+  const currentTab = searchParams.get('tab') ?? fallbackTab;
+  const hasValidTab = availableTabs.some((tab) => tab.id === currentTab);
+  const activeTab = hasValidTab ? currentTab : fallbackTab;
+
+  useEffect(() => {
+    if (!hasValidTab) {
+      router.replace(`/settings?tab=${fallbackTab}`);
+    }
+  }, [fallbackTab, hasValidTab, router]);
 
   return (
     <>
@@ -23,14 +48,16 @@ export default function SettingsPage() {
       </header>
 
       <div className="p-6 lg:px-8">
-        <Tabs tabs={SETTINGS_TABS} basePath="/settings" defaultTab="basic" />
+        <Tabs
+          tabs={availableTabs}
+          basePath="/settings"
+          defaultTab={fallbackTab}
+        />
 
         <div className="mt-6">
-          {currentTab === 'basic' && <SettingsBasicForm />}
-          {currentTab === 'accounts' && (
-            <p className="text-muted-foreground">준비 중입니다.</p>
-          )}
-          {currentTab === 'items' && (
+          {activeTab === 'basic' && <SettingsBasicForm />}
+          {activeTab === 'accounts' && <SettingsAccountsPanel />}
+          {activeTab === 'items' && (
             <p className="text-muted-foreground">준비 중입니다.</p>
           )}
         </div>

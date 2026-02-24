@@ -1,5 +1,6 @@
 import Footer from '@/components/layout/Footer';
 import Navigation from '@/components/layout/Navigation';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 export default function HospitalLayout({
   children,
@@ -7,10 +8,11 @@ export default function HospitalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
-      <Navigation />
-      <div className="pt-20">{children}</div>
-      <Footer />
-    </div>
+    <RoleGuard mode="hospital">
+      <div className="min-h-screen">
+        <Navigation />
+        <div className="pt-20">{children}</div>
+      </div>
+    </RoleGuard>
   );
 }
