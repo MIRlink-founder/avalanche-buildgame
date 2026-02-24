@@ -131,6 +131,10 @@ function ActivateForm() {
       <div className="flex min-h-screen flex-col items-center justify-center px-4">
         <Navigation />
         <AlertModal
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) router.push('/');
+          }}
           message={
             invalidReason === 'expired'
               ? '인증 링크의 유효기간이 만료되었습니다.'

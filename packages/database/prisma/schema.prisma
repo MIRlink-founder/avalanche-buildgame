@@ -313,7 +313,7 @@ model MedicalRecordStats {
   medicalRecordId Int @unique @map("medical_record_id")
   
   // 환자 및 인구 통계
-  /// 연령대: 20s, 30s, 40s, 50s, 60s+
+  /// 태어난 연도(YYYY)
   patientAgeGroup String? @db.VarChar(10) @map("patient_age_group")
   /// 성별: M, F, OTHER
   patientGender String? @db.VarChar(10) @map("patient_gender")
