@@ -17,7 +17,8 @@ import {
   TableRow,
 } from '@mire/ui/components/table';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
-import { Landmark, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Landmark, Info, ChevronLeft, ChevronRight, Receipt, CreditCard } from 'lucide-react';
+import { PaymentsClient } from '../payments/payments-client';
 
 /* ───────────── 타입 정의 ───────────── */
 
@@ -70,7 +71,7 @@ interface SettlementsApiResponse {
 const ITEMS_PER_PAGE = 5;
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: '집계 중',
+  PENDING: '대기',
   CONFIRMED: '확인',
   PAID: '완료',
   SETTLED: '완료',
@@ -252,7 +253,10 @@ function Pagination({
 
 /* ───────────── 메인 컴포넌트 ───────────── */
 
+type TopTab = 'settlements' | 'payments';
+
 export function SettlementsClient() {
+  const [activeTopTab, setActiveTopTab] = useState<TopTab>('settlements');
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [settlements, setSettlements] = useState<SettlementRow[]>([]);
@@ -318,6 +322,39 @@ export function SettlementsClient() {
 
   return (
     <section className="space-y-5 p-6">
+      {/* 최상위 탭 */}
+      <div className="flex gap-1 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTopTab('settlements')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            activeTopTab === 'settlements'
+              ? 'border-b-2 border-foreground text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Receipt className="h-4 w-4" />
+          정산 내역
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTopTab('payments')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            activeTopTab === 'payments'
+              ? 'border-b-2 border-foreground text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <CreditCard className="h-4 w-4" />
+          결제 내역
+        </button>
+      </div>
+
+      {/* 결제 내역 탭 */}
+      {activeTopTab === 'payments' && <PaymentsClient />}
+
+      {/* 정산 내역 탭 */}
+      {activeTopTab === 'settlements' && <>
       {/* 상단 카드 3개 */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* 1. 다음 지급 예정일 */}
@@ -516,6 +553,7 @@ export function SettlementsClient() {
           ))}
         </ul>
       </div>
+      </>}
     </section>
   );
 }
