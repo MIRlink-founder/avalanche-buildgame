@@ -133,10 +133,13 @@ export async function PATCH(
       name?: string;
       role?: string;
       departmentId?: number | null;
+      departmentName?: string;
     };
 
     const status = body.status?.trim().toUpperCase();
     const role = body.role?.trim().toUpperCase();
+    const nameRaw = body.name;
+    const departmentNameRaw = body.departmentName;
     const departmentIdRaw = body.departmentId;
     const departmentId =
       departmentIdRaw === undefined || departmentIdRaw === null
@@ -165,11 +168,20 @@ export async function PATCH(
       );
     }
 
-    if (body.name !== undefined) {
-      return NextResponse.json(
-        { error: '이름은 수정할 수 없습니다.' },
-        { status: 400 },
-      );
+    if (nameRaw !== undefined) {
+      const trimmedName = nameRaw.trim();
+      if (!trimmedName) {
+        return NextResponse.json(
+          { error: '이름은 공백일 수 없습니다.' },
+          { status: 400 },
+        );
+      }
+      if (trimmedName.length > 20) {
+        return NextResponse.json(
+          { error: '이름은 최대 20자까지 입력 가능합니다.' },
+          { status: 400 },
+        );
+      }
     }
 
     if (departmentId !== undefined && departmentId !== null) {
@@ -236,6 +248,7 @@ export async function PATCH(
       status?: string;
       statusChangedAt?: Date;
       role?: string;
+      name?: string;
       departmentId?: number | null;
     } = {};
 
@@ -248,7 +261,28 @@ export async function PATCH(
       updateData.role = role;
     }
 
-    if (departmentId !== undefined) {
+    if (nameRaw !== undefined) {
+      updateData.name = nameRaw.trim();
+    }
+
+    if (departmentNameRaw !== undefined) {
+      const deptName = departmentNameRaw.trim();
+      if (!deptName) {
+        updateData.departmentId = null;
+      } else {
+        let dept = await prisma.department.findFirst({
+          where: { hospitalId: user.hospitalId!, name: deptName },
+          select: { id: true },
+        });
+        if (!dept) {
+          dept = await prisma.department.create({
+            data: { hospitalId: user.hospitalId!, name: deptName },
+            select: { id: true },
+          });
+        }
+        updateData.departmentId = dept.id;
+      }
+    } else if (departmentId !== undefined) {
       if (departmentId === null) {
         updateData.departmentId = null;
       } else {
@@ -279,6 +313,7 @@ export async function PATCH(
         data: updateData,
         select: {
           id: true,
+          name: true,
           status: true,
           statusChangedAt: true,
           role: true,
@@ -300,6 +335,7 @@ export async function PATCH(
       success: true,
       user: {
         id: updated.id,
+        name: updated.name,
         status: updated.status,
         statusChangedAt: updated.statusChangedAt?.toISOString() ?? null,
         role: updated.role,

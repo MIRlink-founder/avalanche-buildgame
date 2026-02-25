@@ -400,11 +400,11 @@ export function SettlementsClient() {
           <Select
             value={String(selectedYear)}
             onChange={handleYearChange}
-            className="w-[120px]"
+            className="w-[100px] pr-6"
           >
             {yearOptions.map((year) => (
               <option key={year} value={year}>
-                {year}년
+                {year}
               </option>
             ))}
           </Select>

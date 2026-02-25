@@ -213,7 +213,19 @@ export function HospitalStaffDetailPanel() {
     };
   }, [staffId]);
 
+  const fromSettings = searchParams.get('from') === 'settings';
   const listHref = useMemo(() => {
+    if (fromSettings) {
+      const listParams = new URLSearchParams();
+      listParams.set('tab', 'accounts');
+      const staffTab = searchParams.get('staffTab');
+      const listPage = searchParams.get('page');
+      const listSearch = searchParams.get('search');
+      if (staffTab) listParams.set('staffTab', staffTab);
+      if (listPage && /^\d+$/.test(listPage)) listParams.set('page', listPage);
+      if (listSearch) listParams.set('search', listSearch);
+      return `/settings?${listParams.toString()}`;
+    }
     const listParams = new URLSearchParams();
     const listTab = searchParams.get('tab');
     const listPage = searchParams.get('page');
@@ -223,7 +235,7 @@ export function HospitalStaffDetailPanel() {
     if (listSearch) listParams.set('search', listSearch);
     const query = listParams.toString();
     return `/hospital/staff${query ? `?${query}` : ''}`;
-  }, [searchParams]);
+  }, [searchParams, fromSettings]);
 
   useEffect(() => {
     if (currentUserRole !== 'MASTER_ADMIN') return;
@@ -431,12 +443,12 @@ export function HospitalStaffDetailPanel() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-          <Link href="/hospital/staff" className="hover:text-foreground">
-            직원 관리
+          <Link href={fromSettings ? '/settings?tab=accounts' : '/hospital/staff'} className="hover:text-foreground">
+            {fromSettings ? '설정' : '직원 관리'}
           </Link>
           <ChevronRight className="h-4 w-4" />
           <Link href={listHref} className="hover:text-foreground">
-            직원 목록
+            {fromSettings ? '계정 및 권한' : '직원 목록'}
           </Link>
           <ChevronRight className="h-4 w-4" />
           <span className="text-foreground">상세</span>
