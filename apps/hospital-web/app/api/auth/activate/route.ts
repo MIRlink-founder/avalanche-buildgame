@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@mire/database';
 
+function isValidPassword(value: string): boolean {
+  if (value.length < 8) return false;
+  const hasLetter = /[A-Za-z]/.test(value);
+  const hasNumber = /\d/.test(value);
+  const hasSpecial = /[@$!%*#?&]/.test(value);
+  return hasLetter && hasNumber && hasSpecial;
+}
+
 // 토큰 유효성 검사 (활성화 폼 노출 전)
 export async function GET(request: NextRequest) {
   try {
@@ -93,9 +101,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (password.length < 8) {
+    if (!isValidPassword(password)) {
       return NextResponse.json(
-        { error: '비밀번호는 8자 이상이어야 합니다.' },
+        {
+          error: '영문, 숫자, 특수문자를 포함하여 8자 이상 입력해주세요.',
+        },
         { status: 400 },
       );
     }

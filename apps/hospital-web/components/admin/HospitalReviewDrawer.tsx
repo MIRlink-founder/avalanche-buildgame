@@ -16,7 +16,6 @@ import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
   formatDate,
   formatBusinessNumber,
-  formatPhone,
   HOSPITAL_STATUS_LABELS,
   HOSPITAL_STATUS_COLORS,
 } from '@/lib/admin-hospital-format';
@@ -48,12 +47,14 @@ interface HospitalReviewDrawerProps {
   hospitalId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  previewHospital?: HospitalForDrawer | null;
 }
 
 export function HospitalReviewDrawer({
   hospitalId,
   open,
   onOpenChange,
+  previewHospital = null,
 }: HospitalReviewDrawerProps) {
   const router = useRouter();
   const [hospital, setHospital] = useState<HospitalForDrawer | null>(null);
@@ -64,7 +65,16 @@ export function HospitalReviewDrawer({
   const [memo, setMemo] = useState('');
 
   useEffect(() => {
-    if (!open || !hospitalId) {
+    if (!open) {
+      setHospital(null);
+      return;
+    }
+    if (previewHospital) {
+      setHospital(previewHospital);
+      setLoading(false);
+      return;
+    }
+    if (!hospitalId) {
       setHospital(null);
       return;
     }
@@ -257,9 +267,7 @@ export function HospitalReviewDrawer({
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">연락처</dt>
-                    <dd className="font-mono">
-                      {formatPhone(hospital.managerPhone)}
-                    </dd>
+                    <dd className="font-mono">{hospital.managerPhone}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">이메일</dt>

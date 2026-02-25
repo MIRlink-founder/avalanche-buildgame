@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const currentPage = Number(searchParams.get('page')) || 1;
     const currentTab = searchParams.get('tab') || 'pending';
     const searchTerm = searchParams.get('search') || '';
+    const includeAll = searchParams.get('scope') === 'all';
 
     // 1. 통계 데이터 (Hospital.status 기준)
     const [
@@ -55,7 +56,9 @@ export async function GET(request: NextRequest) {
       }>;
     } = {};
 
-    if (currentTab === 'pending') {
+    if (includeAll) {
+      whereCondition = {};
+    } else if (currentTab === 'pending') {
       // 심사
       whereCondition = {
         status: { in: ['PENDING', 'APPROVED', 'REJECTED'] },
@@ -115,6 +118,7 @@ export async function GET(request: NextRequest) {
       managerPhone: h.managerPhone,
       createdAt: h.createdAt,
       status: h.status,
+      type: h.type,
       accountCreatedAt: h.users[0]?.createdAt ?? null,
     }));
 

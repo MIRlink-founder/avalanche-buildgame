@@ -50,6 +50,18 @@ next-env.d.ts
 
 # 환경변수 (루트 .env만 무시, 앱별 .env.local은 커밋)
 .env
+packages/database/.env
 
 # Planning
 .planning/
+
+# Private session notes
+PRIVATE-SESSION-CONTEXT.md
+PRIVATE-PAYMENTS-CHECK.md
+PRIVATE-UI-CONTEXT.md
+PRIVATE-IMPLEMENTATION-GAPS.md
+PRIVATE-SEQUENCE-NOTES.md
+PRIVATE-UNIMPLEMENTED.md
+PRIVATE-WIREFRAME-SETTLEMENT-GAP.md
+PRIVATE-PG-PAYMENT-CONTEXT.md
+.vercel

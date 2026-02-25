@@ -65,6 +65,18 @@ model Hospital {
   existingVanCompany String? @db.VarChar(50) @map("existing_van_company")
   /// 기존 단말기 ID
   existingTerminalId String? @db.VarChar(50) @map("existing_terminal_id")
+  /// POS 모델명
+  posModelName String? @db.VarChar(50) @map("pos_model_name")
+  /// POS 제조사
+  posManufacturer String? @db.VarChar(50) @map("pos_manufacturer")
+  /// POS 통신 프로토콜
+  posProtocol String? @db.VarChar(50) @map("pos_protocol")
+  /// POS PG사
+  posPgCompany String? @db.VarChar(50) @map("pos_pg_company")
+  /// POS 납품사
+  posInstallerCompany String? @db.VarChar(50) @map("pos_installer_company")
+  /// POS 가맹점 MID
+  posMerchantId String? @db.VarChar(50) @map("pos_merchant_id")
   
   // 5. 시스템 관련 정보
   /// GENERAL(일반), UNIVERSITY(대학병원)
@@ -90,6 +102,12 @@ model Hospital {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   
+  // 6. 페이백 비율
+  /// 개별 페이백 비율 (%), NULL이면 시스템 기본값 사용
+  paybackRate Decimal? @db.Decimal(5, 2) @map("payback_rate")
+  /// 비율 최종 수정일
+  paybackRateUpdatedAt DateTime? @map("payback_rate_updated_at")
+
   // Relations
   documents HospitalDocument[]
   registrationRequests RegistrationRequest[]
@@ -101,6 +119,7 @@ model Hospital {
   payments Payment[]
   testPaymentSessions TestPaymentSession[]
   settlements Settlement[]
+  paymentLogs PaymentLog[]
   nfts NFT[]
   supplyRequests SupplyRequest[]
   inquiries Inquiry[]
@@ -215,6 +234,7 @@ model User {
   inquiriesCreated Inquiry[] @relation("InquiryAuthor")
   inquiriesAnswered Inquiry[] @relation("InquiryAnswerer")
   tokens Token[]
+  securityLogs SecurityLog[]
   updates User[] @relation("UserUpdater")
 
   @@index([email])
@@ -313,7 +333,7 @@ model MedicalRecordStats {
   medicalRecordId Int @unique @map("medical_record_id")
   
   // 환자 및 인구 통계
-  /// 연령대: 20s, 30s, 40s, 50s, 60s+
+  /// 태어난 연도(YYYY)
   patientAgeGroup String? @db.VarChar(10) @map("patient_age_group")
   /// 성별: M, F, OTHER
   patientGender String? @db.VarChar(10) @map("patient_gender")
@@ -428,6 +448,30 @@ model PaymentIdempotency {
   @@map("payment_idempotencies")
 }
 
+/// PG Webhook으로 수신한 결제 로그 (진료 정보와 매칭하지 않고 단순 적재)
+model PaymentLog {
+  id              Int       @id @default(autoincrement())
+  hospitalId      String?   @db.Uuid @map("hospital_id")
+  subMid          String    @db.VarChar(50) @map("sub_mid")
+  approveNo       String?   @db.VarChar(50) @map("approve_no")
+  amount          Decimal   @db.Decimal(15, 2)
+  /// READY, PAID, CANCELLED
+  status          String    @db.VarChar(20)
+  pgTransactionId String?   @db.VarChar(100) @map("pg_transaction_id")
+  paidAt          DateTime? @map("paid_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+  /// Webhook 원본 JSON
+  rawPayload      String?   @db.Text @map("raw_payload")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  hospital        Hospital? @relation(fields: [hospitalId], references: [id])
+
+  @@index([subMid])
+  @@index([approveNo])
+  @@index([hospitalId, paidAt])
+  @@map("payment_logs")
+}
+
 model TestPaymentSession {
   id Int @id @default(autoincrement())
   hospitalId String @db.Uuid @map("hospital_id")
@@ -448,28 +492,48 @@ model TestPaymentSession {
 }
 
 // ============================================================
+// 시스템 설정
+// ============================================================
+
+model SystemConfig {
+  id Int @id @default(autoincrement())
+  /// 설정 키 (예: DEFAULT_PAYBACK_RATE, POS_FEE_RATE, FIXED_PAYMENT_PER_CASE)
+  key String @unique @db.VarChar(100)
+  /// 설정 값 (문자열로 저장)
+  value String @db.VarChar(500)
+  /// 설정 설명
+  description String? @db.VarChar(500)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}
+
+// ============================================================
 // 정산 관리
 // ============================================================
 
 model Settlement {
   id Int @id @default(autoincrement())
+  publicId String @unique @default(uuid()) @db.Uuid @map("public_id")
   hospitalId String @db.Uuid @map("hospital_id")
   settlementPeriodStart DateTime @db.Date @map("settlement_period_start")
   settlementPeriodEnd DateTime @db.Date @map("settlement_period_end")
   totalVolume Decimal @db.Decimal(15, 2) @map("total_volume")
+  /// 등록 건 수
+  caseCount Int @default(0) @map("case_count")
   /// 정산율 (%)
   appliedRate Decimal @db.Decimal(5, 2) @map("applied_rate")
   /// 실제 지급액
   paybackAmount Decimal @db.Decimal(15, 2) @map("payback_amount")
-  /// NFT 보유 여부
+  /// NFT 보유 여부 (레거시, 미사용)
   isNftBoosted Boolean @default(false) @map("is_nft_boosted")
-  /// PENDING_PAYMENT, SETTLED
+  /// PENDING, CONFIRMED, SETTLED
   status String @db.VarChar(20)
   settledAt DateTime? @map("settled_at")
   createdAt DateTime @default(now()) @map("created_at")
-  
+
   hospital Hospital @relation(fields: [hospitalId], references: [id])
-  
+
   payments Payment[]
   bankTransfers BankTransfer[]
 
@@ -508,6 +572,8 @@ model BlockchainTransaction {
   /// 원문 데이터 해시
   dataHash String @db.VarChar(100) @map("data_hash")
   blockNumber BigInt? @map("block_number")
+  /// 트랜잭션에서 실제 사용한 가스량
+  gasUsed BigInt? @map("gas_used")
   /// PENDING, IN_PROGRESS, CONFIRMED, FAILED (CronJob 이 중복으로 트랜잭션을 날리지 않게 하기 위한 용도)
   status String @db.VarChar(20)
   uploadedAt DateTime @default(now()) @map("uploaded_at")
@@ -557,43 +623,26 @@ model ImplantBrand {
   createdAt DateTime @default(now()) @map("created_at")
 
   manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
-  models ImplantModel[]
-
-  @@map("implant_brands")
-}
-
-model ImplantModel {
-  id Int @id @default(autoincrement())
-  brandId Int @map("brand_id")
-  name String @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  brand ImplantBrand @relation(fields: [brandId], references: [id])
   items ImplantItem[]
 
-  @@map("implant_models")
+  @@unique([manufacturerId, name])
+  @@map("implant_brands")
 }
 
 model ImplantItem {
   id Int @id @default(autoincrement())
-  modelId Int @map("model_id")
-  /// 직경 (mm)
-  diameter Decimal @db.Decimal(4, 2)
-  /// 길이 (mm)
-  length Decimal @db.Decimal(4, 2)
-  /// SLA, RBM, Anodized 등
-  surfaceTreatment String? @db.VarChar(50) @map("surface_treatment")
-  /// Internal, External 등
-  connectionType String? @db.VarChar(50) @map("connection_type")
-  /// ACTIVE, INACTIVE
+  brandId Int @map("brand_id")
+  /// 사이즈 코드 (예: 3507BS, 3507, 3509)
+  size String @db.VarChar(50)
+  /// ACTIVE, INACTIVE (엑셀 '사용안함' False = ACTIVE)
   status String @db.VarChar(20)
   createdAt DateTime @default(now()) @map("created_at")
 
-  model ImplantModel @relation(fields: [modelId], references: [id])
+  brand ImplantBrand @relation(fields: [brandId], references: [id])
   medicalRecordItems MedicalRecordItem[]
 
-  @@index([modelId])
-  @@index([diameter, length])
+  @@unique([brandId, size])
+  @@index([brandId])
   @@map("implant_items")
 }
 
@@ -749,6 +798,23 @@ model Notification {
 }
 
 // ============================================================
+// 지갑 알림 설정 (운영사 마스터 지갑)
+// ============================================================
+
+model WalletNotificationSetting {
+  id Int @id @default(autoincrement())
+  /// 최소 잔액 알림 기준 (AVAX 단위 문자열, 숫자만)
+  minBalanceAvax String @db.VarChar(50) @map("min_balance_avax")
+  /// 알림 수신 이메일
+  notificationEmail String @db.VarChar(100) @map("notification_email")
+  /// 마지막 잔액 부족 알림 발송 시각 (같은 저잔액 구간에서 중복 발송 방지)
+  lastLowBalanceAlertedAt DateTime? @map("last_low_balance_alerted_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("wallet_notification_settings")
+}
+
+// ============================================================
 // 토큰
 // ============================================================
 
@@ -772,4 +838,26 @@ model Token {
   department Department? @relation(fields: [departmentId], references: [id])
 
   @@map("tokens")
+}
+
+// ============================================================
+// 보안 로그
+// ============================================================
+
+model SecurityLog {
+  id Int @id @default(autoincrement())
+  userId String @db.Uuid @map("user_id")
+  /// PASSWORD_RESET 등
+  action String @db.VarChar(50)
+  ipAddress String? @db.VarChar(45) @map("ip_address")
+  userAgent String? @db.Text @map("user_agent")
+  metadata Json? @map("metadata")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("security_logs")
 }

@@ -15,7 +15,7 @@ import { Badge } from '@mire/ui';
 import { Button } from '@mire/ui';
 import { Input } from '@mire/ui';
 import { Search } from 'lucide-react';
-import { Pagination } from './Pagination';
+import { Pagination } from '@/components/layout/Pagination';
 
 const PAGE_SIZE = 10;
 

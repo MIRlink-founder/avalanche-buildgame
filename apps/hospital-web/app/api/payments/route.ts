@@ -54,6 +54,8 @@ export async function GET(request: Request) {
     const paidFrom = getDate(searchParams.get("paidFrom"))
     const paidTo = getDate(searchParams.get("paidTo"))
 
+    const page = getPositiveInt(searchParams.get("page"))
+
     const hospitalId = resolveHospitalId(user, requestedHospitalId || null)
 
     if (status && !PAYMENT_STATUSES.has(status)) {
@@ -105,26 +107,43 @@ export async function GET(request: Request) {
       }
     }
 
+    const select = {
+      id: true,
+      medicalRecordId: true,
+      hospitalId: true,
+      settlementId: true,
+      subMid: true,
+      approveNo: true,
+      pgTransactionId: true,
+      amount: true,
+      paymentMethod: true,
+      status: true,
+      paidAt: true,
+      cancelledAt: true,
+      createdAt: true,
+    }
+
+    if (page) {
+      const [payments, total] = await Promise.all([
+        prisma.payment.findMany({
+          where,
+          orderBy: { id: "desc" },
+          take: limit,
+          skip: (page - 1) * limit,
+          select,
+        }),
+        prisma.payment.count({ where }),
+      ])
+
+      return NextResponse.json({ data: payments, total, page, limit })
+    }
+
     const payments = await prisma.payment.findMany({
       where,
       orderBy: { id: "desc" },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        medicalRecordId: true,
-        hospitalId: true,
-        settlementId: true,
-        subMid: true,
-        approveNo: true,
-        pgTransactionId: true,
-        amount: true,
-        paymentMethod: true,
-        status: true,
-        paidAt: true,
-        cancelledAt: true,
-        createdAt: true,
-      },
+      select,
     })
 
     const hasMore = payments.length > limit

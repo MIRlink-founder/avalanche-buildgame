@@ -9,7 +9,7 @@ export default function HospitalsPage() {
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold">병원 회원 관리</h1>
           <p className="text-sm text-gray-600">
-            등록된 병원을 관리하고 신규 가입을 승인합니다
+            등록된 병원을 관리하고 신규 가입을 승인합니다.
           </p>
         </div>
       </header>

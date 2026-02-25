@@ -1,0 +1,393 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@mire/database';
+import { requireAuth, AuthError } from '@/lib/auth-guard';
+
+const HOSPITAL_ROLES = new Set(['MASTER_ADMIN']);
+const ALLOWED_STATUS = new Set(['ACTIVE', 'DISABLED']);
+const ALLOWED_ROLES = new Set(['MASTER_ADMIN', 'DEPT_ADMIN']);
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { user } = await requireAuth(request);
+    if (!HOSPITAL_ROLES.has(user.role)) {
+      return NextResponse.json(
+        { error: '병원 계정 권한이 필요합니다.' },
+        { status: 403 },
+      );
+    }
+
+    if (!user.hospitalId) {
+      return NextResponse.json(
+        { error: '병원 정보가 없습니다.' },
+        { status: 403 },
+      );
+    }
+
+    const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json(
+        { error: '직원 ID가 필요합니다.' },
+        { status: 400 },
+      );
+    }
+
+    const staff = await prisma.user.findFirst({
+      where: { id, hospitalId: user.hospitalId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        statusChangedAt: true,
+        createdAt: true,
+        departmentId: true,
+        department: { select: { name: true } },
+      },
+    });
+
+    if (!staff) {
+      return NextResponse.json(
+        { error: '직원 정보를 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
+    const activeAdminCount = await prisma.user.count({
+      where: {
+        hospitalId: user.hospitalId,
+        role: 'MASTER_ADMIN',
+        status: 'ACTIVE',
+      },
+    });
+
+    const lastAccess = await prisma.authSession.findFirst({
+      where: { userId: staff.id },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+
+    return NextResponse.json({
+      user: {
+        id: staff.id,
+        email: staff.email,
+        name: staff.name,
+        role: staff.role,
+        status: staff.status,
+        departmentId: staff.departmentId ?? null,
+        departmentName: staff.department?.name ?? null,
+        statusChangedAt: staff.statusChangedAt?.toISOString() ?? null,
+        createdAt: staff.createdAt.toISOString(),
+        lastAccessAt: lastAccess?.createdAt?.toISOString() ?? null,
+      },
+      activeAdminCount,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    console.error('병원 직원 상세 조회 실패:', error);
+    return NextResponse.json(
+      { error: '직원 정보를 불러오는 중 오류가 발생했습니다.' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { user } = await requireAuth(request);
+    if (!HOSPITAL_ROLES.has(user.role)) {
+      return NextResponse.json(
+        { error: '병원 계정 권한이 필요합니다.' },
+        { status: 403 },
+      );
+    }
+
+    if (!user.hospitalId) {
+      return NextResponse.json(
+        { error: '병원 정보가 없습니다.' },
+        { status: 403 },
+      );
+    }
+
+    const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json(
+        { error: '직원 ID가 필요합니다.' },
+        { status: 400 },
+      );
+    }
+
+    const body = (await request.json().catch(() => ({}))) as {
+      status?: string;
+      name?: string;
+      role?: string;
+      departmentId?: number | null;
+      departmentName?: string;
+    };
+
+    const status = body.status?.trim().toUpperCase();
+    const role = body.role?.trim().toUpperCase();
+    const nameRaw = body.name;
+    const departmentNameRaw = body.departmentName;
+    const departmentIdRaw = body.departmentId;
+    const departmentId =
+      departmentIdRaw === undefined || departmentIdRaw === null
+        ? departmentIdRaw
+        : Number(departmentIdRaw);
+    const isSelf = user.id === id;
+
+    if (!isSelf && user.role !== 'MASTER_ADMIN') {
+      return NextResponse.json(
+        { error: '마스터 관리자만 수정할 수 있습니다.' },
+        { status: 403 },
+      );
+    }
+
+    if (status && !ALLOWED_STATUS.has(status)) {
+      return NextResponse.json(
+        { error: '변경할 상태가 올바르지 않습니다.' },
+        { status: 400 },
+      );
+    }
+
+    if (role && !ALLOWED_ROLES.has(role)) {
+      return NextResponse.json(
+        { error: '변경할 권한이 올바르지 않습니다.' },
+        { status: 400 },
+      );
+    }
+
+    if (nameRaw !== undefined) {
+      if (typeof nameRaw !== 'string') {
+        return NextResponse.json(
+          { error: '이름 형식이 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
+      const trimmedName = nameRaw.trim();
+      if (!trimmedName) {
+        return NextResponse.json(
+          { error: '이름은 공백일 수 없습니다.' },
+          { status: 400 },
+        );
+      }
+      if (trimmedName.length > 20) {
+        return NextResponse.json(
+          { error: '이름은 최대 20자까지 입력 가능합니다.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (departmentNameRaw !== undefined) {
+      if (typeof departmentNameRaw !== 'string') {
+        return NextResponse.json(
+          { error: '부서명 형식이 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
+      if (departmentNameRaw.trim().length > 100) {
+        return NextResponse.json(
+          { error: '부서명은 최대 100자까지 입력 가능합니다.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (departmentId !== undefined && departmentId !== null) {
+      if (Number.isNaN(departmentId)) {
+        return NextResponse.json(
+          { error: '부서 정보가 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (isSelf && status) {
+      return NextResponse.json(
+        { error: '내 계정은 상태를 변경할 수 없습니다.' },
+        { status: 400 },
+      );
+    }
+
+    if (isSelf && role) {
+      return NextResponse.json(
+        { error: '내 계정의 권한은 변경할 수 없습니다.' },
+        { status: 400 },
+      );
+    }
+
+    const targetUser = await prisma.user.findFirst({
+      where: { id, hospitalId: user.hospitalId },
+      select: { id: true, role: true, status: true },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json(
+        { error: '직원을 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
+    const nextRole = role ?? targetUser.role;
+    const nextStatus = status ?? targetUser.status;
+    const isActiveAdmin =
+      targetUser.role === 'MASTER_ADMIN' && targetUser.status === 'ACTIVE';
+    const willRemainActiveAdmin =
+      nextRole === 'MASTER_ADMIN' && nextStatus === 'ACTIVE';
+
+    if (isActiveAdmin && !willRemainActiveAdmin) {
+      const remainingAdmins = await prisma.user.count({
+        where: {
+          hospitalId: user.hospitalId,
+          role: 'MASTER_ADMIN',
+          status: 'ACTIVE',
+          id: { not: targetUser.id },
+        },
+      });
+
+      if (remainingAdmins === 0) {
+        return NextResponse.json(
+          { error: '관리자는 최소 1명 이상 유지되어야 합니다.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    const updateData: {
+      status?: string;
+      statusChangedAt?: Date;
+      role?: string;
+      name?: string;
+      departmentId?: number | null;
+    } = {};
+
+    if (status) {
+      updateData.status = status;
+      updateData.statusChangedAt = new Date();
+    }
+
+    if (role) {
+      updateData.role = role;
+    }
+
+    if (nameRaw !== undefined) {
+      updateData.name = nameRaw.trim();
+    }
+
+    if (departmentNameRaw !== undefined) {
+      const deptName = departmentNameRaw.trim();
+      if (!deptName) {
+        updateData.departmentId = null;
+      } else {
+        let dept = await prisma.department.findFirst({
+          where: { hospitalId: user.hospitalId!, name: deptName },
+          select: { id: true },
+        });
+        if (!dept) {
+          try {
+            dept = await prisma.department.create({
+              data: { hospitalId: user.hospitalId!, name: deptName },
+              select: { id: true },
+            });
+          } catch {
+            dept = await prisma.department.findFirst({
+              where: { hospitalId: user.hospitalId!, name: deptName },
+              select: { id: true },
+            });
+            if (!dept) {
+              return NextResponse.json(
+                { error: '부서 생성에 실패했습니다.' },
+                { status: 500 },
+              );
+            }
+          }
+        }
+        updateData.departmentId = dept.id;
+      }
+    } else if (departmentId !== undefined) {
+      if (departmentId === null) {
+        updateData.departmentId = null;
+      } else {
+        const department = await prisma.department.findFirst({
+          where: { id: departmentId, hospitalId: user.hospitalId },
+          select: { id: true },
+        });
+        if (!department) {
+          return NextResponse.json(
+            { error: '부서 정보를 찾을 수 없습니다.' },
+            { status: 404 },
+          );
+        }
+        updateData.departmentId = department.id;
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: '변경할 정보가 없습니다.' },
+        { status: 400 },
+      );
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: targetUser.id },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          statusChangedAt: true,
+          role: true,
+          department: { select: { id: true, name: true } },
+        },
+      });
+
+      if (status && status !== 'ACTIVE') {
+        await tx.authSession.updateMany({
+          where: { userId: targetUser.id, isActive: true },
+          data: { isActive: false },
+        });
+      }
+
+      return result;
+    });
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: updated.id,
+        name: updated.name,
+        status: updated.status,
+        statusChangedAt: updated.statusChangedAt?.toISOString() ?? null,
+        role: updated.role,
+        departmentId: updated.department?.id ?? null,
+        departmentName: updated.department?.name ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    console.error('병원 직원 상태 변경 실패:', error);
+    return NextResponse.json(
+      { error: '직원 상태 변경 중 오류가 발생했습니다.' },
+      { status: 500 },
+    );
+  }
+}

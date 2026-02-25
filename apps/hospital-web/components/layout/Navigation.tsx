@@ -1,16 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@mire/ui/components/button';
 import { cn } from '@mire/ui';
 import { getPayloadFromToken } from '@/lib/decode-token';
+import { getAuthHeaders } from '@/lib/get-auth-headers';
 import { ChevronDown } from 'lucide-react';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { FEATURES } from '@/lib/permissions/features';
 
 const HOSPITAL_MENU_PATHS = [
   '/dashboard',
+  '/records',
   '/settlements',
   '/reports',
   '/support',
@@ -27,6 +31,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -35,11 +40,32 @@ export default function Navigation() {
   const showMenu =
     pathname != null && !showLogin && isHospitalMenuPath(pathname);
 
+  const fetchReportsGate = useCallback(async () => {
+    const res = await fetch('/api/hospitals/reports-gate', {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('통계 조회 실패');
+    const data = await res.json();
+    return {
+      hospitalType: data.hospitalType,
+      paidOrOnChainedRecordCount: data.paidOrOnChainedRecordCount,
+    };
+  }, []);
+
+  // Reports 기능 접근 권한 체크 (GENERAL 병원은 50건 이상일 때만 메뉴 표시)
+  const { allowed: canAccessReports } = useFeatureAccess(FEATURES.REPORTS, {
+    fetchDataStats: fetchReportsGate,
+  });
+  const { allowed: canAccessSettlements } = useFeatureAccess(
+    FEATURES.SETTLEMENTS,
+  );
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const token = localStorage.getItem('accessToken');
     const payload = token ? getPayloadFromToken(token) : null;
     setUserName(payload?.name ?? null);
+    setUserRole(payload?.role ?? null);
   }, [pathname]);
 
   useEffect(() => {
@@ -82,12 +108,19 @@ export default function Navigation() {
             <NavLink href="/dashboard" current={pathname === '/dashboard'}>
               대시보드
             </NavLink>
-            <NavLink href="/settlements" current={pathname === '/settlements'}>
-              정산 관리
-            </NavLink>
-            <NavLink href="/reports" current={pathname === '/reports'}>
-              데이터 리포트
-            </NavLink>
+            {canAccessSettlements && (
+              <NavLink
+                href="/settlements"
+                current={pathname === '/settlements'}
+              >
+                정산 관리
+              </NavLink>
+            )}
+            {canAccessReports && (
+              <NavLink href="/reports" current={pathname === '/reports'}>
+                데이터 리포트
+              </NavLink>
+            )}
             <NavLink href="/support" current={pathname === '/support'}>
               고객지원
             </NavLink>
@@ -101,7 +134,12 @@ export default function Navigation() {
                 onClick={() => setUserMenuOpen((v) => !v)}
                 className="text-foreground hover:text-primary hover:bg-transparent"
               >
-                {userName ?? '사용자'}님
+                <div className="flex items-center gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-foreground">
+                    {userName?.slice(0, 1) ?? 'U'}
+                  </span>
+                  <span>{userName ?? '사용자'}</span>
+                </div>
                 <ChevronDown
                   className={cn(
                     'ml-1 h-4 w-4 transition-transform',
@@ -110,7 +148,7 @@ export default function Navigation() {
                 />
               </Button>
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 min-w-[10rem] rounded-md border bg-popover py-1 shadow-md">
+                <div className="absolute right-0 top-full mt-0 min-w-[10rem] rounded-md border bg-popover py-1 shadow-md">
                   <button
                     type="button"
                     onClick={handleLogout}

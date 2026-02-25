@@ -1,5 +1,6 @@
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@mire/ui';
+import { SidebarProvider, SidebarInset } from '@mire/ui';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 export default function AdminLayout({
   children,
@@ -7,9 +8,11 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <AdminSidebar />
-      <SidebarInset>{children}</SidebarInset>
-    </SidebarProvider>
+    <RoleGuard mode="admin">
+      <SidebarProvider>
+        <AdminSidebar />
+        <SidebarInset>{children}</SidebarInset>
+      </SidebarProvider>
+    </RoleGuard>
   );
 }

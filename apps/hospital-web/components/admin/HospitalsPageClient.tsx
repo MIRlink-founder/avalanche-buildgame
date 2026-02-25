@@ -7,7 +7,7 @@ import { Tabs } from '@/components/layout/Tabs';
 import { StatsCards } from './StatsCards';
 import { SearchBar } from './SearchBar';
 import { HospitalsTable } from './HospitalsTable';
-import { Pagination } from './Pagination';
+import { Pagination } from '@/components/layout/Pagination';
 
 interface HospitalFromApi {
   id: string;
@@ -19,6 +19,7 @@ interface HospitalFromApi {
   createdAt: string;
   accountCreatedAt: string | null;
   status: string;
+  type: string;
 }
 
 interface ApiResponse {
@@ -123,9 +124,7 @@ export function HospitalsPageClient() {
   const hospitals = safeData.hospitals.map((h) => ({
     ...h,
     createdAt: new Date(h.createdAt),
-    accountCreatedAt: h.accountCreatedAt
-      ? new Date(h.accountCreatedAt)
-      : null,
+    accountCreatedAt: h.accountCreatedAt ? new Date(h.accountCreatedAt) : null,
   }));
 
   return (

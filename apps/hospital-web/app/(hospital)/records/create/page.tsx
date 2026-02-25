@@ -1,0 +1,921 @@
+'use client';
+
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  Suspense,
+  useRef,
+} from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@mire/ui';
+import { AlertModal } from '@/components/layout/AlertModal';
+import {
+  PreInfoModal,
+  type PreInfo,
+  type PreInfoModalMode,
+} from '@/components/records/PreInfoModal';
+import { PatientInfoBar } from '@/components/records/PatientInfoBar';
+import { ToothChart } from '@/components/records/ToothChart';
+import {
+  type TreatmentSheet,
+  type TreatmentSheetType,
+  type SavedTreatmentRecord,
+  type ImplantPlacementFormData,
+  type ImplantProsthesisFormData,
+  type LaminateFormData,
+} from '@/components/records/treatment-sheet-types';
+import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
+import {
+  SESSION_KEY_RECORD_PATIENT_ID,
+  SESSION_KEY_RECORD_PIN_CODE,
+  SESSION_KEY_RECORD_EDIT_PAYLOAD,
+} from '@/lib/records-session';
+import { encryptWithPin } from '@/lib/records-encrypt-client';
+import { BookSearch, ClipboardClock, ClipboardPen, Copy } from 'lucide-react';
+import { ToothQuadrantCell } from '@/components/records/ToothQuadrantCell';
+
+function generateSheetId() {
+  return `sheet-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+interface PatientCheckResult {
+  exists: boolean;
+  patientGender?: string | null;
+  patientAgeGroup?: string | null;
+}
+
+function CreateContent() {
+  const router = useRouter();
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const [pinCode, setPinCode] = useState<string | null>(null);
+  const [patientLoading, setPatientLoading] = useState(true);
+  const [modalMode, setModalMode] = useState<PreInfoModalMode>('full');
+  const [existingPatientGender, setExistingPatientGender] = useState<'M' | 'F'>(
+    'M',
+  );
+  const [preInfo, setPreInfo] = useState<PreInfo | null>(null);
+  const [preInfoModalOpen, setPreInfoModalOpen] = useState(false);
+  const [isEditingPreInfo, setIsEditingPreInfo] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [registerConfirmOpen, setRegisterConfirmOpen] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [registerResult, setRegisterResult] = useState<
+    | null
+    | { status: 'signing' }
+    | { status: 'success'; txHash: string }
+    | { status: 'error'; message: string }
+  >(null);
+  const [selectedTeeth, setSelectedTeeth] = useState<number | null>(null);
+  const [treatmentSheets, setTreatmentSheets] = useState<TreatmentSheet[]>([]);
+  const [savedRecords, setSavedRecords] = useState<SavedTreatmentRecord[]>([]); // 임시 저장 데이터
+  const [activeSheetId, setActiveSheetId] = useState<string | 'add'>('add'); // 현재 선택된 진료 시트 탭
+  const consumedSessionRef = useRef(false);
+  const fromEditPayloadRef = useRef(false);
+  const [implantItems, setImplantItems] = useState<
+    { id: number; manufacturerName: string; brandName: string; size: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedPatientId = sessionStorage.getItem(
+      SESSION_KEY_RECORD_PATIENT_ID,
+    );
+    const storedPin = sessionStorage.getItem(SESSION_KEY_RECORD_PIN_CODE);
+    const editPayloadRaw = sessionStorage.getItem(
+      SESSION_KEY_RECORD_EDIT_PAYLOAD,
+    );
+    if (!storedPatientId) {
+      if (!consumedSessionRef.current) {
+        alert('환자 카드의 바코드를 먼저 스캔해주세요.');
+        router.replace('/dashboard');
+      }
+      return;
+    }
+    setPatientId(storedPatientId);
+    setPinCode(storedPin ?? '');
+    // session(patientId, pinCode)은 remove 하지 않음 — view↔create 이동 시 조회/편집에 필요
+    if (editPayloadRaw) {
+      fromEditPayloadRef.current = true;
+      try {
+        const { preInfo: editPreInfo, treatmentSheets: editSheets } =
+          JSON.parse(editPayloadRaw) as {
+            preInfo?: PreInfo;
+            treatmentSheets?: TreatmentSheet[];
+          };
+        sessionStorage.removeItem(SESSION_KEY_RECORD_EDIT_PAYLOAD);
+        if (editPreInfo) setPreInfo(editPreInfo);
+        if (Array.isArray(editSheets) && editSheets.length > 0) {
+          const asSaved: SavedTreatmentRecord[] = editSheets.map((s) => ({
+            id: s.id,
+            tooth: s.tooth,
+            type: s.type,
+            formData: s.formData,
+            date: new Date(),
+          }));
+          setSavedRecords(asSaved);
+          const first = editSheets[0];
+          setSelectedTeeth(first.tooth);
+          const sheetsForFirst = editSheets
+            .filter((r) => r.tooth === first.tooth)
+            .map((r) => ({
+              id: r.id,
+              tooth: r.tooth,
+              type: r.type,
+              formData: r.formData,
+            }));
+          setTreatmentSheets(sheetsForFirst);
+          setActiveSheetId(first.id);
+        }
+      } catch {
+        sessionStorage.removeItem(SESSION_KEY_RECORD_EDIT_PAYLOAD);
+      }
+      consumedSessionRef.current = true;
+      return;
+    }
+    consumedSessionRef.current = true;
+  }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const doFetch = () =>
+      fetch('/api/implant-items', { headers: getAuthHeaders() })
+        .then((res: Response) => (res.ok ? res.json() : []))
+        .then(
+          (
+            data: {
+              id: number;
+              manufacturerName: string;
+              brandName: string;
+              size: string;
+            }[],
+          ) => {
+            if (!cancelled) setImplantItems(Array.isArray(data) ? data : []);
+          },
+        )
+        .catch(() => {
+          if (!cancelled) setImplantItems([]);
+        });
+    doFetch();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refetchImplantItems = useCallback(() => {
+    fetch('/api/implant-items', { headers: getAuthHeaders() })
+      .then((res: Response) => (res.ok ? res.json() : []))
+      .then(
+        (
+          data: {
+            id: number;
+            manufacturerName: string;
+            brandName: string;
+            size: string;
+          }[],
+        ) => setImplantItems(Array.isArray(data) ? data : []),
+      )
+      .catch(() => setImplantItems([]));
+  }, []);
+
+  useEffect(() => {
+    if (!patientId) return;
+    let cancelled = false;
+    setPatientLoading(true);
+    fetch('/api/records/latest', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ patientId, metaOnly: true }),
+    })
+      .then((res) => {
+        if (redirectIfUnauthorized(res)) return null;
+        return res.json();
+      })
+      .then((data: PatientCheckResult | null) => {
+        if (cancelled) return;
+        if (fromEditPayloadRef.current) return; // view 편집으로 들어온 경우 모달 스킵
+        if (data?.exists) {
+          setModalMode('dateOnly');
+          setExistingPatientGender(data.patientGender === 'F' ? 'F' : 'M');
+        } else {
+          setModalMode('full');
+        }
+        setPreInfoModalOpen(true);
+      })
+      .catch(() => {
+        if (cancelled || fromEditPayloadRef.current) return;
+        setPreInfoModalOpen(true);
+        setModalMode('full');
+      })
+      .finally(() => {
+        if (!cancelled) setPatientLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId]);
+
+  const handlePreInfoComplete = (data: PreInfo) => {
+    setPreInfo(data);
+    setPreInfoModalOpen(false);
+  };
+
+  // 치아 선택
+  const toggleTooth = useCallback(
+    (n: number) => {
+      setSelectedTeeth((prev) => {
+        if (prev !== null && prev !== n) {
+          const sheetsForN = savedRecords
+            .filter((r) => r.tooth === n)
+            .map((r) => ({
+              id: r.id,
+              tooth: r.tooth,
+              type: r.type,
+              formData: r.formData,
+            }));
+          setTreatmentSheets(sheetsForN);
+          setActiveSheetId(sheetsForN[0]?.id ?? 'add');
+        }
+        return n;
+      });
+    },
+    [savedRecords],
+  );
+
+  const handleResetTooth = useCallback(() => {
+    setSelectedTeeth(null);
+    setTreatmentSheets([]);
+    setActiveSheetId('add');
+    setSavedRecords([]);
+  }, []);
+
+  const handleAddSheet = useCallback(
+    (tooth: number, type: TreatmentSheetType) => {
+      const newSheet: TreatmentSheet = {
+        id: generateSheetId(),
+        tooth,
+        type,
+        formData:
+          type === 'implant_placement' ||
+          type === 'implant_prosthesis' ||
+          type === 'laminate'
+            ? {}
+            : undefined,
+      };
+      setTreatmentSheets((prev) => [...prev, newSheet]);
+      setActiveSheetId(newSheet.id);
+    },
+    [],
+  );
+
+  // 왼쪽 임시 저장된 행 클릭 시 오른쪽 탭에서 수정
+  const handleOpenSavedRecord = useCallback(
+    (record: SavedTreatmentRecord) => {
+      setSelectedTeeth(record.tooth);
+      const sheetsForTooth = savedRecords
+        .filter((r) => r.tooth === record.tooth)
+        .map((r) => ({
+          id: r.id,
+          tooth: r.tooth,
+          type: r.type,
+          formData: r.formData,
+        }));
+      setTreatmentSheets(sheetsForTooth);
+      setActiveSheetId(record.id);
+    },
+    [savedRecords],
+  );
+
+  const handleUpdateSheetFormData = useCallback(
+    (sheetId: string, formData: TreatmentSheet['formData']) => {
+      setTreatmentSheets((prev) =>
+        prev.map((s) =>
+          s.id === sheetId ? { ...s, formData: formData ?? {} } : s,
+        ),
+      );
+    },
+    [],
+  );
+
+  // 시트 탭에서 제거 (편집 배열 + 왼쪽 임시 저장 목록에서도 제거)
+  const handleRemoveSheet = useCallback(
+    (sheetId: string) => {
+      setTreatmentSheets((prev) => {
+        const next = prev.filter((s) => s.id !== sheetId);
+        setActiveSheetId((current) => {
+          if (current === sheetId) {
+            const sameToothSheets = next.filter(
+              (s) => s.tooth === selectedTeeth,
+            );
+            return sameToothSheets[0]?.id ?? 'add';
+          }
+          return current;
+        });
+        return next;
+      });
+      setSavedRecords((prev) => prev.filter((r) => r.id !== sheetId));
+    },
+    [selectedTeeth],
+  );
+
+  // 임시 저장: 기존 id면 갱신, 없으면 새 id로 추가
+  const handleDraftSave = useCallback(() => {
+    const now = new Date();
+    setSavedRecords((prev) => {
+      const byId = new Map(prev.map((r) => [r.id, r]));
+      for (const s of treatmentSheets) {
+        byId.set(s.id, {
+          id: s.id,
+          date: now,
+          tooth: s.tooth,
+          type: s.type,
+          formData: s.formData,
+        });
+      }
+      return Array.from(byId.values());
+    });
+    setRegisterConfirmOpen(false);
+  }, [treatmentSheets]);
+
+  const sheetsForSelectedTooth =
+    selectedTeeth !== null
+      ? treatmentSheets.filter((s) => s.tooth === selectedTeeth)
+      : [];
+
+  // 임시 저장된 데이터가 있는 치아 번호 목록 (치식 붉은색 표시용)
+  const savedTeeth = React.useMemo(
+    () => [...new Set(savedRecords.map((r) => r.tooth))],
+    [savedRecords],
+  );
+
+  const handleCancelConfirm = () => {
+    setCancelConfirmOpen(false);
+    router.push('/dashboard');
+  };
+
+  const handleRegisterConfirmClick = () => {
+    // TODO: 추후 draft - paid - onchained 순으로 변경되게 수정
+    setRegisterConfirmOpen(false);
+    setPaymentConfirmOpen(true);
+  };
+
+  const handleRegisterConfirm = async () => {
+    setPaymentConfirmOpen(false);
+    if (!preInfo) {
+      alert('사전 정보를 입력해주세요.');
+      return;
+    }
+    // 등록 시 전체 진료 목록 사용 (savedRecords가 있으면 전체, 없으면 현재 치아 시트만)
+    const sheetsToSend =
+      savedRecords.length > 0
+        ? savedRecords.map((r) => ({
+            id: r.id,
+            tooth: r.tooth,
+            type: r.type,
+            formData: r.formData,
+          }))
+        : treatmentSheets.map((s) => ({
+            id: s.id,
+            tooth: s.tooth,
+            type: s.type,
+            formData: s.formData,
+          }));
+    if (sheetsToSend.length === 0) {
+      alert(
+        '추가된 진료 시트가 없습니다. 치아를 선택한 뒤 진료 타입을 추가해주세요.',
+      );
+      return;
+    }
+    if (!patientId || !pinCode) {
+      alert('환자 정보가 없습니다. 바코드를 다시 스캔해주세요.');
+      return;
+    }
+    setRegisterLoading(true);
+    setRegisterResult({ status: 'signing' });
+    try {
+      const payload = {
+        version: 1,
+        preInfo,
+        treatmentSheets: sheetsToSend,
+      };
+      const encryptedPayload = await encryptWithPin(
+        JSON.stringify(payload),
+        pinCode,
+      );
+      const res = await fetch('/api/records/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          patientId,
+          encryptedPayload,
+        }),
+      });
+      if (redirectIfUnauthorized(res)) {
+        setRegisterResult(null);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        setRegisterResult({
+          status: 'error',
+          message: data?.error ?? '진료 기록 등록에 실패했습니다.',
+        });
+        return;
+      }
+      if (data.success) {
+        setRegisterResult({
+          status: 'success',
+          txHash: data.txHash ?? '',
+        });
+      } else {
+        setRegisterResult({
+          status: 'error',
+          message: `블록체인 전송이 실패했습니다. (txHash: ${data.txHash ?? '없음'})`,
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setRegisterResult({
+        status: 'error',
+        message: '진료 기록 등록 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  if (!patientId) {
+    return (
+      <div className="min-h-[calc(100vh-80px)] flex flex-col px-4 pt-6 sm:px-6 lg:px-8 gap-4"></div>
+    );
+  }
+
+  return (
+    <div className="min-h-[calc(100vh-80px)] flex flex-col px-4 pt-6 sm:px-6 lg:px-8 gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-foreground">진료 기록 생성</h1>
+        <Button variant="ghost" asChild>
+          <Link href="/records/view">
+            <BookSearch /> 진료 기록 조회
+          </Link>
+        </Button>
+      </header>
+
+      {/* 위쪽 */}
+      <div className="flex justify-between">
+        <PatientInfoBar
+          patientId={patientId}
+          treatmentDate={preInfo?.treatmentDate ?? ''}
+          birthDate={preInfo?.birthDate ?? ''}
+          gender={preInfo?.gender ?? undefined}
+          phmLabel={preInfo?.phm ?? undefined}
+          showPhmEdit
+          onPhmEdit={() => {
+            setIsEditingPreInfo(true);
+            setPreInfoModalOpen(true);
+          }}
+        />
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCancelConfirmOpen(true)}>
+            생성 취소
+          </Button>
+          <Button
+            onClick={() => {
+              if (treatmentSheets.length === 0) {
+                alert(
+                  '추가된 진료 시트가 없습니다. 치아를 선택한 뒤 진료 타입을 추가해주세요.',
+                );
+                return;
+              }
+              handleDraftSave();
+            }}
+          >
+            <ClipboardClock /> 임시 저장
+          </Button>
+          <Button
+            onClick={() => setRegisterConfirmOpen(true)}
+            disabled={registerLoading}
+          >
+            <ClipboardPen /> 진료 기록 등록
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3 flex-1 min-h-0 border-t">
+        {/* 왼쪽: 임시 저장된 진료 목록 (날짜 = 임시 저장 시점) */}
+        <div className="lg:col-span-1 flex flex-col min-h-0 border-r">
+          <div className="flex-1 min-h-0 bg-muted/20 overflow-auto">
+            <div className="grid grid-cols-[auto_auto_1fr] gap-0 content-start">
+              <p className="p-1.5 text-center bg-muted-foreground/10 text-xs font-medium text-muted-foreground border-b border-r border-border">
+                날짜
+              </p>
+              <p className="p-1.5 text-center bg-muted-foreground/10 text-xs font-medium text-muted-foreground border-b border-r border-border">
+                치식
+              </p>
+              <p className="p-1.5 text-center bg-muted-foreground/10 text-xs font-medium text-muted-foreground border-b border-border">
+                진료 내용
+              </p>
+              {[...savedRecords].reverse().map((record) => (
+                <React.Fragment key={record.id}>
+                  {/* 날짜 */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOpenSavedRecord(record)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOpenSavedRecord(record);
+                      }
+                    }}
+                    className="p-2 flex items-center text-center text-sm border-b border-r border-border bg-background cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {record.date.toLocaleDateString('ko-KR', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                    })}
+                  </div>
+                  {/* 치식 */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOpenSavedRecord(record)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOpenSavedRecord(record);
+                      }
+                    }}
+                    className="p-2 flex items-center justify-center border-b border-r border-border bg-background cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <ToothQuadrantCell tooth={record.tooth} />
+                  </div>
+                  {/* 진료 내용 */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOpenSavedRecord(record)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOpenSavedRecord(record);
+                      }
+                    }}
+                    className="p-2 border-b border-border bg-background text-sm min-w-0 cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {record.type === 'implant_placement' && record.formData ? (
+                      (() => {
+                        const fd = record.formData as ImplantPlacementFormData;
+                        return (
+                          <div className="text-xs flex flex-col gap-0.5">
+                            <span className="font-medium text-sm mb-1">
+                              임플란트 식립
+                            </span>
+                            <p>치아번호: #{record.tooth}</p>
+                            {fd.fixture && <p>- Fixture: {fd.fixture}</p>}
+                            {fd.initialFixation && (
+                              <p>- 초기고정: {fd.initialFixation}</p>
+                            )}
+                            {fd.boneQuality && (
+                              <p>
+                                - 골질: {fd.boneQuality}{' '}
+                                {fd.keratinizedGingiva && (
+                                  <>({fd.keratinizedGingiva})</>
+                                )}
+                              </p>
+                            )}
+
+                            {fd.sinusLift && (
+                              <p>
+                                - 상악동거상: {fd.sinusLift}{' '}
+                                {fd.sinusLiftMaterials && (
+                                  <>
+                                    (
+                                    {fd.sinusLiftMaterials
+                                      .map((o) => o)
+                                      .join(', ')}
+                                    )
+                                  </>
+                                )}{' '}
+                              </p>
+                            )}
+                            {fd.boneGraft?.length ? (
+                              <p>- 골이식: {fd.boneGraft.join(', ')}</p>
+                            ) : null}
+                            {fd.surgeryCount && (
+                              <p>
+                                - 수술 횟수: {fd.surgeryCount}{' '}
+                                {fd.healingInput &&
+                                  (fd.healingInput
+                                    ? '(힐링 입력: O)'
+                                    : '(힐링 입력: X)')}
+                              </p>
+                            )}
+                            {fd.prosthesisTiming && (
+                              <p>- 보철시기: {fd.prosthesisTiming}</p>
+                            )}
+                            {fd.comment && <p>- {fd.comment}</p>}
+                          </div>
+                        );
+                      })()
+                    ) : record.type === 'implant_prosthesis' &&
+                      record.formData ? (
+                      (() => {
+                        const fd = record.formData as ImplantProsthesisFormData;
+                        const methodLabel =
+                          fd.method === '직접 입력'
+                            ? fd.methodDirectInput
+                            : fd.method;
+                        let abutmentLabel: string | undefined;
+                        if (fd.abutmentType === '직접 입력') {
+                          abutmentLabel =
+                            fd.abutmentDirectInput ?? fd.abutmentPreset;
+                        } else if (
+                          fd.abutmentType === 'Solid(Rigid)' ||
+                          fd.abutmentType === 'Transfer(SCRP)'
+                        ) {
+                          abutmentLabel = fd.abutmentSubType
+                            ? `${fd.abutmentType} / ${fd.abutmentSubType}`
+                            : fd.abutmentType;
+                        } else if (fd.abutmentType === '오버덴취용') {
+                          abutmentLabel = fd.abutmentOverdent
+                            ? fd.abutmentOverdent === '기타' &&
+                              (fd.abutmentDirectInput ?? fd.abutmentPreset)
+                              ? `오버덴취용 / ${fd.abutmentDirectInput ?? fd.abutmentPreset}`
+                              : `오버덴취용 / ${fd.abutmentOverdent}`
+                            : fd.abutmentType;
+                        } else {
+                          abutmentLabel = fd.abutmentType;
+                        }
+                        return (
+                          <div className="text-xs flex flex-col gap-0.5">
+                            <span className="font-medium text-sm mb-1">
+                              임플란트 보철
+                            </span>
+                            <p>치아번호: #{record.tooth}</p>
+                            {methodLabel && <p>- 방식: {methodLabel}</p>}
+                            {fd.cementationType && (
+                              <p>- 접착 유형: {fd.cementationType}</p>
+                            )}
+                            {abutmentLabel && (
+                              <p>
+                                - 어벗 선택: {abutmentLabel}
+                                {fd.hexStatus &&
+                                  (!fd.sizeNotEntered &&
+                                  (fd.diameter != null ||
+                                    fd.cuff != null ||
+                                    fd.height != null) ? (
+                                    <>
+                                      {' '}
+                                      (Hex - Φ={fd.diameter ?? '-'}, C=
+                                      {fd.cuff ?? '-'}, H={fd.height ?? '-'})
+                                    </>
+                                  ) : (
+                                    <> (Non-Hex)</>
+                                  ))}
+                                {fd.torque && ` - ${fd.torque}`}
+                              </p>
+                            )}
+                            {fd.comment && <p>- {fd.comment}</p>}
+                          </div>
+                        );
+                      })()
+                    ) : record.type === 'laminate' && record.formData ? (
+                      (() => {
+                        const fd = record.formData as LaminateFormData;
+                        return (
+                          <div className="text-xs flex flex-col gap-0.5">
+                            <span className="font-medium text-sm mb-1">
+                              라미네이트
+                            </span>
+                            <p>치아번호: #{record.tooth}</p>
+                            {fd.manufacturer && (
+                              <p>- 제조사: {fd.manufacturer}</p>
+                            )}
+                            {fd.product && <p>- 제품명: {fd.product}</p>}
+                            {fd.shade && <p>- Shade: {fd.shade}</p>}
+                            {fd.lot && <p>- LOT: {fd.lot}</p>}
+                            {fd.cement && <p>- 시멘트: {fd.cement}</p>}
+                            {fd.comment && <p>- {fd.comment}</p>}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <p className="text-muted-foreground">준비 중입니다</p>
+                    )}
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* 오른쪽 */}
+        <div className="lg:col-span-2">
+          <ToothChart
+            selectedTeeth={selectedTeeth}
+            onToggle={toggleTooth}
+            onReset={handleResetTooth}
+            emptyLabel="치식에서 치아를 먼저 선택 해주세요."
+            sheetsForSelectedTooth={sheetsForSelectedTooth}
+            onAddSheet={handleAddSheet}
+            onUpdateSheetFormData={handleUpdateSheetFormData}
+            activeSheetId={activeSheetId}
+            onActiveSheetChange={setActiveSheetId}
+            onRemoveSheet={handleRemoveSheet}
+            savedTeeth={savedTeeth}
+            implantItems={implantItems}
+            onFixtureListChange={refetchImplantItems}
+          />
+        </div>
+      </div>
+
+      <PreInfoModal
+        open={preInfoModalOpen}
+        onOpenChange={(open) => {
+          setPreInfoModalOpen(open);
+          if (!open) setIsEditingPreInfo(false);
+        }}
+        mode={isEditingPreInfo ? 'full' : modalMode}
+        initial={
+          isEditingPreInfo
+            ? (preInfo ?? undefined)
+            : modalMode === 'dateOnly'
+              ? { gender: existingPatientGender, birthDate: '', phm: [] }
+              : (preInfo ?? undefined)
+        }
+        onComplete={handlePreInfoComplete}
+      />
+
+      <AlertModal
+        open={cancelConfirmOpen}
+        onOpenChange={setCancelConfirmOpen}
+        title="생성 취소"
+        message="진료 기록 생성을 취소 하시겠습니까?"
+        secondaryButton={{
+          label: '닫기',
+          onClick: () => setCancelConfirmOpen(false),
+        }}
+        primaryButton={{
+          label: '생성 취소',
+          onClick: handleCancelConfirm,
+        }}
+      />
+
+      <AlertModal
+        open={registerConfirmOpen}
+        onOpenChange={setRegisterConfirmOpen}
+        title="진료 기록 등록"
+        message={
+          <div>
+            더 추가할 진료 기록이 없으신가요?
+            <br /> 이대로 등록을 완료하시겠습니까?
+          </div>
+        }
+        secondaryButton={{
+          label: '취소',
+          onClick: () => setRegisterConfirmOpen(false),
+        }}
+        primaryButton={{
+          label: '등록',
+          onClick: handleRegisterConfirmClick,
+        }}
+      />
+
+      <AlertModal
+        open={paymentConfirmOpen}
+        onOpenChange={setPaymentConfirmOpen}
+        title="단말기 결제 확인"
+        message={
+          <div>
+            단말기 결제를 완료하셨습니까?
+            <br />
+            확인 시 진료 기록이 블록체인에 등록됩니다.
+          </div>
+        }
+        secondaryButton={{
+          label: '취소',
+          onClick: () => setPaymentConfirmOpen(false),
+        }}
+        primaryButton={{
+          label: registerLoading ? '처리 중…' : '확인',
+          onClick: handleRegisterConfirm,
+          disabled: registerLoading,
+        }}
+      />
+
+      <AlertModal
+        open={registerResult !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRegisterResult(null);
+            // if (
+            //   registerResult !== null &&
+            //   registerResult.status === 'success'
+            // ) {
+            //   router.push('/dashboard');
+            // }
+          }
+        }}
+        title={
+          registerResult?.status === 'signing'
+            ? '지갑 서명 중'
+            : registerResult?.status === 'success'
+              ? '진료 기록 등록 완료'
+              : registerResult?.status === 'error'
+                ? '등록 실패'
+                : ''
+        }
+        message={
+          registerResult?.status === 'signing' ? (
+            <div>블록체인에 기록을 저장하고 있습니다.</div>
+          ) : registerResult?.status === 'success' ? (
+            <>
+              <span className="block">
+                진료 기록을 안전하게 <br />
+                블록체인 네트워크에 등록 하였습니다.
+              </span>
+              {registerResult.txHash && (
+                <span className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+                  <span className="text-sm break-all font-mono text-muted-foreground">
+                    TXID:{' '}
+                    {registerResult.txHash.length <= 12
+                      ? registerResult.txHash
+                      : `${registerResult.txHash.slice(0, 4)}...${registerResult.txHash.slice(-4)}`}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        registerResult.txHash ?? '',
+                      );
+                    }}
+                    title="주소 복사"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </span>
+              )}
+            </>
+          ) : registerResult?.status === 'error' ? (
+            <div>{registerResult.message}</div>
+          ) : (
+            <div />
+          )
+        }
+        secondaryButton={
+          registerResult?.status === 'signing'
+            ? undefined
+            : {
+                label: '홈으로',
+                onClick: () => {
+                  setRegisterResult(null);
+                  if (
+                    registerResult !== null &&
+                    registerResult.status === 'success'
+                  ) {
+                    router.push('/dashboard');
+                  }
+                },
+              }
+        }
+        primaryButton={
+          registerResult?.status === 'signing'
+            ? undefined
+            : {
+                label: '확인',
+                onClick: () => {
+                  setRegisterResult(null);
+                  if (
+                    registerResult !== null &&
+                    registerResult.status === 'success'
+                  ) {
+                    router.push('/records/view');
+                  }
+                },
+              }
+        }
+      />
+    </div>
+  );
+}
+
+export default function RecordCreatePage() {
+  return (
+    <Suspense
+      fallback={<div className="p-6 text-muted-foreground">로딩 중...</div>}
+    >
+      <CreateContent />
+    </Suspense>
+  );
+}

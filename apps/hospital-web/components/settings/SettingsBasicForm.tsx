@@ -95,9 +95,16 @@ export function SettingsBasicForm() {
     setAccountHolder(data.accountHolder ?? '');
     setManagerPhone(data.managerPhone ?? '');
     setManagerEmail(data.managerEmail ?? '');
-    setAddressZipcode(data.addressZipcode ?? '');
-    setAddressRoad(data.addressRoad ?? '');
-    setAddressDetail(data.addressDetail ?? '');
+    if (data.businessAddress) {
+      const parts = data.businessAddress.split('/');
+      setAddressZipcode(data.addressZipcode ?? parts[0] ?? '');
+      setAddressRoad(data.addressRoad ?? parts[1] ?? '');
+      setAddressDetail(data.addressDetail ?? parts[2] ?? '');
+    } else {
+      setAddressZipcode(data.addressZipcode ?? '');
+      setAddressRoad(data.addressRoad ?? '');
+      setAddressDetail(data.addressDetail ?? '');
+    }
   }, []);
 
   useEffect(() => {
@@ -144,7 +151,7 @@ export function SettingsBasicForm() {
     const road = addressRoad.trim();
     const detail = addressDetail.trim();
     if (!zip || !road || !detail) {
-      alert('누락 값이 존재합니다.');
+      alert('병원 주소를 입력해주세요.');
       return;
     }
 

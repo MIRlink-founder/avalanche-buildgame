@@ -25,8 +25,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // 상태별 에러 메시지
-    const statusMessages: Record<string, string> = {
+    // 사용자 상태별 에러 메시지
+    const userStatusMessages: Record<string, string> = {
       WITHDRAWN: '탈퇴된 계정입니다. 관리자에게 문의하세요.',
       DISABLED: '운영 정책에 의해 차단된 계정입니다.',
       DELETED: '삭제된 계정입니다.',
@@ -34,7 +34,8 @@ export async function POST(request: Request) {
     if (user.status !== 'ACTIVE') {
       return NextResponse.json(
         {
-          error: statusMessages[user.status] || '계정 상태가 올바르지 않습니다',
+          error:
+            userStatusMessages[user.status] || '계정 상태가 올바르지 않습니다',
         },
         { status: 403 },
       );
@@ -46,10 +47,25 @@ export async function POST(request: Request) {
       const hospital = await prisma.hospital.findUnique({
         where: { id: user.hospitalId! },
       });
-      if (!hospital || hospital.status !== 'ACTIVE') {
+      if (!hospital) {
+        return NextResponse.json(
+          { error: '병원 정보를 찾을 수 없습니다.' },
+          { status: 403 },
+        );
+      }
+      if (hospital.status !== 'ACTIVE') {
+        const hospitalStatusMessages: Record<string, string> = {
+          PENDING: '아직 승인되지 않았습니다.',
+          APPROVED: '비밀번호 설정이 완료되지 않았습니다.',
+          REJECTED: '운영사에 의해 반려되었습니다.',
+          DISABLED: '계정이 정지되었습니다.',
+          WITHDRAWN: '탈퇴된 계정입니다.',
+        };
         return NextResponse.json(
           {
-            error: '병원 승인이 완료되지 않았습니다',
+            error:
+              hospitalStatusMessages[hospital.status] ||
+              '병원 상태가 올바르지 않습니다.',
           },
           { status: 403 },
         );

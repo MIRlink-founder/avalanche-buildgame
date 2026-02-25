@@ -2,6 +2,8 @@ import nodemailer from 'nodemailer';
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 const ACTIVATION_PATH = '/auth/activate';
+const INVITATION_PATH = '/auth/invite';
+const RESET_PASSWORD_PATH = '/auth/reset-password';
 
 function getTransport() {
   const host = process.env.SMTP_HOST;
@@ -88,6 +90,98 @@ export interface SendRejectionEmailParams {
   rejectionReason: string;
 }
 
+export interface SendResetPasswordEmailParams {
+  to: string;
+  name?: string | null;
+  token: string;
+}
+
+export interface SendInvitationEmailParams {
+  to: string;
+  hospitalName: string;
+  invitedBy?: string | null;
+  token: string;
+  expiresInHours: number;
+}
+
+// 비밀번호 재설정 메일 발송
+export async function sendResetPasswordEmail(
+  params: SendResetPasswordEmailParams,
+): Promise<void> {
+  const { to, name, token } = params;
+  const link = `${baseUrl}${RESET_PASSWORD_PATH}?token=${encodeURIComponent(token)}`;
+  const displayName = name?.trim() || '담당자';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+  <p>안녕하세요, <strong>${displayName}</strong>님.</p>
+  <p>미르링크 비밀번호 재설정을 요청하셨습니다. 아래 버튼을 눌러 새 비밀번호를 설정해주세요.</p>
+
+  <p><a href="${link}" style="display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">비밀번호 재설정하기</a></p>
+  <p style="font-size: 14px;">또는 아래 링크를 브라우저에 붙여넣기 하세요:<br><a href="${link}">${link}</a></p>
+
+  <p><strong>⚠️ 유의사항</strong></p>
+  <ul>
+    <li>보안을 위해 위 링크는 발송 후 1시간 동안만 유효합니다.</li>
+    <li>본인이 요청하지 않았다면 이 메일을 무시해 주세요.</li>
+  </ul>
+  <p>문의처: help@mirlink.com | 02-1234-5678</p>
+</body>
+</html>
+  `;
+
+  const transporter = getTransport();
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    to,
+    subject: '[미르링크] 비밀번호 재설정 안내',
+    html,
+  });
+}
+
+// 병원 직원 초대 메일 발송
+export async function sendInvitationEmail(
+  params: SendInvitationEmailParams,
+): Promise<void> {
+  const { to, hospitalName, invitedBy, token, expiresInHours } = params;
+  const link = `${baseUrl}${INVITATION_PATH}?token=${encodeURIComponent(token)}`;
+  const inviter = invitedBy?.trim() ? invitedBy : '병원 관리자';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+  <p>안녕하세요.</p>
+  <p><strong>${hospitalName}</strong>에서 미르링크 계정으로 초대했습니다.</p>
+  <p>아래 버튼을 눌러 비밀번호를 설정하고 계정을 활성화해주세요.</p>
+
+  <p><a href="${link}" style="display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">계정 설정하기</a></p>
+  <p style="font-size: 14px;">또는 아래 링크를 브라우저에 붙여넣기 하세요:<br><a href="${link}">${link}</a></p>
+
+  <p><strong>⚠️ 유의사항</strong></p>
+  <ul>
+    <li>보안을 위해 위 링크는 발송 후 ${expiresInHours}시간 동안만 유효합니다.</li>
+    <li>본인이 요청하지 않았다면 이 메일을 무시해 주세요.</li>
+    <li>초대한 사람: ${inviter}</li>
+  </ul>
+  <p>문의처: help@mirlink.com | 02-1234-5678</p>
+</body>
+</html>
+  `;
+
+  const transporter = getTransport();
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    to,
+    subject: `[미르링크] ${hospitalName}에서 직원 계정을 초대했습니다.`,
+    html,
+  });
+}
+
 // 입점 반려 안내 메일 발송
 export async function sendRejectionEmail(
   params: SendRejectionEmailParams,
@@ -127,6 +221,51 @@ export async function sendRejectionEmail(
     from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
     to,
     subject: `[Mirlink] ${hospitalName} 가입 신청이 반려되었습니다.`,
+    html,
+  });
+}
+
+export interface SendWalletLowBalanceEmailParams {
+  to: string;
+  balanceAvax: string;
+  thresholdAvax: string;
+  networkName: string;
+}
+
+// 지갑 잔액 부족 알림 메일 발송
+export async function sendWalletLowBalanceEmail(
+  params: SendWalletLowBalanceEmailParams,
+): Promise<void> {
+  const { to, balanceAvax, thresholdAvax, networkName } = params;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+  <p>안녕하세요, 미르링크(Mirlink) 운영팀입니다.</p>
+
+  <p><strong>가스비 대납용 마스터 지갑 잔액이 설정하신 기준보다 낮습니다.</strong></p>
+
+  <ul>
+    <li>네트워크: ${networkName}</li>
+    <li>현재 잔액: <strong>${balanceAvax} AVAX</strong></li>
+    <li>알림 기준: ${thresholdAvax} AVAX</li>
+  </ul>
+
+  <p>잔액을 보충해 주시지 않으면 병원 진료 데이터 블록체인 등록이 실패할 수 있습니다.<br>
+  관리자 지갑 관리 페이지에서 잔액을 확인하고 AVAX를 충전해 주세요.</p>
+
+  <p>문의처: help@mirlink.com</p>
+</body>
+</html>
+`;
+
+  const transporter = getTransport();
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    to,
+    subject: '[미르링크] 지갑 잔액 부족 알림',
     html,
   });
 }

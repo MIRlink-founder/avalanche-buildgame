@@ -12,6 +12,8 @@ interface PaginationProps {
   pageSize: number;
   /** 미지정 시 /admin/hospitals (목록 페이지용) */
   basePath?: string;
+  /** 지정 시 URL 대신 콜백으로 페이지 변경 (상세 등 로컬 페이지네이션용) */
+  onPageChange?: (page: number) => void;
 }
 
 export function Pagination({
@@ -20,11 +22,16 @@ export function Pagination({
   totalCount,
   pageSize,
   basePath = '/admin/hospitals',
+  onPageChange,
 }: PaginationProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const handlePageChange = (page: number) => {
+    if (onPageChange) {
+      onPageChange(page);
+      return;
+    }
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', page.toString());
     router.push(`${basePath}?${params.toString()}`);
