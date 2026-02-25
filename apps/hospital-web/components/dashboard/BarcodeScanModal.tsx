@@ -42,7 +42,8 @@ export function BarcodeScanModal({
     e.preventDefault();
     const value = inputRef.current?.value?.trim();
     if (!value) return;
-    const parsed = parseBarcode(DUMMY_BARCODE); // TODO: value 로 변경
+    // const parsed = parseBarcode(DUMMY_BARCODE); // TODO: value 로 변경
+    const parsed = parseBarcode(value);
     if (!parsed) {
       alert(
         '바코드 형식이 올바르지 않습니다. 환자ID#PIN 형식으로 스캔해주세요.',
@@ -84,13 +85,6 @@ export function BarcodeScanModal({
 
   const handleClose = () => {
     onOpenChange(false);
-    // if (typeof window !== 'undefined') {
-    //   sessionStorage.setItem(
-    //     SESSION_KEY_RECORD_PATIENT_ID,
-    //     encodeURIComponent(DUMMY_BARCODE),
-    //   );
-    //   router.push('/records/create');
-    // }
   };
 
   return (
@@ -112,9 +106,15 @@ export function BarcodeScanModal({
             type="text"
             autoComplete="off"
             tabIndex={0}
-            className="absolute h-0 w-0 opacity-0"
+            // className="absolute h-0 w-0 opacity-0"
+            className="w-full border p-2 rounded"
+            placeholder="e.g. patient001#123456"
             aria-label="바코드 스캔"
           />
+          <p className="text-center mt-2 text-xs text-muted-foreground">
+            테스트를 위한 입력창입니다. [환자ID#핀코드] 형식으로 입력한 뒤 Enter
+            를 눌러주세요.
+          </p>
           <Button
             type="button"
             variant="ghost"
