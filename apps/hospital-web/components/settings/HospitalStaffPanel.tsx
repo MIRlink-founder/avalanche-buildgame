@@ -124,7 +124,6 @@ export function HospitalStaffPanel({
   // 정보 수정 모달
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogUser, setEditDialogUser] = useState<HospitalUser | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDepartment, setEditDepartment] = useState('');
   const [editRole, setEditRole] = useState('DEPT_ADMIN');
@@ -315,28 +314,6 @@ export function HospitalStaffPanel({
       setInviteError('멤버 초대 중 오류가 발생했습니다.');
     } finally {
       setInviteSending(false);
-    }
-  };
-
-  const changeStatus = async (userId: string, newStatus: string) => {
-    setActionLoadingId(userId);
-    try {
-      const res = await fetch(`/api/hospitals/staff/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (redirectIfUnauthorized(res)) return;
-      const result = await res.json();
-      if (!res.ok) {
-        alert(result.error || '상태 변경에 실패했습니다.');
-        return;
-      }
-      setRefreshTrigger((prev) => prev + 1);
-    } catch {
-      alert('상태 변경 중 오류가 발생했습니다.');
-    } finally {
-      setActionLoadingId(null);
     }
   };
 
@@ -927,59 +904,62 @@ export function HospitalStaffPanel({
                   value={editDepartment}
                   onChange={(e) => setEditDepartment(e.target.value)}
                   placeholder="운영부"
+                  maxLength={100}
                 />
               </div>
-              <div className="space-y-3">
-                <Label>
-                  권한 설정 <span className="text-destructive">*</span>
-                </Label>
-                <label
-                  className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-                    editRole === 'MASTER_ADMIN'
-                      ? 'border-primary'
-                      : 'border-border',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="edit-role"
-                    value="MASTER_ADMIN"
-                    checked={editRole === 'MASTER_ADMIN'}
-                    onChange={() => setEditRole('MASTER_ADMIN')}
-                    className="mt-0.5 h-4 w-4 accent-primary"
-                  />
-                  <div>
-                    <span className="font-medium">관리자</span>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      모든 권한 및 설정 관리 가능
-                    </p>
-                  </div>
-                </label>
-                <label
-                  className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-                    editRole === 'DEPT_ADMIN'
-                      ? 'border-primary'
-                      : 'border-border',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="edit-role"
-                    value="DEPT_ADMIN"
-                    checked={editRole === 'DEPT_ADMIN'}
-                    onChange={() => setEditRole('DEPT_ADMIN')}
-                    className="mt-0.5 h-4 w-4 accent-primary"
-                  />
-                  <div>
-                    <span className="font-medium">일반</span>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      환자 정보 조회 및 진료 기록 작성
-                    </p>
-                  </div>
-                </label>
-              </div>
+              {canManage && editDialogUser && currentUserEmail !== editDialogUser.email && (
+                <div className="space-y-3">
+                  <Label>
+                    권한 설정 <span className="text-destructive">*</span>
+                  </Label>
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                      editRole === 'MASTER_ADMIN'
+                        ? 'border-primary'
+                        : 'border-border',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="edit-role"
+                      value="MASTER_ADMIN"
+                      checked={editRole === 'MASTER_ADMIN'}
+                      onChange={() => setEditRole('MASTER_ADMIN')}
+                      className="mt-0.5 h-4 w-4 accent-primary"
+                    />
+                    <div>
+                      <span className="font-medium">관리자</span>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        모든 권한 및 설정 관리 가능
+                      </p>
+                    </div>
+                  </label>
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                      editRole === 'DEPT_ADMIN'
+                        ? 'border-primary'
+                        : 'border-border',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="edit-role"
+                      value="DEPT_ADMIN"
+                      checked={editRole === 'DEPT_ADMIN'}
+                      onChange={() => setEditRole('DEPT_ADMIN')}
+                      className="mt-0.5 h-4 w-4 accent-primary"
+                    />
+                    <div>
+                      <span className="font-medium">일반</span>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        환자 정보 조회 및 진료 기록 작성
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
               {editError && (
                 <p className="text-sm text-destructive">{editError}</p>
               )}

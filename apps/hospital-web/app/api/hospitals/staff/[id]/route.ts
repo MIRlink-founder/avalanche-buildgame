@@ -169,6 +169,12 @@ export async function PATCH(
     }
 
     if (nameRaw !== undefined) {
+      if (typeof nameRaw !== 'string') {
+        return NextResponse.json(
+          { error: '이름 형식이 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
       const trimmedName = nameRaw.trim();
       if (!trimmedName) {
         return NextResponse.json(
@@ -179,6 +185,21 @@ export async function PATCH(
       if (trimmedName.length > 20) {
         return NextResponse.json(
           { error: '이름은 최대 20자까지 입력 가능합니다.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (departmentNameRaw !== undefined) {
+      if (typeof departmentNameRaw !== 'string') {
+        return NextResponse.json(
+          { error: '부서명 형식이 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
+      if (departmentNameRaw.trim().length > 100) {
+        return NextResponse.json(
+          { error: '부서명은 최대 100자까지 입력 가능합니다.' },
           { status: 400 },
         );
       }
@@ -200,7 +221,7 @@ export async function PATCH(
       );
     }
 
-    if (isSelf && role && user.role !== 'MASTER_ADMIN') {
+    if (isSelf && role) {
       return NextResponse.json(
         { error: '내 계정의 권한은 변경할 수 없습니다.' },
         { status: 400 },
@@ -275,10 +296,23 @@ export async function PATCH(
           select: { id: true },
         });
         if (!dept) {
-          dept = await prisma.department.create({
-            data: { hospitalId: user.hospitalId!, name: deptName },
-            select: { id: true },
-          });
+          try {
+            dept = await prisma.department.create({
+              data: { hospitalId: user.hospitalId!, name: deptName },
+              select: { id: true },
+            });
+          } catch {
+            dept = await prisma.department.findFirst({
+              where: { hospitalId: user.hospitalId!, name: deptName },
+              select: { id: true },
+            });
+            if (!dept) {
+              return NextResponse.json(
+                { error: '부서 생성에 실패했습니다.' },
+                { status: 500 },
+              );
+            }
+          }
         }
         updateData.departmentId = dept.id;
       }
