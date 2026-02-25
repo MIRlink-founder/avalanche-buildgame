@@ -708,46 +708,50 @@ function PaybackSettingsTab() {
     <div className="space-y-6">
       {/* 전체 비율 설정 카드 */}
       <Card className="rounded-xl border-border">
-        <div className="p-8">
-          <h3 className="text-lg font-bold">전체 페이백 비율 설정</h3>
-
-          <div className="mt-5 flex items-start justify-between">
+        <div className="flex items-start justify-between p-8">
+          {/* 좌측: 타이틀 + 라벨 + 입력 + 버튼 */}
+          <div>
+            <h3 className="text-lg font-bold">전체 페이백 비율 설정</h3>
             <label
               htmlFor="default-payback-rate"
-              className="text-sm font-medium text-foreground"
+              className="mt-2 block text-sm font-medium text-foreground"
             >
               리워드 비율 (%)
             </label>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              설정된 비율에 따라 매월 1일 리워드가 자동 산출됩니다.
-              <br />
-              개별 설정 비율이 우선 적용 됩니다.
-            </p>
+
+            <div className="mt-5 flex items-center gap-3">
+              <Input
+                id="default-payback-rate"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={defaultRate}
+                onChange={(e) => setDefaultRate(e.target.value)}
+                className="h-11 w-[180px] rounded-lg bg-background"
+                placeholder="예: 5.0"
+              />
+              <span className="text-base font-medium text-foreground">%</span>
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleSaveRate}
+              disabled={isSavingRate || !defaultRate.trim()}
+              className="mt-5 rounded-lg bg-gray-900 px-5 text-white hover:bg-gray-800"
+            >
+              {isSavingRate ? '저장 중...' : '설정 저장'}
+            </Button>
           </div>
 
-          <div className="mt-5 flex items-center gap-3">
-            <Input
-              id="default-payback-rate"
-              type="number"
-              step="0.1"
-              min="0"
-              max="100"
-              value={defaultRate}
-              onChange={(e) => setDefaultRate(e.target.value)}
-              className="h-11 w-[180px] rounded-lg bg-background"
-              placeholder="예: 5.0"
-            />
-            <span className="text-base font-medium text-foreground">%</span>
-          </div>
-
-          <Button
-            type="button"
-            onClick={handleSaveRate}
-            disabled={isSavingRate || !defaultRate.trim()}
-            className="mt-5 rounded-lg bg-gray-900 px-5 text-white hover:bg-gray-800"
-          >
-            {isSavingRate ? '저장 중...' : '설정 저장'}
-          </Button>
+          {/* 우측: 설명 텍스트 (타이틀과 같은 높이) */}
+          <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+            설정된 비율에 따라 매월 1일 리워드가 자동 산출됩니다.
+            <br />
+            개별 설정 비율이 우선 적용 됩니다.
+          </p>
+        </div>
+        <div className="px-8 pb-8">
           {rateError && (
             <p className="mt-3 text-sm text-destructive">{rateError}</p>
           )}
