@@ -119,6 +119,7 @@ model Hospital {
   payments Payment[]
   testPaymentSessions TestPaymentSession[]
   settlements Settlement[]
+  paymentLogs PaymentLog[]
   nfts NFT[]
   supplyRequests SupplyRequest[]
   inquiries Inquiry[]
@@ -445,6 +446,30 @@ model PaymentIdempotency {
 
   @@index([status])
   @@map("payment_idempotencies")
+}
+
+/// PG Webhook으로 수신한 결제 로그 (진료 정보와 매칭하지 않고 단순 적재)
+model PaymentLog {
+  id              Int       @id @default(autoincrement())
+  hospitalId      String?   @db.Uuid @map("hospital_id")
+  subMid          String    @db.VarChar(50) @map("sub_mid")
+  approveNo       String?   @db.VarChar(50) @map("approve_no")
+  amount          Decimal   @db.Decimal(15, 2)
+  /// READY, PAID, CANCELLED
+  status          String    @db.VarChar(20)
+  pgTransactionId String?   @db.VarChar(100) @map("pg_transaction_id")
+  paidAt          DateTime? @map("paid_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+  /// Webhook 원본 JSON
+  rawPayload      String?   @db.Text @map("raw_payload")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  hospital        Hospital? @relation(fields: [hospitalId], references: [id])
+
+  @@index([subMid])
+  @@index([approveNo])
+  @@index([hospitalId, paidAt])
+  @@map("payment_logs")
 }
 
 model TestPaymentSession {

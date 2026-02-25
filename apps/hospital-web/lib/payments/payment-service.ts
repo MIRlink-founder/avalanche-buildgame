@@ -6,6 +6,7 @@ import type {
 } from "@/lib/payments/payment-types"
 import type { PaymentProvider } from "@/lib/payments/payment-provider"
 import { MockPaymentProvider } from "@/lib/payments/mock-payment-provider"
+import { NicePosPaymentProvider } from "@/lib/payments/nicepay-payment-provider"
 import {
   mapApproveResultToPaymentCreatePayload,
   mapCancelResultToPaymentUpdatePayload,
@@ -32,7 +33,11 @@ export function createPaymentProvider(
     return new MockPaymentProvider()
   }
 
-  throw new Error("NICE POS 프로바이더가 아직 준비되지 않았습니다")
+  if (type === "NICE_POS") {
+    return new NicePosPaymentProvider()
+  }
+
+  throw new Error("지원하지 않는 결제 프로바이더입니다")
 }
 
 export async function requestPaymentApproval(
