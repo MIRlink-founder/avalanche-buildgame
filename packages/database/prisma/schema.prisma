@@ -502,7 +502,7 @@ model Settlement {
   paybackAmount Decimal @db.Decimal(15, 2) @map("payback_amount")
   /// NFT 보유 여부 (레거시, 미사용)
   isNftBoosted Boolean @default(false) @map("is_nft_boosted")
-  /// PENDING, CONFIRMED, PAID
+  /// PENDING, CONFIRMED, SETTLED
   status String @db.VarChar(20)
   settledAt DateTime? @map("settled_at")
   createdAt DateTime @default(now()) @map("created_at")

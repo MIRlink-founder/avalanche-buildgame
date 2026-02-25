@@ -33,17 +33,6 @@ export function formatBusinessNumber(num: string): string {
   return num;
 }
 
-export function formatPhone(phone: string | null): string {
-  if (!phone) return '-';
-  if (phone.startsWith('02')) {
-    if (phone.length === 9) {
-      return `${phone.slice(0, 2)}-${phone.slice(2, 5)}-${phone.slice(5)}`;
-    }
-    return `${phone.slice(0, 2)}-${phone.slice(2, 6)}-${phone.slice(6)}`;
-  }
-  return `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7)}`;
-}
-
 export const HOSPITAL_STATUS_LABELS: Record<string, string> = {
   PENDING: '승인대기',
   APPROVED: '승인완료',

@@ -5,7 +5,6 @@ import {
   formatDate,
   formatDateOnly,
   formatBusinessNumber,
-  formatPhone,
   formatFileSize,
 } from '@/lib/admin-hospital-format';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
@@ -18,7 +17,10 @@ interface HospitalDetailBasicProps {
   onRefresh: () => void;
 }
 
-export function HospitalDetailBasic({ hospital, onRefresh }: HospitalDetailBasicProps) {
+export function HospitalDetailBasic({
+  hospital,
+  onRefresh,
+}: HospitalDetailBasicProps) {
   const [memoText, setMemoText] = useState('');
   const [savingMemo, setSavingMemo] = useState(false);
   const [statusActionLoading, setStatusActionLoading] = useState(false);
@@ -114,9 +116,7 @@ export function HospitalDetailBasic({ hospital, onRefresh }: HospitalDetailBasic
           </div>
           <div className="flex justify-between">
             <dt className="text-sm text-muted-foreground">연락처</dt>
-            <dd className="mt-1 font-mono">
-              {formatPhone(hospital.managerPhone)}
-            </dd>
+            <dd className="mt-1 font-mono">{hospital.managerPhone}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-sm text-muted-foreground">이메일</dt>
