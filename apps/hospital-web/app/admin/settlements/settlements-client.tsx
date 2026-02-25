@@ -692,45 +692,41 @@ function PaybackSettingsTab() {
           <CardTitle>전체 페이백 비율 설정</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-start gap-4">
-            <div className="flex items-end gap-3">
-              <div className="w-[200px]">
-                <label
-                  htmlFor="default-payback-rate"
-                  className="mb-1 block text-sm font-medium text-foreground"
-                >
-                  페이백 비율
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="default-payback-rate"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={defaultRate}
-                    onChange={(e) => setDefaultRate(e.target.value)}
-                    className="bg-background"
-                    placeholder="예: 5.0"
-                  />
-                  <span className="text-sm font-medium text-foreground">%</span>
-                </div>
-              </div>
-              <Button
-                type="button"
-                onClick={handleSaveRate}
-                disabled={isSavingRate || !defaultRate.trim()}
-                className="bg-gray-900 text-white hover:bg-gray-800"
-              >
-                {isSavingRate ? '저장 중...' : '설정 저장'}
-              </Button>
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground leading-relaxed">
+          <div className="flex items-start justify-between">
+            <label
+              htmlFor="default-payback-rate"
+              className="text-sm font-medium text-foreground"
+            >
+              리워드 비율 (%)
+            </label>
+            <p className="text-sm text-muted-foreground leading-relaxed">
               설정된 비율에 따라 매월 1일 리워드가 자동 산출됩니다.
               <br />
               개별 설정 비율이 우선 적용 됩니다.
             </p>
           </div>
+          <div className="mt-3 flex items-center gap-2">
+            <Input
+              id="default-payback-rate"
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              value={defaultRate}
+              onChange={(e) => setDefaultRate(e.target.value)}
+              className="w-[160px] bg-background"
+              placeholder="예: 5.0"
+            />
+            <span className="text-sm font-medium text-foreground">%</span>
+          </div>
+          <Button
+            type="button"
+            onClick={handleSaveRate}
+            disabled={isSavingRate || !defaultRate.trim()}
+            className="mt-4 bg-gray-900 text-white hover:bg-gray-800"
+          >
+            {isSavingRate ? '저장 중...' : '설정 저장'}
+          </Button>
           {rateError && (
             <p className="mt-2 text-sm text-destructive">{rateError}</p>
           )}
@@ -739,6 +735,9 @@ function PaybackSettingsTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* 구분선 */}
+      <hr className="border-border" />
 
       {/* 개별 설정 병원 리스트 */}
       <div className="space-y-3">
@@ -753,10 +752,10 @@ function PaybackSettingsTab() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>병원명</TableHead>
+              <TableHead>병원</TableHead>
               <TableHead>대표자명</TableHead>
-              <TableHead className="text-right">적용 비율(%)</TableHead>
-              <TableHead>상태</TableHead>
+              <TableHead className="text-center">적용 비율</TableHead>
+              <TableHead className="text-center">상태</TableHead>
               <TableHead className="text-center">관리</TableHead>
             </TableRow>
           </TableHeader>
@@ -779,10 +778,10 @@ function PaybackSettingsTab() {
                       {hospitalName}
                     </TableCell>
                     <TableCell>{h.ceoName ?? '-'}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
+                    <TableCell className="text-center whitespace-nowrap">
                       {formatRate(h.paybackRate)}%
                     </TableCell>
-                    <TableCell>{getStatusBadge(h.status)}</TableCell>
+                    <TableCell className="text-center">{getStatusBadge(h.status)}</TableCell>
                     <TableCell className="text-center">
                       <Button asChild variant="outline" size="sm">
                         <Link
