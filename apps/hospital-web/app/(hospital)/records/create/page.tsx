@@ -26,8 +26,7 @@ import {
   type ImplantProsthesisFormData,
   type LaminateFormData,
 } from '@/components/records/treatment-sheet-types';
-import { getAuthHeaders } from '@/lib/get-auth-headers';
-import { redirectIfUnauthorized } from '@/lib/get-auth-headers';
+import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
   SESSION_KEY_RECORD_PATIENT_ID,
   SESSION_KEY_RECORD_PIN_CODE,
@@ -750,12 +749,12 @@ function CreateContent() {
       <AlertModal
         open={paymentConfirmOpen}
         onOpenChange={setPaymentConfirmOpen}
-        title="결제를 진행해주세요"
+        title="단말기 결제 확인"
         message={
           <div>
-            포스기에서 결제를 진행한 뒤,
+            단말기 결제를 완료하셨습니까?
             <br />
-            결제가 완료되면 확인 버튼을 눌러주세요.
+            확인 시 진료 기록이 블록체인에 등록됩니다.
           </div>
         }
         secondaryButton={{
@@ -763,7 +762,7 @@ function CreateContent() {
           onClick: () => setPaymentConfirmOpen(false),
         }}
         primaryButton={{
-          label: registerLoading ? '등록 중…' : '확인',
+          label: registerLoading ? '처리 중…' : '확인',
           onClick: handleRegisterConfirm,
           disabled: registerLoading,
         }}
