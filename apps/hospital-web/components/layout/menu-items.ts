@@ -10,6 +10,7 @@ import {
   Users2,
   CalendarCheck2,
   NotebookPen,
+  CreditCard,
 } from 'lucide-react';
 import type { SidebarMenuItem } from './AppSidebar';
 
@@ -29,6 +30,7 @@ export const hospitalMenuItems: SidebarMenuItem[] = [
   { title: '환자 관리', icon: Users2, href: '/patients' },
   { title: '예약 관리', icon: CalendarCheck2, href: '/appointments' },
   { title: '진료 기록', icon: NotebookPen, href: '/records' },
+  { title: '결제 내역', icon: CreditCard, href: '/payments' },
   { title: '재고 관리', icon: Package, href: '/inventories' },
   { title: '직원 관리', icon: User, href: '/hospital/staff' },
   { title: '설정', icon: Settings, href: '/settings' },

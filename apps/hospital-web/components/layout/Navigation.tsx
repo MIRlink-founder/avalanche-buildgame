@@ -14,6 +14,7 @@ import { FEATURES } from '@/lib/permissions/features';
 const HOSPITAL_MENU_PATHS = [
   '/dashboard',
   '/records',
+  '/payments',
   '/settlements',
   '/reports',
   '/support',
@@ -89,6 +90,9 @@ export default function Navigation() {
           <div className="flex items-center gap-1">
             <NavLink href="/dashboard" current={pathname === '/dashboard'}>
               대시보드
+            </NavLink>
+            <NavLink href="/payments" current={pathname === '/payments'}>
+              결제 내역
             </NavLink>
             <NavLink href="/settlements" current={pathname === '/settlements'}>
               정산 관리
