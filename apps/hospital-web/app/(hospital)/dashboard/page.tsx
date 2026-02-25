@@ -1,20 +1,75 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, Separator } from '@mire/ui';
 import { Camera, BarChart3 } from 'lucide-react';
 import { BarcodeScanModal } from '@/components/dashboard/BarcodeScanModal';
 import Image from 'next/image';
+import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
+
+interface Settlement {
+  settlementPeriodStart: string;
+  paybackAmount: number;
+  caseCount: number;
+}
+
+interface SettlementsResponse {
+  data: Settlement[];
+  summary: { totalPayback: number; totalCaseCount: number };
+  paybackRate: number;
+}
 
 export default function DashboardPage() {
   const [barcodeModalOpen, setBarcodeModalOpen] = useState(false);
+  const [monthlyReward, setMonthlyReward] = useState('0');
+  const [monthlyUploadCount, setMonthlyUploadCount] = useState(0);
+  const [accumulatedReward, setAccumulatedReward] = useState('0');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // TODO: API 연동 후 실제 데이터로 교체
-  const monthlyReward = '450,000';
-  const monthlyUploadCount = 30;
-  const accumulatedReward = '5,200,000';
-  const currentMonthLabel = '2026년 2월';
+  const now = new Date();
+  const currentMonthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/settlements/my', {
+          headers: getAuthHeaders(),
+        });
+        if (redirectIfUnauthorized(res)) return;
+        if (!res.ok) return;
+
+        const json: SettlementsResponse = await res.json();
+
+        // 현재 월 정산 필터
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        const currentMonthSettlements = json.data.filter((s) => {
+          const d = new Date(s.settlementPeriodStart);
+          return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        });
+
+        const reward = currentMonthSettlements.reduce(
+          (sum, s) => sum + Number(s.paybackAmount),
+          0,
+        );
+        const uploads = currentMonthSettlements.reduce(
+          (sum, s) => sum + s.caseCount,
+          0,
+        );
+
+        setMonthlyReward(reward.toLocaleString('ko-KR'));
+        setMonthlyUploadCount(uploads);
+        setAccumulatedReward(json.summary.totalPayback.toLocaleString('ko-KR'));
+      } catch {
+        // 에러 시 기본값 유지
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col items-center">
@@ -72,7 +127,7 @@ export default function DashboardPage() {
                 {currentMonthLabel} 리워드 예상액
               </p>
               <p className="text-4xl font-semibold text-foreground font-[Pretendard]">
-                {monthlyReward}원
+                {isLoading ? '-' : `${monthlyReward}원`}
               </p>
             </div>
             <Separator />
@@ -81,11 +136,11 @@ export default function DashboardPage() {
                 <span className="text-muted-foreground">
                   이번 달 데이터 업로드
                 </span>
-                <span className="font-medium">{monthlyUploadCount}건</span>
+                <span className="font-medium">{isLoading ? '-' : `${monthlyUploadCount}건`}</span>
               </li>
               <li className="flex justify-between">
                 <span className="text-muted-foreground">누적 적립액</span>
-                <span className="font-medium">{accumulatedReward}원</span>
+                <span className="font-medium">{isLoading ? '-' : `${accumulatedReward}원`}</span>
               </li>
             </ul>
             <Separator />

@@ -228,7 +228,7 @@ function SettlementListTab() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `정산내역_${selectedMonth || '전체'}.csv`;
+      anchor.download = `은행이체용_정산내역_${selectedMonth || '전체'}.csv`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
@@ -406,7 +406,7 @@ function SettlementListTab() {
             onClick={handleExport}
           >
             <Download className="mr-1 h-4 w-4" />
-            엑셀 다운로드
+            은행 이체용 엑셀 다운로드
           </Button>
           <p className="text-sm text-muted-foreground">
             {isLoading
