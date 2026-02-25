@@ -63,13 +63,15 @@ interface SettlementResponse {
 const STATUS_LABEL: Record<string, string> = {
   PENDING: '대기',
   CONFIRMED: '확인',
-  SETTLED: '지급완료',
+  PAID: '완료',
+  SETTLED: '완료',
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
-  CONFIRMED: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  SETTLED: 'bg-green-100 text-green-800 hover:bg-green-100',
+  PENDING: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
+  CONFIRMED: 'bg-blue-600 text-white hover:bg-blue-600',
+  PAID: 'bg-emerald-600 text-white hover:bg-emerald-600',
+  SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
 };
 
 // ── 금액 포맷 (원 단위, 천 단위 콤마) ──
