@@ -708,9 +708,9 @@ function PaybackSettingsTab() {
     <div className="space-y-6">
       {/* 전체 비율 설정 카드 */}
       <Card className="rounded-xl border-border">
-        <div className="flex items-start justify-between p-8">
+        <div className="flex items-start gap-16 p-8">
           {/* 좌측: 타이틀 + 라벨 + 입력 + 버튼 */}
-          <div>
+          <div className="shrink-0">
             <h3 className="text-lg font-bold">전체 페이백 비율 설정</h3>
             <label
               htmlFor="default-payback-rate"
