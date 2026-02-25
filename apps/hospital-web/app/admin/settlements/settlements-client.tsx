@@ -240,7 +240,7 @@ function SettlementListTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /* 월 목록 로드 */
+  /* 월 목록 로드 + 전달(N-1) 자동 선택 */
   useEffect(() => {
     async function loadMonths() {
       try {
@@ -249,12 +249,23 @@ function SettlementListTab() {
         });
         if (!res.ok) return;
         const json = (await res.json()) as { data: string[] };
-        setMonths(json.data ?? []);
+        const monthList = json.data ?? [];
+        setMonths(monthList);
+
+        /* 기본값: 현재 날짜 기준 전달(N-1) 자동 선택 */
+        if (monthList.length > 0 && !selectedMonth) {
+          const now = new Date();
+          const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const prevYM = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+          const match = monthList.includes(prevYM) ? prevYM : monthList[0];
+          setSelectedMonth(match);
+        }
       } catch {
         /* 월 목록 실패 시 무시 */
       }
     }
     loadMonths();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* 정산 내역 로드 */
@@ -366,7 +377,7 @@ function SettlementListTab() {
 
       {/* 요약 카드 */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border">
+        <Card className="border-border bg-muted/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {monthNum ? `${monthNum}월` : '전체'} 총 연동 매출액
@@ -379,7 +390,7 @@ function SettlementListTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-border">
+        <Card className="border-border bg-muted/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               평균 페이백 비율
@@ -395,7 +406,7 @@ function SettlementListTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-border">
+        <Card className="border-border bg-muted/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               이번 달 지급 예정액
@@ -415,7 +426,6 @@ function SettlementListTab() {
       {/* 검색바 + 엑셀 다운로드 (한 줄) */}
       <div className="flex items-center justify-between gap-3">
         <div className="relative w-full md:w-[300px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -425,16 +435,27 @@ function SettlementListTab() {
                 fetchSettlements(1);
               }
             }}
-            placeholder="병원명 / 계좌 예금주 검색"
-            className="bg-background pl-9"
+            placeholder="병원명/계좌예금주 검색"
+            className="bg-background pr-9"
             aria-label="검색"
           />
+          <button
+            type="button"
+            onClick={() => {
+              setPage(1);
+              fetchSettlements(1);
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="검색 실행"
+          >
+            <Search className="h-4 w-4" />
+          </button>
         </div>
         <Button
           type="button"
-          variant="outline"
           size="sm"
           onClick={handleExport}
+          className="bg-gray-900 text-white hover:bg-gray-800"
         >
           <Download className="mr-1 h-4 w-4" />
           은행 이체용 엑셀 다운로드
@@ -456,7 +477,7 @@ function SettlementListTab() {
             <TableHead className="text-right">
               {monthNum ? `${monthNum}월 ` : ''}연동 매출액
             </TableHead>
-            <TableHead className="text-right">적용 비율</TableHead>
+            <TableHead className="text-center">적용 비율</TableHead>
             <TableHead className="text-right">이번 달 지급액</TableHead>
             <TableHead>입금 계좌</TableHead>
           </TableRow>
@@ -492,7 +513,7 @@ function SettlementListTab() {
                     {formatAmount(row.totalVolume)}
                   </TableCell>
                   {/* 적용 비율 */}
-                  <TableCell className="text-right whitespace-nowrap">
+                  <TableCell className="text-center whitespace-nowrap">
                     {formatRate(row.appliedRate)}%
                   </TableCell>
                   {/* 지급액: ₩ 접두사 + 볼드 */}
