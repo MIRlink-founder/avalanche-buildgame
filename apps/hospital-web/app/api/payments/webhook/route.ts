@@ -17,7 +17,9 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function getString(v: unknown): string {
-  return typeof v === 'string' ? v.trim() : ''
+  if (typeof v === 'string') return v.trim()
+  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  return ''
 }
 
 /** Webhook 시그니처 검증 (HMAC-SHA256) */
