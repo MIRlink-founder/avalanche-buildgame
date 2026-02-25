@@ -729,7 +729,6 @@ function PaybackSettingsTab() {
                 value={defaultRate}
                 onChange={(e) => setDefaultRate(e.target.value)}
                 className="h-11 w-[180px] rounded-lg bg-background"
-                placeholder="예: 5.0"
               />
               <span className="text-base font-medium text-foreground">%</span>
             </div>
