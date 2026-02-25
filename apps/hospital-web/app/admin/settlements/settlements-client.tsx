@@ -352,7 +352,7 @@ function SettlementListTab() {
   const parsed = selectedMonth ? parseYearMonth(selectedMonth) : null;
   const titleLabel = parsed
     ? `${parsed.year}년 ${parsed.month}월 정산`
-    : '전체 정산';
+    : '정산';
   const monthNum = parsed ? parsed.month : null;
 
   return (
@@ -366,7 +366,6 @@ function SettlementListTab() {
           className="w-[120px]"
           aria-label="월 선택"
         >
-          <option value="">전체</option>
           {months.map((m) => (
             <option key={m} value={m}>
               {m}
@@ -380,7 +379,7 @@ function SettlementListTab() {
         <Card className="border-border bg-muted/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {monthNum ? `${monthNum}월` : '전체'} 총 연동 매출액
+              {monthNum ? `${monthNum}월` : ''} 총 연동 매출액
             </CardTitle>
           </CardHeader>
           <CardContent>
