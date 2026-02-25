@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@mire/ui/components/button';
 import { Input } from '@mire/ui/components/input';
@@ -10,6 +10,46 @@ import { Separator } from '@mire/ui/components/separator';
 import { TermsModal } from './TermsModal';
 import { TERMS_CONTENT, type TermsType } from '@/lib/terms';
 import { CheckCircle2, XCircle, Upload, AlertCircle } from 'lucide-react';
+
+const DAUM_POSTCODE_SCRIPT =
+  'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+
+function loadDaumPostcodeScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject(new Error('window undefined'));
+      return;
+    }
+    const existing = document.querySelector(
+      `script[src="${DAUM_POSTCODE_SCRIPT}"]`,
+    );
+    if (existing) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = DAUM_POSTCODE_SCRIPT;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('우편번호 스크립트 로드 실패'));
+    document.head.appendChild(script);
+  });
+}
+
+declare global {
+  interface Window {
+    daum?: {
+      Postcode: new (opts: {
+        oncomplete: (data: {
+          zonecode: string;
+          roadAddress: string;
+          jibunAddress: string;
+          userSelectedType: 'R' | 'J';
+        }) => void;
+      }) => { open: () => void };
+    };
+  }
+}
 
 interface FileUpload {
   name: string;
@@ -247,12 +287,26 @@ export function RegisterForm() {
   };
 
   // 주소 검색 (Daum 우편번호 API)
-  const handleSearchAddress = () => {
-    // TODO: 실제로는 Daum 우편번호 API를 연동해야 함
-    // 여기서는 임시로 더미 데이터 사용
-    setPostalCode('06234');
-    setAddress('서울특별시 강남구 테헤란로 123');
-  };
+  const handleSearchAddress = useCallback(() => {
+    loadDaumPostcodeScript()
+      .then(() => {
+        if (!window.daum?.Postcode) {
+          alert('우편번호 서비스를 불러올 수 없습니다.');
+          return;
+        }
+        new window.daum.Postcode({
+          oncomplete(data) {
+            const road =
+              data.userSelectedType === 'R'
+                ? data.roadAddress
+                : data.jibunAddress;
+            setPostalCode(data.zonecode);
+            setAddress(road);
+          },
+        }).open();
+      })
+      .catch(() => alert('우편번호 서비스를 불러올 수 없습니다.'));
+  }, []);
 
   // 파일 업로드 핸들러
   const handleFileUpload = (
@@ -385,6 +439,13 @@ export function RegisterForm() {
           phone,
           hospitalName,
           businessNumber,
+          ...(ceoName.trim() && { ceoName: ceoName.trim() }),
+          ...([postalCode, address, detailAddress].some(Boolean) && {
+            businessAddress: [postalCode, address, detailAddress]
+              .filter(Boolean)
+              .join(' ')
+              .trim(),
+          }),
         }),
       });
 

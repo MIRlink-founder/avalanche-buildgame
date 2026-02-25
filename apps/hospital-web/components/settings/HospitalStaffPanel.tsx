@@ -21,7 +21,7 @@ import {
   ACCOUNT_ROLE_LABELS,
   USER_ROLE_COLORS,
 } from '@/lib/admin-hospital-format';
-import { Pagination } from '@/components/admin/Pagination';
+import { Pagination } from '@/components/layout/Pagination';
 import { Plus, Settings } from 'lucide-react';
 
 const PAGE_SIZE = 10;

@@ -3,7 +3,7 @@ import { prisma } from '@mire/database';
 
 export async function POST(request: Request) {
   try {
-    const { email, name, phone, hospitalName, businessNumber } =
+    const { email, name, phone, hospitalName, businessNumber, ceoName, businessAddress } =
       await request.json();
 
     if (!email || !name || !phone || !hospitalName || !businessNumber) {
@@ -45,8 +45,14 @@ export async function POST(request: Request) {
           managerPhone: phone,
           businessNumber: businessNumber,
           officialName: hospitalName,
-          ceoName: '',
-          businessAddress: '',
+          ceoName:
+            typeof ceoName === 'string' && ceoName.trim()
+              ? ceoName.trim()
+              : '',
+          businessAddress:
+            typeof businessAddress === 'string' && businessAddress.trim()
+              ? businessAddress.trim()
+              : '',
           type: 'GENERAL',
           status: 'PENDING',
         },

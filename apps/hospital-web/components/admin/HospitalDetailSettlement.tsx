@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@mire/ui/components/table';
 import { Separator } from '@mire/ui';
-import { Pagination } from './Pagination';
+import { Pagination } from '@/components/layout/Pagination';
 
 // ── 정산 내역 항목 타입 ──
 interface SettlementItem {
@@ -51,6 +51,7 @@ interface SettlementResponse {
     paybackRate: string | null;
     paybackRateUpdatedAt: string | null;
   };
+  paymentDayOfMonth?: number;
   pagination: {
     totalCount: number;
     totalPages: number;
@@ -130,6 +131,7 @@ export function HospitalDetailSettlement({
     pageSize: PAGE_SIZE,
     currentPage: 1,
   });
+  const [paymentDayOfMonth, setPaymentDayOfMonth] = useState(25);
   const [loading, setLoading] = useState(false);
 
   // ── API에서 돌아온 최신 hospital.paybackRate 상태 ──
@@ -164,6 +166,9 @@ export function HospitalDetailSettlement({
       setSettlements(json.data);
       setSummary(json.summary);
       setPagination(json.pagination);
+      if (json.paymentDayOfMonth != null) {
+        setPaymentDayOfMonth(json.paymentDayOfMonth);
+      }
       // API 응답의 병원 정보 동기화
       setCurrentRate(json.hospital.paybackRate);
       setCurrentRateUpdatedAt(json.hospital.paybackRateUpdatedAt);
@@ -252,15 +257,14 @@ export function HospitalDetailSettlement({
                 %
               </div>
             </div>
-            {/* TODO: 실제 정산일로 수정 */}
             <p className="text-sm text-muted-foreground">
-              설정된 비율에 따라 매월 1일 리워드가 자동 산출됩니다.
+              설정된 비율에 따라 매월 {paymentDayOfMonth}일 리워드가 자동
+              산출됩니다.
             </p>
 
             <Separator />
 
             {/* 최종 수정일 */}
-            {/* TODO: 마이그레이트 후 체크 */}
             <p className="text-xs text-muted-foreground">
               최종 수정:
               {currentRateUpdatedAt

@@ -1,10 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Card,
-  CardContent,
-} from '@mire/ui/components/card';
+import { Card, CardContent } from '@mire/ui/components/card';
 import { Badge } from '@mire/ui/components/badge';
 import { Select } from '@mire/ui/components/select';
 import { Button } from '@mire/ui/components/button';
@@ -26,12 +23,8 @@ import {
 } from '@mire/ui/components/sheet';
 import { ScrollArea } from '@mire/ui/components/scroll-area';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
-import {
-  RotateCcw,
-  ChevronLeft,
-  ChevronRight,
-  Ban,
-} from 'lucide-react';
+import { Pagination } from '@/components/layout/Pagination';
+import { RotateCcw, Ban } from 'lucide-react';
 
 /* ───────────── 타입 정의 ───────────── */
 
@@ -113,91 +106,6 @@ function getMethodLabel(method: string | null): string {
   return METHOD_LABELS[method] ?? method;
 }
 
-/* ───────────── 페이지네이션 컴포넌트 ───────────── */
-
-function Pagination({
-  currentPage,
-  totalPages,
-  onPageChange,
-  disabled = false,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  disabled?: boolean;
-}) {
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    const pages: (number | 'ellipsis')[] = [1];
-    if (currentPage > 3) pages.push('ellipsis');
-    const start = Math.max(2, currentPage - 1);
-    const end = Math.min(totalPages - 1, currentPage + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
-    if (currentPage < totalPages - 2) pages.push('ellipsis');
-    pages.push(totalPages);
-    return pages;
-  };
-
-  const pages = getPageNumbers();
-
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage <= 1 || disabled}
-        className="h-8 px-2 text-xs"
-      >
-        <ChevronLeft className="mr-0.5 h-3.5 w-3.5" />
-        이전
-      </Button>
-
-      {pages.map((p, idx) =>
-        p === 'ellipsis' ? (
-          <span
-            key={`ellipsis-${idx}`}
-            className="flex h-8 w-8 items-center justify-center text-sm text-muted-foreground"
-          >
-            ...
-          </span>
-        ) : (
-          <Button
-            key={p}
-            type="button"
-            variant={p === currentPage ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onPageChange(p)}
-            disabled={disabled}
-            className={`h-8 w-8 p-0 ${
-              p === currentPage
-                ? 'bg-gray-900 text-white hover:bg-gray-800 hover:text-white'
-                : ''
-            }`}
-          >
-            {p}
-          </Button>
-        ),
-      )}
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage >= totalPages || disabled}
-        className="h-8 px-2 text-xs"
-      >
-        다음
-        <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-}
-
 /* ───────────── 결제 취소 섹션 ───────────── */
 
 function CancelSection({
@@ -241,7 +149,10 @@ function CancelSection({
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
         setCancelError(
-          String((payload as Record<string, unknown>).error ?? '취소 처리에 실패했습니다.'),
+          String(
+            (payload as Record<string, unknown>).error ??
+              '취소 처리에 실패했습니다.',
+          ),
         );
         return;
       }
@@ -294,38 +205,48 @@ export function PaymentsClient() {
   const [statusFilter, setStatusFilter] = useState('');
   const [paidFrom, setPaidFrom] = useState('');
   const [paidTo, setPaidTo] = useState('');
-  const [selectedPayment, setSelectedPayment] = useState<PaymentRow | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRow | null>(
+    null,
+  );
 
-  const fetchPayments = useCallback(async (pageNum: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(pageNum));
-      params.set('limit', String(ITEMS_PER_PAGE));
-      if (statusFilter) params.set('status', statusFilter);
-      if (paidFrom) params.set('paidFrom', paidFrom);
-      if (paidTo) params.set('paidTo', paidTo);
+  const fetchPayments = useCallback(
+    async (pageNum: number) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        params.set('page', String(pageNum));
+        params.set('limit', String(ITEMS_PER_PAGE));
+        if (statusFilter) params.set('status', statusFilter);
+        if (paidFrom) params.set('paidFrom', paidFrom);
+        if (paidTo) params.set('paidTo', paidTo);
 
-      const res = await fetch(`/api/payments?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      });
-      if (redirectIfUnauthorized(res)) return;
-      if (!res.ok) {
-        const p = await res.json().catch(() => ({}));
-        setError(String((p as Record<string, unknown>).error ?? '결제 내역을 불러오지 못했습니다.'));
-        return;
+        const res = await fetch(`/api/payments?${params.toString()}`, {
+          headers: getAuthHeaders(),
+        });
+        if (redirectIfUnauthorized(res)) return;
+        if (!res.ok) {
+          const p = await res.json().catch(() => ({}));
+          setError(
+            String(
+              (p as Record<string, unknown>).error ??
+                '결제 내역을 불러오지 못했습니다.',
+            ),
+          );
+          return;
+        }
+        const payload: PageApiResponse = await res.json();
+        setPayments(payload.data ?? []);
+        setTotal(payload.total ?? 0);
+        setPage(payload.page ?? pageNum);
+      } catch {
+        setError('결제 내역을 불러오는 중 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
       }
-      const payload: PageApiResponse = await res.json();
-      setPayments(payload.data ?? []);
-      setTotal(payload.total ?? 0);
-      setPage(payload.page ?? pageNum);
-    } catch {
-      setError('결제 내역을 불러오는 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, paidFrom, paidTo]);
+    },
+    [statusFilter, paidFrom, paidTo],
+  );
 
   useEffect(() => {
     setPage(1);
@@ -361,13 +282,31 @@ export function PaymentsClient() {
             className="w-[140px]"
           >
             {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </Select>
-          <Input type="date" value={paidFrom} onChange={(e) => setPaidFrom(e.target.value)} className="w-[160px]" />
+          <Input
+            type="date"
+            value={paidFrom}
+            onChange={(e) => setPaidFrom(e.target.value)}
+            className="w-[160px]"
+          />
           <span className="text-sm text-muted-foreground">~</span>
-          <Input type="date" value={paidTo} onChange={(e) => setPaidTo(e.target.value)} className="w-[160px]" />
-          <Button type="button" variant="outline" size="sm" onClick={handleFilterReset} className="gap-1.5">
+          <Input
+            type="date"
+            value={paidTo}
+            onChange={(e) => setPaidTo(e.target.value)}
+            className="w-[160px]"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleFilterReset}
+            className="gap-1.5"
+          >
             <RotateCcw className="h-3.5 w-3.5" />
             초기화
           </Button>
@@ -381,55 +320,77 @@ export function PaymentsClient() {
         </div>
         <div className="p-0">
           <Table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[10%]" />
-              <col className="w-[16%]" />
-              <col className="w-[10%]" />
-              <col className="w-[16%]" />
-              <col className="w-[18%]" />
-              <col className="w-[12%]" />
-            </colgroup>
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>결제번호</TableHead>
                 <TableHead>진료기록</TableHead>
                 <TableHead>결제수단</TableHead>
-                <TableHead className="text-right">결제 금액</TableHead>
+                <TableHead>결제 금액</TableHead>
                 <TableHead>상태</TableHead>
                 <TableHead>결제일시</TableHead>
                 <TableHead>등록일시</TableHead>
-                <TableHead className="text-center">관리</TableHead>
+                <TableHead>관리</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y">
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">불러오는 중...</TableCell>
+                  <TableCell
+                    colSpan={8}
+                    className="py-8 text-center text-muted-foreground"
+                  >
+                    불러오는 중...
+                  </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-destructive">{error}</TableCell>
+                  <TableCell
+                    colSpan={8}
+                    className="py-8 text-center text-destructive"
+                  >
+                    {error}
+                  </TableCell>
                 </TableRow>
               ) : payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">결제 내역이 없습니다.</TableCell>
+                  <TableCell
+                    colSpan={8}
+                    className="py-8 text-center text-muted-foreground"
+                  >
+                    결제 내역이 없습니다.
+                  </TableCell>
                 </TableRow>
               ) : (
                 payments.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="py-4 whitespace-nowrap">#{item.id}</TableCell>
-                    <TableCell className="py-4 whitespace-nowrap">#{item.medicalRecordId}</TableCell>
-                    <TableCell className="py-4 whitespace-nowrap">{getMethodLabel(item.paymentMethod)}</TableCell>
-                    <TableCell className="py-4 text-right whitespace-nowrap font-semibold">{formatAmount(Number(item.amount))}원</TableCell>
+                    <TableCell className="py-4 whitespace-nowrap">
+                      #{item.id}
+                    </TableCell>
+                    <TableCell className="py-4 whitespace-nowrap">
+                      #{item.medicalRecordId}
+                    </TableCell>
+                    <TableCell className="py-4 whitespace-nowrap">
+                      {getMethodLabel(item.paymentMethod)}
+                    </TableCell>
+                    <TableCell className="py-4 text-right whitespace-nowrap font-semibold">
+                      {formatAmount(Number(item.amount))}원
+                    </TableCell>
                     <TableCell className="py-4">
-                      <Badge className={STATUS_COLORS[item.status] ?? 'bg-gray-100 text-gray-700 hover:bg-gray-100'}>
+                      <Badge
+                        className={
+                          STATUS_COLORS[item.status] ??
+                          'bg-gray-100 text-gray-700 hover:bg-gray-100'
+                        }
+                      >
                         {STATUS_LABELS[item.status] ?? item.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-4 whitespace-nowrap text-muted-foreground">{formatDateTime(item.paidAt)}</TableCell>
-                    <TableCell className="py-4 whitespace-nowrap text-muted-foreground">{formatDateTime(item.createdAt)}</TableCell>
+                    <TableCell className="py-4 whitespace-nowrap text-muted-foreground">
+                      {formatDateTime(item.paidAt)}
+                    </TableCell>
+                    <TableCell className="py-4 whitespace-nowrap text-muted-foreground">
+                      {formatDateTime(item.createdAt)}
+                    </TableCell>
                     <TableCell className="py-4 text-center">
                       <Button
                         variant="outline"
@@ -447,16 +408,16 @@ export function PaymentsClient() {
         </div>
 
         {/* 페이지네이션 */}
-        {!loading && !error && total > 0 && (
-          <div className="flex items-center justify-center border-t border-border px-6 py-3">
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              disabled={loading}
-            />
-          </div>
-        )}
+        <div className="border-t border-border px-6 py-3">
+          {' '}
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalCount={total}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+          />
+        </div>
       </Card>
 
       {/* 결제 상세 Sheet */}
@@ -478,7 +439,8 @@ export function PaymentsClient() {
                   <Badge
                     className={`${STATUS_COLORS[selectedPayment.status] ?? 'bg-gray-100 text-gray-700'} ml-2`}
                   >
-                    {STATUS_LABELS[selectedPayment.status] ?? selectedPayment.status}
+                    {STATUS_LABELS[selectedPayment.status] ??
+                      selectedPayment.status}
                   </Badge>
                 </SheetTitle>
               </SheetHeader>
@@ -494,20 +456,28 @@ export function PaymentsClient() {
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">결제 금액</dt>
-                      <dd className="font-semibold">{formatAmount(Number(selectedPayment.amount))}원</dd>
+                      <dd className="font-semibold">
+                        {formatAmount(Number(selectedPayment.amount))}원
+                      </dd>
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">결제수단</dt>
-                      <dd className="font-medium">{getMethodLabel(selectedPayment.paymentMethod)}</dd>
+                      <dd className="font-medium">
+                        {getMethodLabel(selectedPayment.paymentMethod)}
+                      </dd>
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">진료기록</dt>
-                      <dd className="font-medium">#{selectedPayment.medicalRecordId}</dd>
+                      <dd className="font-medium">
+                        #{selectedPayment.medicalRecordId}
+                      </dd>
                     </div>
                     {selectedPayment.settlementId && (
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">정산번호</dt>
-                        <dd className="font-medium">#{selectedPayment.settlementId}</dd>
+                        <dd className="font-medium">
+                          #{selectedPayment.settlementId}
+                        </dd>
                       </div>
                     )}
                   </dl>
@@ -519,11 +489,15 @@ export function PaymentsClient() {
                   <dl className="grid gap-2 text-sm rounded-lg bg-muted p-4">
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">승인번호</dt>
-                      <dd className="font-mono">{selectedPayment.approveNo ?? '-'}</dd>
+                      <dd className="font-mono">
+                        {selectedPayment.approveNo ?? '-'}
+                      </dd>
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">PG 거래 ID</dt>
-                      <dd className="font-mono break-all text-right max-w-[60%]">{selectedPayment.pgTransactionId ?? '-'}</dd>
+                      <dd className="font-mono break-all text-right max-w-[60%]">
+                        {selectedPayment.pgTransactionId ?? '-'}
+                      </dd>
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">가맹점 (SubMID)</dt>
@@ -538,17 +512,23 @@ export function PaymentsClient() {
                   <dl className="grid gap-2 text-sm rounded-lg bg-muted p-4">
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">결제일시</dt>
-                      <dd className="font-medium">{formatDateTime(selectedPayment.paidAt)}</dd>
+                      <dd className="font-medium">
+                        {formatDateTime(selectedPayment.paidAt)}
+                      </dd>
                     </div>
                     {selectedPayment.cancelledAt && (
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">취소일시</dt>
-                        <dd className="font-medium">{formatDateTime(selectedPayment.cancelledAt)}</dd>
+                        <dd className="font-medium">
+                          {formatDateTime(selectedPayment.cancelledAt)}
+                        </dd>
                       </div>
                     )}
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">등록일시</dt>
-                      <dd className="font-medium">{formatDateTime(selectedPayment.createdAt)}</dd>
+                      <dd className="font-medium">
+                        {formatDateTime(selectedPayment.createdAt)}
+                      </dd>
                     </div>
                   </dl>
                 </section>
@@ -556,7 +536,10 @@ export function PaymentsClient() {
                 {/* 결제 취소 */}
                 {selectedPayment.status === 'PAID' && (
                   <div className="mt-8">
-                    <CancelSection payment={selectedPayment} onCancelled={handleCancelled} />
+                    <CancelSection
+                      payment={selectedPayment}
+                      onCancelled={handleCancelled}
+                    />
                   </div>
                 )}
               </ScrollArea>

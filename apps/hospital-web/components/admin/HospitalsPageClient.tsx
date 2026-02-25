@@ -7,7 +7,7 @@ import { Tabs } from '@/components/layout/Tabs';
 import { StatsCards } from './StatsCards';
 import { SearchBar } from './SearchBar';
 import { HospitalsTable } from './HospitalsTable';
-import { Pagination } from './Pagination';
+import { Pagination } from '@/components/layout/Pagination';
 
 interface HospitalFromApi {
   id: string;

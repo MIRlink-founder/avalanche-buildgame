@@ -69,7 +69,6 @@ export function LoginForm() {
           localStorage.removeItem(STORAGE_KEY);
         }
 
-        // TODO: role 에 따라 페이지 리다이렉트
         const role = data.user?.role;
         switch (role) {
           case 'SUPER_ADMIN': // 운영사 - 슈퍼 어드민

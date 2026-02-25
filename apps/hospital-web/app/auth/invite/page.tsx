@@ -161,7 +161,7 @@ function InviteForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 pt-20">
       <Navigation />
 
       <div className="w-full max-w-4xl space-y-6 rounded-lg border bg-card p-12 shadow-sm">

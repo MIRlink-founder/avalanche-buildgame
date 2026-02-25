@@ -91,6 +91,17 @@ export async function GET(
 
     const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
+    // SETTLEMENT_PAYMENT_DAY (정산 지급일)
+    const paymentDayConfig = await prisma.systemConfig.findUnique({
+      where: { key: 'SETTLEMENT_PAYMENT_DAY' },
+    });
+    const paymentDayRaw = paymentDayConfig
+      ? Number(paymentDayConfig.value)
+      : 25;
+    const paymentDayOfMonth = Number.isFinite(paymentDayRaw)
+      ? Math.min(28, Math.max(1, Math.floor(paymentDayRaw)))
+      : 25;
+
     // 병원 정보 (paybackRate 포함)
     const hospital = await prisma.hospital.findUnique({
       where: { id: hospitalId },
@@ -107,6 +118,7 @@ export async function GET(
       data: settlements,
       summary,
       hospital,
+      paymentDayOfMonth,
       pagination: {
         totalCount,
         totalPages,

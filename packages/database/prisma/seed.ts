@@ -149,6 +149,11 @@ async function main() {
       value: '30000',
       description: '건당 고정 금액 (원)',
     },
+    {
+      key: 'SETTLEMENT_PAYMENT_DAY',
+      value: '25',
+      description: '매월 정산 지급 예정일',
+    },
   ];
 
   for (const config of systemConfigSeeds) {

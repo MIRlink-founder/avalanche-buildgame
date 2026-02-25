@@ -22,7 +22,8 @@ import {
   TableRow,
 } from '@mire/ui/components/table';
 import { Select } from '@mire/ui/components/select';
-import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
+import { Pagination } from '@/components/layout/Pagination';
 import {
   HOSPITAL_STATUS_COLORS,
   HOSPITAL_STATUS_LABELS,
@@ -117,104 +118,6 @@ function parseYearMonth(ym: string): { year: number; month: number } | null {
   const month = Number(parts[1]);
   if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
   return { year, month };
-}
-
-/* ------------------------------------------------------------------ */
-/*  공통 숫자 페이지네이션 컴포넌트                                        */
-/* ------------------------------------------------------------------ */
-
-function Pagination({
-  currentPage,
-  totalPages,
-  onPageChange,
-  disabled = false,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  disabled?: boolean;
-}) {
-  /** 표시할 페이지 번호 생성 (1 2 3 ... 19 형태) */
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-
-    const pages: (number | 'ellipsis')[] = [1];
-
-    if (currentPage > 3) {
-      pages.push('ellipsis');
-    }
-
-    const start = Math.max(2, currentPage - 1);
-    const end = Math.min(totalPages - 1, currentPage + 1);
-
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-
-    if (currentPage < totalPages - 2) {
-      pages.push('ellipsis');
-    }
-
-    pages.push(totalPages);
-    return pages;
-  };
-
-  const pages = getPageNumbers();
-
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage <= 1 || disabled}
-        className="h-8 w-8 p-0"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-
-      {pages.map((p, idx) =>
-        p === 'ellipsis' ? (
-          <span
-            key={`ellipsis-${idx}`}
-            className="flex h-8 w-8 items-center justify-center text-sm text-muted-foreground"
-          >
-            ...
-          </span>
-        ) : (
-          <Button
-            key={p}
-            type="button"
-            variant={p === currentPage ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onPageChange(p)}
-            disabled={disabled}
-            className={`h-8 w-8 p-0 ${
-              p === currentPage
-                ? 'bg-gray-900 text-white hover:bg-gray-800 hover:text-white'
-                : ''
-            }`}
-          >
-            {p}
-          </Button>
-        ),
-      )}
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage >= totalPages || disabled}
-        className="h-8 w-8 p-0"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -350,8 +253,6 @@ function SettlementListTab() {
 
   /* 페이지네이션 계산 */
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
-  const startIndex = (page - 1) * ITEMS_PER_PAGE + 1;
-  const endIndex = Math.min(page * ITEMS_PER_PAGE, total);
 
   /* 월 라벨 */
   const parsed = selectedMonth ? parseYearMonth(selectedMonth) : null;
@@ -555,23 +456,14 @@ function SettlementListTab() {
         </TableBody>
       </Table>
 
-      {/* 하단: 카운트 텍스트 + 숫자 페이지네이션 */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {isLoading
-            ? '데이터를 불러오는 중입니다'
-            : total > 0
-              ? `전체 ${total}개 중 ${startIndex}-${endIndex} 표시`
-              : '전체 0개'}
-        </p>
-
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={(p) => fetchSettlements(p)}
-          disabled={isLoading}
-        />
-      </div>
+      {/* 하단: 공통 Pagination (총 N개 중 start-end 표시 포함) */}
+      <Pagination
+        currentPage={page}
+        totalPages={totalPages}
+        totalCount={total}
+        pageSize={ITEMS_PER_PAGE}
+        onPageChange={(p) => fetchSettlements(p)}
+      />
     </div>
   );
 }
@@ -585,6 +477,7 @@ const PAYBACK_PER_PAGE = 6;
 function PaybackSettingsTab() {
   /* 전체 비율 설정 */
   const [defaultRate, setDefaultRate] = useState('');
+  const [paymentDayOfMonth, setPaymentDayOfMonth] = useState(25);
   const [isSavingRate, setIsSavingRate] = useState(false);
   const [rateError, setRateError] = useState<string | null>(null);
   const [rateSuccess, setRateSuccess] = useState<string | null>(null);
@@ -606,6 +499,14 @@ function PaybackSettingsTab() {
         const json = (await res.json()) as SystemConfigResponse;
         const rate = json.data?.DEFAULT_PAYBACK_RATE;
         if (rate) setDefaultRate(rate);
+        const dayRaw = json.data?.SETTLEMENT_PAYMENT_DAY;
+        if (dayRaw != null) {
+          const n = Number(dayRaw);
+          const day = Number.isFinite(n)
+            ? Math.min(28, Math.max(1, Math.floor(n)))
+            : 25;
+          setPaymentDayOfMonth(day);
+        }
       } catch {
         /* 로드 실패 시 무시 */
       }
@@ -733,7 +634,7 @@ function PaybackSettingsTab() {
 
           {/* 우측: 설명 텍스트 (타이틀과 같은 높이) */}
           <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-            설정된 비율에 따라 매월 1일 리워드가 자동 산출됩니다.
+            설정된 비율에 따라 매월 {paymentDayOfMonth}일 리워드가 자동 산출됩니다.
             <br />
             개별 설정 비율이 우선 적용 됩니다.
           </p>
@@ -817,19 +718,15 @@ function PaybackSettingsTab() {
           </TableBody>
         </Table>
 
-        {/* 하단: 카운트 + 숫자 페이지네이션 */}
+        {/* 하단: 공통 Pagination */}
         {hospitals.length > 0 && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              총 {hospitals.length}개 중 {hospitalStartIndex + 1}-
-              {hospitalEndIndex} 표시
-            </p>
-            <Pagination
-              currentPage={hospitalPage}
-              totalPages={totalHospitalPages}
-              onPageChange={setHospitalPage}
-            />
-          </div>
+          <Pagination
+            currentPage={hospitalPage}
+            totalPages={totalHospitalPages}
+            totalCount={hospitals.length}
+            pageSize={PAYBACK_PER_PAGE}
+            onPageChange={setHospitalPage}
+          />
         )}
       </div>
     </div>

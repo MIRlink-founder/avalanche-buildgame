@@ -199,40 +199,7 @@ const DATA_REQUIREMENTS = {
 
 ## 다른 기능에 적용
 
-### Analytics 기능 추가 예시
-
-**1. features.ts에 기능 추가**
-```typescript
-export const FEATURES = {
-  REPORTS: 'reports',
-  ANALYTICS: 'analytics',  // 추가
-} as const;
-```
-
-**2. feature-access.ts에 규칙 추가**
-```typescript
-const ACCESS_RULES = {
-  [FEATURES.ANALYTICS]: (user, dataStats) => {
-    if (dataStats?.medicalRecordCount >= 50) {
-      return { allowed: true };
-    }
-    if (user.role === 'MASTER_ADMIN') {
-      return { allowed: true };
-    }
-    return {
-      allowed: false,
-      message: '분석 기능은 마스터 관리자만 사용할 수 있습니다.',
-    };
-  },
-};
-```
-
-**3. 페이지에 적용**
-```typescript
-<FeatureGate feature={FEATURES.ANALYTICS}>
-  <AnalyticsContent />
-</FeatureGate>
-```
+새 기능을 추가할 때는 `features.ts`에 상수 추가 후 `feature-access.ts`의 `DATA_REQUIREMENTS`와 `ACCESS_RULES`에 해당 규칙을 넣고, 페이지에서는 `<FeatureGate feature={FEATURES.새기능}>`으로 감싸면 됩니다.
 
 ## 주의사항
 

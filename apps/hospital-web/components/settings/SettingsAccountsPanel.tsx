@@ -23,6 +23,7 @@ type ProfileResponse = {
     name: string;
     email: string;
     role: string;
+    departmentName?: string | null;
   };
   hospital: {
     id: string;
@@ -134,6 +135,15 @@ export function SettingsAccountsPanel() {
               <Input
                 id="account-hospital"
                 value={profile.hospital.name}
+                readOnly
+                className="bg-muted"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-department">부서</Label>
+              <Input
+                id="account-department"
+                value={profile.user.departmentName ?? '-'}
                 readOnly
                 className="bg-muted"
               />

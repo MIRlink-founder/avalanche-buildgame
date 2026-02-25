@@ -99,10 +99,31 @@ export async function GET(request: Request) {
         ? Number(defaultRateConfig.value)
         : 5.0;
 
-    // 이번 달 PENDING 정산 (집계 중 상태)
+    // SETTLEMENT_PAYMENT_DAY 기준 다음 지급 예정일 계산
+    const paymentDayConfig = await prisma.systemConfig.findUnique({
+      where: { key: 'SETTLEMENT_PAYMENT_DAY' },
+    });
+    const paymentDayRaw = paymentDayConfig
+      ? Number(paymentDayConfig.value)
+      : 25;
+    const paymentDay = Number.isFinite(paymentDayRaw)
+      ? Math.min(28, Math.max(1, Math.floor(paymentDayRaw)))
+      : 25;
+
     const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    let nextPayment = new Date(y, m, paymentDay);
+    if (now.getTime() > nextPayment.getTime()) {
+      nextPayment = new Date(y, m + 1, paymentDay);
+    }
+    const diffMs = nextPayment.getTime() - now.getTime();
+    const dDay = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const nextPaymentDateString = `${nextPayment.getMonth() + 1}월 ${nextPayment.getDate()}일`;
+
+    // 이번 달 PENDING 정산 (집계 중 상태)
+    const currentMonthStart = new Date(y, m, 1);
+    const nextMonthStart = new Date(y, m + 1, 1);
 
     const currentMonthSettlement = await prisma.settlement.findFirst({
       where: {
@@ -134,6 +155,11 @@ export async function GET(request: Request) {
         accountNumber: hospital?.accountNumber ?? null,
         accountHolder: hospital?.accountHolder ?? null,
       },
+      nextPaymentDate: {
+        dateString: nextPaymentDateString,
+        dDay,
+      },
+      paymentDayOfMonth: paymentDay,
       currentMonth: currentMonthSettlement
         ? {
             paybackAmount: Number(currentMonthSettlement.paybackAmount),

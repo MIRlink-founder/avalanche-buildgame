@@ -19,7 +19,7 @@ import { Button } from '@mire/ui/components/button';
 import { Input } from '@mire/ui/components/input';
 import { Label } from '@mire/ui/components/label';
 import { Badge } from '@mire/ui/components/badge';
-import { Pagination } from '@/components/admin/Pagination';
+import { Pagination } from '@/components/layout/Pagination';
 
 type WalletInfo = {
   network: string;

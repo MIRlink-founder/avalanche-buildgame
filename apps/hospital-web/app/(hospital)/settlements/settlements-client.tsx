@@ -1,10 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Card,
-  CardContent,
-} from '@mire/ui/components/card';
+import { Card, CardContent } from '@mire/ui/components/card';
 import { Badge } from '@mire/ui/components/badge';
 import { Select } from '@mire/ui/components/select';
 import { Button } from '@mire/ui/components/button';
@@ -17,10 +14,8 @@ import {
   TableRow,
 } from '@mire/ui/components/table';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
-import { Landmark, Info, ChevronLeft, ChevronRight, Receipt, CreditCard } from 'lucide-react';
-import { PaymentsClient } from '../payments/payments-client';
-
-/* ───────────── 타입 정의 ───────────── */
+import { Landmark, Info } from 'lucide-react';
+import { Pagination } from '@/components/layout/Pagination';
 
 interface SettlementRow {
   id: number;
@@ -64,9 +59,9 @@ interface SettlementsApiResponse {
   paybackRateUpdatedAt: string;
   account: AccountInfo;
   currentMonth: CurrentMonth | null;
+  nextPaymentDate?: { dateString: string; dDay: number };
+  paymentDayOfMonth?: number;
 }
-
-/* ───────────── 상수 ───────────── */
 
 const ITEMS_PER_PAGE = 5;
 
@@ -84,8 +79,7 @@ const STATUS_COLORS: Record<string, string> = {
   SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
 };
 
-const SETTLEMENT_POLICIES = [
-  '매월 1일~말일까지 집계된 리워드는 익월 25일에 자동 이체됩니다.',
+const SETTLEMENT_POLICIES_BASE = [
   '지급일이 주말/공휴일인 경우 익영업일에 지급됩니다.',
   '계좌 정보 변경은 설정에서 변경 해주세요.',
   '정산 내역은 최대 24개월까지 조회 가능합니다.',
@@ -111,25 +105,6 @@ function maskAccountNumber(accountNumber: string): string {
       return '****';
     })
     .join('-');
-}
-
-/** 다음 지급 예정일 계산 (매월 25일 기준) */
-function calculateNextPaymentDate(): { dateString: string; dDay: number } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  let nextPayment = new Date(year, month, 25);
-  if (now.getTime() > nextPayment.getTime()) {
-    nextPayment = new Date(year, month + 1, 25);
-  }
-
-  const diffMs = nextPayment.getTime() - now.getTime();
-  const dDay = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-  const dateString = `${nextPayment.getMonth() + 1}월 ${nextPayment.getDate()}일`;
-
-  return { dateString, dDay };
 }
 
 /** settlementPeriodStart → "YYYY년 M월" 형식 */
@@ -166,138 +141,68 @@ function buildYearOptions(): number[] {
   return years;
 }
 
-/* ───────────── 페이지네이션 컴포넌트 ───────────── */
-
-function Pagination({
-  currentPage,
-  totalPages,
-  onPageChange,
-  disabled = false,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  disabled?: boolean;
-}) {
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    const pages: (number | 'ellipsis')[] = [1];
-    if (currentPage > 3) pages.push('ellipsis');
-    const start = Math.max(2, currentPage - 1);
-    const end = Math.min(totalPages - 1, currentPage + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
-    if (currentPage < totalPages - 2) pages.push('ellipsis');
-    pages.push(totalPages);
-    return pages;
-  };
-
-  const pages = getPageNumbers();
-
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage <= 1 || disabled}
-        className="h-8 px-2 text-xs"
-      >
-        <ChevronLeft className="mr-0.5 h-3.5 w-3.5" />
-        이전
-      </Button>
-
-      {pages.map((p, idx) =>
-        p === 'ellipsis' ? (
-          <span
-            key={`ellipsis-${idx}`}
-            className="flex h-8 w-8 items-center justify-center text-sm text-muted-foreground"
-          >
-            ...
-          </span>
-        ) : (
-          <Button
-            key={p}
-            type="button"
-            variant={p === currentPage ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onPageChange(p)}
-            disabled={disabled}
-            className={`h-8 w-8 p-0 ${
-              p === currentPage
-                ? 'bg-gray-900 text-white hover:bg-gray-800 hover:text-white'
-                : ''
-            }`}
-          >
-            {p}
-          </Button>
-        ),
-      )}
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage >= totalPages || disabled}
-        className="h-8 px-2 text-xs"
-      >
-        다음
-        <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-}
-
-/* ───────────── 메인 컴포넌트 ───────────── */
-
-type TopTab = 'settlements' | 'payments';
-
 export function SettlementsClient() {
-  const [activeTopTab, setActiveTopTab] = useState<TopTab>('settlements');
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [account, setAccount] = useState<AccountInfo>({ accountBank: null, accountNumber: null, accountHolder: null });
+  const [account, setAccount] = useState<AccountInfo>({
+    accountBank: null,
+    accountNumber: null,
+    accountHolder: null,
+  });
   const [currentMonth, setCurrentMonth] = useState<CurrentMonth | null>(null);
+  const [nextPaymentDate, setNextPaymentDate] = useState<{
+    dateString: string;
+    dDay: number;
+  } | null>(null);
+  const [paymentDayOfMonth, setPaymentDayOfMonth] = useState<number>(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const yearOptions = buildYearOptions();
 
-  const fetchSettlements = useCallback(async (year: number, pageNum: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/settlements/my?year=${year}&page=${pageNum}&limit=${ITEMS_PER_PAGE}`,
-        { headers: getAuthHeaders() },
-      );
-      if (redirectIfUnauthorized(res)) return;
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        const msg =
-          (payload as Record<string, unknown>).error ??
-          '정산 내역을 불러오지 못했습니다.';
-        setError(String(msg));
-        return;
+  const fetchSettlements = useCallback(
+    async (year: number, pageNum: number) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/settlements/my?year=${year}&page=${pageNum}&limit=${ITEMS_PER_PAGE}`,
+          { headers: getAuthHeaders() },
+        );
+        if (redirectIfUnauthorized(res)) return;
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          const msg =
+            (payload as Record<string, unknown>).error ??
+            '정산 내역을 불러오지 못했습니다.';
+          setError(String(msg));
+          return;
+        }
+        const payload: SettlementsApiResponse = await res.json();
+        setSettlements(payload.data ?? []);
+        setTotal(payload.total ?? 0);
+        setPage(payload.page ?? pageNum);
+        setAccount(
+          payload.account ?? {
+            accountBank: null,
+            accountNumber: null,
+            accountHolder: null,
+          },
+        );
+        setCurrentMonth(payload.currentMonth ?? null);
+        setNextPaymentDate(payload.nextPaymentDate ?? null);
+        setPaymentDayOfMonth(payload.paymentDayOfMonth ?? 25);
+      } catch {
+        setError('정산 내역을 불러오는 중 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
       }
-      const payload: SettlementsApiResponse = await res.json();
-      setSettlements(payload.data ?? []);
-      setTotal(payload.total ?? 0);
-      setPage(payload.page ?? pageNum);
-      setAccount(payload.account ?? { accountBank: null, accountNumber: null, accountHolder: null });
-      setCurrentMonth(payload.currentMonth ?? null);
-    } catch {
-      setError('정산 내역을 불러오는 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     fetchSettlements(selectedYear, 1);
@@ -314,71 +219,48 @@ export function SettlementsClient() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
-  const { dateString: nextPayDate, dDay } = calculateNextPaymentDate();
+  const nextPayDate = nextPaymentDate?.dateString ?? '-';
+  const dDay = nextPaymentDate?.dDay ?? 0;
+
+  const settlementPolicies = [
+    `매월 1일~말일까지 집계된 리워드는 익월 ${paymentDayOfMonth}일에 자동 이체됩니다.`,
+    ...SETTLEMENT_POLICIES_BASE,
+  ];
 
   const currentMonthLabel = currentMonth
     ? formatCollectionPeriod(currentMonth.periodStart, currentMonth.periodEnd)
     : null;
 
   return (
-    <section className="space-y-5 p-6">
-      {/* 최상위 탭 */}
-      <div className="flex gap-1 border-b border-border">
-        <button
-          type="button"
-          onClick={() => setActiveTopTab('settlements')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-            activeTopTab === 'settlements'
-              ? 'border-b-2 border-foreground text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Receipt className="h-4 w-4" />
-          정산 내역
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTopTab('payments')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-            activeTopTab === 'payments'
-              ? 'border-b-2 border-foreground text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <CreditCard className="h-4 w-4" />
-          결제 내역
-        </button>
-      </div>
-
-      {/* 결제 내역 탭 */}
-      {activeTopTab === 'payments' && <PaymentsClient />}
-
-      {/* 정산 내역 탭 */}
-      {activeTopTab === 'settlements' && <>
+    <div className="space-y-6">
       {/* 상단 카드 3개 */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* 1. 다음 지급 예정일 */}
-        <Card className="border-border">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">다음 지급 예정일</p>
-            <p className="mt-2 text-xl font-semibold">{nextPayDate}</p>
-            <span className="mt-1.5 inline-block rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-500">
+        <Card>
+          <CardContent className="p-6 space-y-2">
+            <p className="text-muted-foreground">다음 지급 예정일</p>
+            <p className="text-xl font-semibold">
+              {loading ? '-' : nextPayDate}
+            </p>
+            <span className="inline-block rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-500">
               D-{dDay}
             </span>
           </CardContent>
         </Card>
 
         {/* 2. 이번 달 지급 예정 금액 */}
-        <Card className="border-border">
-          <CardContent className="p-4 text-center">
-            <p className="text-sm text-muted-foreground">이번 달 지급 예정 금액</p>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">이번 달 지급 예정 금액</p>
             <p className="mt-3">
               {loading ? (
                 <span className="text-3xl font-bold">-</span>
               ) : currentMonth ? (
                 <>
-                  <span className="text-3xl font-bold">{formatAmount(currentMonth.paybackAmount)}</span>
-                  <span className="ml-0.5 text-lg font-medium">원</span>
+                  <span className="text-4xl font-semibold font-mono">
+                    {formatAmount(currentMonth.paybackAmount)}
+                  </span>
+                  <span className="ml-0.5 text-lg">원</span>
                 </>
               ) : (
                 <>
@@ -388,7 +270,7 @@ export function SettlementsClient() {
               )}
             </p>
             {currentMonthLabel && (
-              <p className="mt-1.5 text-xs text-muted-foreground">
+              <p className="mt-1.5 text-sm text-muted-foreground">
                 집계 기간: {currentMonthLabel}
               </p>
             )}
@@ -396,21 +278,21 @@ export function SettlementsClient() {
         </Card>
 
         {/* 3. 계좌 정보 */}
-        <Card className="border-border bg-muted/30">
-          <CardContent className="p-4">
+        <Card className="bg-muted/50">
+          <CardContent className="p-6 space-y-2">
             {loading ? (
-              <p className="text-sm text-muted-foreground">-</p>
+              <p className="text-sm text-foreground">-</p>
             ) : account.accountBank && account.accountNumber ? (
               <>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 text-sm text-foreground">
                   <Landmark className="h-4 w-4" />
                   {account.accountBank}
                 </div>
-                <p className="mt-2 text-base font-medium">
+                <p className="mt-2 text-lg font-medium">
                   {maskAccountNumber(account.accountNumber)}
                 </p>
                 {account.accountHolder && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                  <p className="mt-0.5 text-sm text-muted-foreground">
                     예금주: {account.accountHolder}
                   </p>
                 )}
@@ -433,7 +315,7 @@ export function SettlementsClient() {
       {/* 테이블 */}
       <Card className="border-border">
         <div className="flex items-center justify-between border-b border-border px-6 py-3">
-          <h2 className="text-base font-semibold">월별 정산 내역</h2>
+          <h2 className="text-lg font-semibold">월별 정산 내역</h2>
           <Select
             value={String(selectedYear)}
             onChange={handleYearChange}
@@ -449,19 +331,12 @@ export function SettlementsClient() {
 
         <div className="p-0">
           <Table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col className="w-[20%]" />
-              <col className="w-[18%]" />
-              <col className="w-[22%]" />
-              <col className="w-[22%]" />
-              <col className="w-[18%]" />
-            </colgroup>
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="text-center">기간</TableHead>
+                <TableHead>기간</TableHead>
                 <TableHead>상태</TableHead>
                 <TableHead>진료 등록</TableHead>
-                <TableHead className="text-right">총 지급액</TableHead>
+                <TableHead>총 지급액</TableHead>
                 <TableHead>지급일</TableHead>
               </TableRow>
             </TableHeader>
@@ -526,16 +401,15 @@ export function SettlementsClient() {
         </div>
 
         {/* 페이지네이션 */}
-        {!loading && !error && total > 0 && (
-          <div className="flex items-center justify-center border-t border-border px-6 py-3">
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              disabled={loading}
-            />
-          </div>
-        )}
+        <div className="border-t border-border px-6 py-3">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalCount={total}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+          />
+        </div>
       </Card>
 
       {/* 정산 정책 Footer */}
@@ -545,7 +419,7 @@ export function SettlementsClient() {
           정산 정책
         </div>
         <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-          {SETTLEMENT_POLICIES.map((policy, idx) => (
+          {settlementPolicies.map((policy, idx) => (
             <li key={idx} className="flex gap-2">
               <span className="shrink-0">{'•'}</span>
               <span>{policy}</span>
@@ -553,7 +427,6 @@ export function SettlementsClient() {
           ))}
         </ul>
       </div>
-      </>}
-    </section>
+    </div>
   );
 }

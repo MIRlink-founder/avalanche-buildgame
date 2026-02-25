@@ -3,7 +3,6 @@
  */
 export const FEATURES = {
   REPORTS: 'reports',
-  ANALYTICS: 'analytics',
   SETTLEMENTS: 'settlements',
 } as const;
 
@@ -28,7 +27,10 @@ export interface DataStats {
   paymentCount?: number;
   /** 정산 수 */
   settlementCount?: number;
-  // 향후 추가될 수 있는 통계들
+  /** 리포트 게이트용: 병원 유형 (GENERAL | UNIVERSITY) */
+  hospitalType?: string;
+  /** 리포트 게이트용: PAID/ON-CHAINED 진료 기록 수 */
+  paidOrOnChainedRecordCount?: number;
 }
 
 /**

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@mire/ui/components/button';
 import { cn } from '@mire/ui';
 import { getPayloadFromToken } from '@/lib/decode-token';
+import { getAuthHeaders } from '@/lib/get-auth-headers';
 import { ChevronDown } from 'lucide-react';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { FEATURES } from '@/lib/permissions/features';
@@ -39,8 +40,22 @@ export default function Navigation() {
   const showMenu =
     pathname != null && !showLogin && isHospitalMenuPath(pathname);
 
-  // Reports 기능 접근 권한 체크
-  const { allowed: canAccessReports } = useFeatureAccess(FEATURES.REPORTS);
+  const fetchReportsGate = useCallback(async () => {
+    const res = await fetch('/api/hospitals/reports-gate', {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('통계 조회 실패');
+    const data = await res.json();
+    return {
+      hospitalType: data.hospitalType,
+      paidOrOnChainedRecordCount: data.paidOrOnChainedRecordCount,
+    };
+  }, []);
+
+  // Reports 기능 접근 권한 체크 (GENERAL 병원은 50건 이상일 때만 메뉴 표시)
+  const { allowed: canAccessReports } = useFeatureAccess(FEATURES.REPORTS, {
+    fetchDataStats: fetchReportsGate,
+  });
   const { allowed: canAccessSettlements } = useFeatureAccess(
     FEATURES.SETTLEMENTS,
   );

@@ -26,12 +26,31 @@ export async function GET(request: Request) {
 
     const hospitalName = hospital.displayName ?? hospital.officialName;
 
+    const userWithDept = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        department: { select: { name: true } },
+      },
+    });
+
+    if (!userWithDept) {
+      return NextResponse.json(
+        { error: '사용자 정보를 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json({
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        id: userWithDept.id,
+        name: userWithDept.name,
+        email: userWithDept.email,
+        role: userWithDept.role,
+        departmentName: userWithDept.department?.name ?? null,
       },
       hospital: {
         id: hospital.id,

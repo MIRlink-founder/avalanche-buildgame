@@ -180,9 +180,11 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as {
       email?: string;
       name?: string;
+      department?: string;
     };
     const email = body.email?.trim().toLowerCase();
     const name = body.name?.trim();
+    const departmentName = body.department?.trim() || null;
 
     if (!name) {
       return NextResponse.json(
@@ -221,6 +223,30 @@ export async function POST(request: Request) {
       where: { email },
     });
 
+    // 부서명이 있으면 해당 병원의 Department 찾기 또는 생성
+    let departmentId: number | null = null;
+    if (departmentName) {
+      const existing = await prisma.department.findFirst({
+        where: {
+          hospitalId: user.hospitalId,
+          name: departmentName,
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        departmentId = existing.id;
+      } else {
+        const created = await prisma.department.create({
+          data: {
+            hospitalId: user.hospitalId,
+            name: departmentName,
+          },
+          select: { id: true },
+        });
+        departmentId = created.id;
+      }
+    }
+
     const expiresAt = new Date(
       Date.now() + INVITATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
     );
@@ -244,7 +270,7 @@ export async function POST(request: Request) {
       await prisma.$transaction([
         prisma.user.update({
           where: { id: existingUser.id },
-          data: { name },
+          data: { name, departmentId },
         }),
         prisma.token.updateMany({
           where: {
@@ -293,6 +319,7 @@ export async function POST(request: Request) {
         role: 'DEPT_ADMIN',
         status: 'PENDING',
         hospitalId: user.hospitalId,
+        departmentId,
       },
     });
 
