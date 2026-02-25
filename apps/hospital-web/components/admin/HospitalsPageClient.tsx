@@ -19,6 +19,7 @@ interface HospitalFromApi {
   createdAt: string;
   accountCreatedAt: string | null;
   status: string;
+  type: string;
 }
 
 interface ApiResponse {

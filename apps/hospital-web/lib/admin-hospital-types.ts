@@ -27,6 +27,7 @@ export interface HospitalDetail {
   accountCreatedAt: string | null;
   withdrawalDate: string | null;
   status: string;
+  type: string;
   paybackRate: string | null;
   paybackRateUpdatedAt: string | null;
   documents: HospitalDocument[];

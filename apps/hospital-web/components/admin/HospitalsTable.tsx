@@ -22,6 +22,7 @@ interface Hospital {
   createdAt: Date;
   accountCreatedAt?: Date | null; // 계정 (최초 User) 생성일
   status: string;
+  type: string;
 }
 
 interface HospitalsTableProps {
@@ -81,6 +82,9 @@ export function HospitalsTable({
                   {showAccountCreatedAt ? '계정 생성일' : '가입 신청일'}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  유형
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                   상태
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">
@@ -121,6 +125,11 @@ export function HospitalsTable({
                             ? formatDate(hospital.accountCreatedAt)
                             : '-'
                           : formatDate(hospital.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {hospital.type === 'UNIVERSITY'
+                          ? '대학병원'
+                          : '일반병원'}
                       </td>
                       <td className="px-4 py-3">
                         <Badge className={HOSPITAL_STATUS_COLORS[status]}>

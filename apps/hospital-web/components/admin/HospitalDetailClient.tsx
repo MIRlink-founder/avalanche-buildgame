@@ -83,7 +83,7 @@ export function HospitalDetailClient() {
             병원 관리
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <Link href="/admin/hospitals" className="hover:text-foreground">
+          <Link href={listHref} className="hover:text-foreground">
             병원 목록
           </Link>
           <ChevronRight className="h-4 w-4" />
@@ -99,6 +99,9 @@ export function HospitalDetailClient() {
         <h1 className="text-2xl font-bold">{displayName}</h1>
         <Badge className={HOSPITAL_STATUS_COLORS[hospital.status]}>
           {HOSPITAL_STATUS_LABELS[hospital.status] || hospital.status}
+        </Badge>
+        <Badge className="bg-gray-400 text-white hover:bg-gray-400">
+          {hospital.type === 'UNIVERSITY' ? '대학병원' : '일반병원'}
         </Badge>
       </div>
 
@@ -118,7 +121,9 @@ export function HospitalDetailClient() {
 
       {currentTab === 'basic' && <HospitalDetailBasic {...panelProps} />}
       {currentTab === 'account' && <HospitalDetailAccount {...panelProps} />}
-      {currentTab === 'settlement' && <HospitalDetailSettlement {...panelProps} />}
+      {currentTab === 'settlement' && (
+        <HospitalDetailSettlement {...panelProps} />
+      )}
       {currentTab === 'as' && <HospitalDetailAs {...panelProps} />}
     </div>
   );

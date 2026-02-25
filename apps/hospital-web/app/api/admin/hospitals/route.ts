@@ -118,6 +118,7 @@ export async function GET(request: NextRequest) {
       managerPhone: h.managerPhone,
       createdAt: h.createdAt,
       status: h.status,
+      type: h.type,
       accountCreatedAt: h.users[0]?.createdAt ?? null,
     }));
 

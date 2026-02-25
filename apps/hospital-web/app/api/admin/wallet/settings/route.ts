@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@mire/database';
 import { requireAuth, AuthError, isAdminRole } from '@/lib/auth-guard';
 
-const DEFAULT_MIN_BALANCE = '100';
-const DEFAULT_EMAIL = 'admin@mirlink.io';
+const DEFAULT_MIN_BALANCE = '10';
+const DEFAULT_EMAIL = 'admin@mire.com';
 
 /** 알림 임계치 설정 조회 */
 export async function GET(request: Request) {
