@@ -23,8 +23,8 @@ export async function GET(request: Request) {
       const [yearStr, monthStr] = month.split('-');
       const year = Number(yearStr);
       const mon = Number(monthStr);
-      const start = new Date(year, mon - 1, 1);
-      const end = new Date(year, mon, 0);
+      const start = new Date(Date.UTC(year, mon - 1, 1));
+      const end = new Date(Date.UTC(year, mon, 0, 23, 59, 59, 999));
       where.settlementPeriodStart = { gte: start };
       where.settlementPeriodEnd = { lte: end };
     }
@@ -47,19 +47,15 @@ export async function GET(request: Request) {
     });
 
     const BOM = '\uFEFF';
-    const header =
-      '병원명,사업자번호,연동 매출액,적용 비율(%),지급액,은행,계좌번호,예금주';
+    const header = '병원명,계좌번호,지급액,은행,예금주';
     const rows = settlements.map((s) => {
       const name =
         s.hospital?.displayName || s.hospital?.officialName || '';
-      const bizNo = s.hospital?.businessNumber || '';
-      const volume = Number(s.totalVolume).toLocaleString('ko-KR');
-      const rate = Number(s.appliedRate).toFixed(2);
+      const account = s.hospital?.accountNumber || '';
       const payback = Number(s.paybackAmount).toLocaleString('ko-KR');
       const bank = s.hospital?.accountBank || '';
-      const account = s.hospital?.accountNumber || '';
       const holder = s.hospital?.accountHolder || '';
-      return `"${name}","${bizNo}","${volume}","${rate}","${payback}","${bank}","${account}","${holder}"`;
+      return `"${name}","${account}","${payback}","${bank}","${holder}"`;
     });
 
     const csv = BOM + header + '\n' + rows.join('\n');
