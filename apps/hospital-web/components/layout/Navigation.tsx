@@ -41,6 +41,9 @@ export default function Navigation() {
 
   // Reports 기능 접근 권한 체크
   const { allowed: canAccessReports } = useFeatureAccess(FEATURES.REPORTS);
+  const { allowed: canAccessSettlements } = useFeatureAccess(
+    FEATURES.SETTLEMENTS,
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -90,9 +93,14 @@ export default function Navigation() {
             <NavLink href="/dashboard" current={pathname === '/dashboard'}>
               대시보드
             </NavLink>
-            <NavLink href="/settlements" current={pathname === '/settlements'}>
-              정산 관리
-            </NavLink>
+            {canAccessSettlements && (
+              <NavLink
+                href="/settlements"
+                current={pathname === '/settlements'}
+              >
+                정산 관리
+              </NavLink>
+            )}
             {canAccessReports && (
               <NavLink href="/reports" current={pathname === '/reports'}>
                 데이터 리포트
