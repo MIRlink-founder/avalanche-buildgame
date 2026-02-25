@@ -7,7 +7,6 @@ import { Button } from '@mire/ui';
 import {
   formatDate,
   formatBusinessNumber,
-  formatPhone,
   HOSPITAL_STATUS_LABELS,
   HOSPITAL_STATUS_COLORS,
 } from '@/lib/admin-hospital-format';
@@ -114,7 +113,7 @@ export function HospitalsTable({
                         {formatBusinessNumber(hospital.businessNumber)}
                       </td>
                       <td className="px-4 py-3 font-mono">
-                        {formatPhone(hospital.managerPhone)}
+                        {hospital.managerPhone}
                       </td>
                       <td className="px-4 py-3">
                         {showAccountCreatedAt
@@ -134,7 +133,7 @@ export function HospitalsTable({
                       >
                         {isPending ? (
                           <Button
-                            variant="outline"
+                            // variant="outline"
                             size="sm"
                             onClick={(e) =>
                               handleManagementButtonClick(e, hospital)

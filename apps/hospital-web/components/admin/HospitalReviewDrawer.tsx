@@ -16,7 +16,6 @@ import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
   formatDate,
   formatBusinessNumber,
-  formatPhone,
   HOSPITAL_STATUS_LABELS,
   HOSPITAL_STATUS_COLORS,
 } from '@/lib/admin-hospital-format';
@@ -268,9 +267,7 @@ export function HospitalReviewDrawer({
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">연락처</dt>
-                    <dd className="font-mono">
-                      {formatPhone(hospital.managerPhone)}
-                    </dd>
+                    <dd className="font-mono">{hospital.managerPhone}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">이메일</dt>
