@@ -424,8 +424,8 @@ function SettlementListTab() {
       </div>
 
       {/* 검색바 + 엑셀 다운로드 (한 줄) */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="relative w-full md:w-[300px]">
+      <div className="flex items-center justify-between">
+        <div className="relative w-full max-w-[400px]">
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -436,7 +436,7 @@ function SettlementListTab() {
               }
             }}
             placeholder="병원명/계좌예금주 검색"
-            className="bg-background pr-9"
+            className="h-11 rounded-lg bg-background pr-10"
             aria-label="검색"
           />
           <button
@@ -453,11 +453,10 @@ function SettlementListTab() {
         </div>
         <Button
           type="button"
-          size="sm"
           onClick={handleExport}
-          className="bg-gray-900 text-white hover:bg-gray-800"
+          className="h-11 rounded-lg bg-gray-900 px-5 text-white hover:bg-gray-800"
         >
-          <Download className="mr-1 h-4 w-4" />
+          <Download className="mr-2 h-4 w-4" />
           은행 이체용 엑셀 다운로드
         </Button>
       </div>
@@ -708,12 +707,11 @@ function PaybackSettingsTab() {
   return (
     <div className="space-y-6">
       {/* 전체 비율 설정 카드 */}
-      <Card className="border-border">
-        <CardHeader>
-          <CardTitle>전체 페이백 비율 설정</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-start justify-between">
+      <Card className="rounded-xl border-border">
+        <div className="p-8">
+          <h3 className="text-lg font-bold">전체 페이백 비율 설정</h3>
+
+          <div className="mt-5 flex items-start justify-between">
             <label
               htmlFor="default-payback-rate"
               className="text-sm font-medium text-foreground"
@@ -726,7 +724,8 @@ function PaybackSettingsTab() {
               개별 설정 비율이 우선 적용 됩니다.
             </p>
           </div>
-          <div className="mt-3 flex items-center gap-2">
+
+          <div className="mt-5 flex items-center gap-3">
             <Input
               id="default-payback-rate"
               type="number"
@@ -735,26 +734,27 @@ function PaybackSettingsTab() {
               max="100"
               value={defaultRate}
               onChange={(e) => setDefaultRate(e.target.value)}
-              className="w-[160px] bg-background"
+              className="h-11 w-[180px] rounded-lg bg-background"
               placeholder="예: 5.0"
             />
-            <span className="text-sm font-medium text-foreground">%</span>
+            <span className="text-base font-medium text-foreground">%</span>
           </div>
+
           <Button
             type="button"
             onClick={handleSaveRate}
             disabled={isSavingRate || !defaultRate.trim()}
-            className="mt-4 bg-gray-900 text-white hover:bg-gray-800"
+            className="mt-5 rounded-lg bg-gray-900 px-5 text-white hover:bg-gray-800"
           >
             {isSavingRate ? '저장 중...' : '설정 저장'}
           </Button>
           {rateError && (
-            <p className="mt-2 text-sm text-destructive">{rateError}</p>
+            <p className="mt-3 text-sm text-destructive">{rateError}</p>
           )}
           {rateSuccess && (
-            <p className="mt-2 text-sm text-green-600">{rateSuccess}</p>
+            <p className="mt-3 text-sm text-green-600">{rateSuccess}</p>
           )}
-        </CardContent>
+        </div>
       </Card>
 
       {/* 구분선 */}
