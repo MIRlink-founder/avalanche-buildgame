@@ -358,12 +358,12 @@ function SettlementListTab() {
   return (
     <div className="space-y-6">
       {/* 제목 + 월 드롭다운 (인라인) */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         <h2 className="text-xl font-semibold">{titleLabel}</h2>
         <Select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="w-[160px]"
+          className="w-[120px]"
           aria-label="월 선택"
         >
           <option value="">전체</option>
@@ -436,7 +436,7 @@ function SettlementListTab() {
               }
             }}
             placeholder="병원명/계좌예금주 검색"
-            className="h-11 rounded-lg bg-background pr-10"
+            className="h-11 rounded-lg bg-background pl-4 pr-10"
             aria-label="검색"
           />
           <button
@@ -499,7 +499,7 @@ function SettlementListTab() {
               return (
                 <TableRow key={row.id}>
                   {/* 병원명: 2줄 (이름 + 사업자번호) */}
-                  <TableCell>
+                  <TableCell className="py-4">
                     <div>
                       <p className="font-medium">{hospitalName}</p>
                       <p className="text-xs text-muted-foreground">
@@ -508,19 +508,19 @@ function SettlementListTab() {
                     </div>
                   </TableCell>
                   {/* 연동 매출액: ₩ 접두사 */}
-                  <TableCell className="text-right whitespace-nowrap">
+                  <TableCell className="py-4 text-right whitespace-nowrap">
                     {formatAmount(row.totalVolume)}
                   </TableCell>
                   {/* 적용 비율 */}
-                  <TableCell className="text-center whitespace-nowrap">
+                  <TableCell className="py-4 text-center whitespace-nowrap">
                     {formatRate(row.appliedRate)}%
                   </TableCell>
                   {/* 지급액: ₩ 접두사 + 볼드 */}
-                  <TableCell className="text-right whitespace-nowrap font-semibold">
+                  <TableCell className="py-4 text-right whitespace-nowrap font-semibold">
                     {formatAmount(row.paybackAmount)}
                   </TableCell>
                   {/* 입금 계좌: 2줄 (은행/예금주 + 계좌번호) */}
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell className="py-4 whitespace-nowrap">
                     {row.hospital.accountBank && row.hospital.accountNumber ? (
                       <div>
                         <p>
