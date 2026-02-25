@@ -7,6 +7,8 @@ export type TreatmentSheetType =
 // 임플란트 식립 진료 시트 폼 데이터
 export interface ImplantPlacementFormData {
   fixture?: string;
+  /** DB ImplantItem id (Fixture 선택 시 저장, 목록/뷰 표시는 fixture 문자열 사용) */
+  fixtureItemId?: number;
   initialFixation?: string;
   boneQuality?: 'D1' | 'D2' | 'D3' | 'D4';
   keratinizedGingiva?: '충분' | '부족' | 'FGG 필요' | 'FGG함';

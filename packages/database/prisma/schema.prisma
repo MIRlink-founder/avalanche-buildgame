@@ -623,43 +623,26 @@ model ImplantBrand {
   createdAt DateTime @default(now()) @map("created_at")
 
   manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
-  models ImplantModel[]
-
-  @@map("implant_brands")
-}
-
-model ImplantModel {
-  id Int @id @default(autoincrement())
-  brandId Int @map("brand_id")
-  name String @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  brand ImplantBrand @relation(fields: [brandId], references: [id])
   items ImplantItem[]
 
-  @@map("implant_models")
+  @@unique([manufacturerId, name])
+  @@map("implant_brands")
 }
 
 model ImplantItem {
   id Int @id @default(autoincrement())
-  modelId Int @map("model_id")
-  /// 직경 (mm)
-  diameter Decimal @db.Decimal(4, 2)
-  /// 길이 (mm)
-  length Decimal @db.Decimal(4, 2)
-  /// SLA, RBM, Anodized 등
-  surfaceTreatment String? @db.VarChar(50) @map("surface_treatment")
-  /// Internal, External 등
-  connectionType String? @db.VarChar(50) @map("connection_type")
-  /// ACTIVE, INACTIVE
+  brandId Int @map("brand_id")
+  /// 사이즈 코드 (예: 3507BS, 3507, 3509)
+  size String @db.VarChar(50)
+  /// ACTIVE, INACTIVE (엑셀 '사용안함' False = ACTIVE)
   status String @db.VarChar(20)
   createdAt DateTime @default(now()) @map("created_at")
 
-  model ImplantModel @relation(fields: [modelId], references: [id])
+  brand ImplantBrand @relation(fields: [brandId], references: [id])
   medicalRecordItems MedicalRecordItem[]
 
-  @@index([modelId])
-  @@index([diameter, length])
+  @@unique([brandId, size])
+  @@index([brandId])
   @@map("implant_items")
 }
 

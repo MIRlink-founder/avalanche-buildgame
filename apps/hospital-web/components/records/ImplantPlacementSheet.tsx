@@ -1,8 +1,28 @@
 'use client';
 
-import { Input, Label, Checkbox } from '@mire/ui';
+import { useState } from 'react';
+import { Label, Checkbox } from '@mire/ui';
 import { Settings } from 'lucide-react';
 import type { ImplantPlacementFormData } from './treatment-sheet-types';
+import { FixtureSelectModal } from './FixtureSelectModal';
+import { FixtureManageModal } from './FixtureManageModal';
+
+export interface ImplantItemOption {
+  id: number;
+  manufacturerName: string;
+  brandName: string;
+  size: string;
+}
+
+export interface ImplantPlacementSheetProps {
+  value: ImplantPlacementFormData;
+  onChange: (data: ImplantPlacementFormData) => void;
+  readOnly?: boolean;
+  /** DB에서 받은 ACTIVE ImplantItem 목록 — 있으면 Fixture를 셀렉트로 선택 */
+  implantItems?: ImplantItemOption[];
+  /** 픽스처 목록 갱신 시 호출 (관리 모달 저장 후 목록 다시 fetch) */
+  onFixtureListChange?: () => void;
+}
 
 const INITIAL_FIXATION_OPTIONS = [
   '15N',
@@ -41,12 +61,6 @@ const PROSTHESIS_TIMING_OPTIONS = [
   '8개월 후',
 ];
 
-export interface ImplantPlacementSheetProps {
-  value: ImplantPlacementFormData;
-  onChange: (data: ImplantPlacementFormData) => void;
-  readOnly?: boolean;
-}
-
 function Row({
   label,
   children,
@@ -66,7 +80,12 @@ export function ImplantPlacementSheet({
   value,
   onChange,
   readOnly = false,
+  implantItems = [],
+  onFixtureListChange,
 }: ImplantPlacementSheetProps) {
+  const [selectModalOpen, setSelectModalOpen] = useState(false);
+  const [manageModalOpen, setManageModalOpen] = useState(false);
+
   const update = (patch: Partial<ImplantPlacementFormData>) => {
     onChange({ ...value, ...patch });
   };
@@ -86,17 +105,18 @@ export function ImplantPlacementSheet({
     <div className="space-y-0 text-sm">
       <Row label="Fixture">
         <div className="flex items-center gap-2">
-          <select
-            value={value.fixture ?? ''}
-            onChange={(e) => update({ fixture: e.target.value || undefined })}
+          <button
+            type="button"
+            onClick={() => !readOnly && setSelectModalOpen(true)}
             disabled={readOnly}
-            className="border-input bg-background h-10 flex-1 min-w-0 rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="border-input bg-background h-10 flex-1 min-w-0 rounded-md border px-3 py-2 text-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="">임플란트 픽스처 선택</option>
-          </select>
+            {value.fixture ?? '임플란트 픽스처 선택'}
+          </button>
           {!readOnly && (
             <button
               type="button"
+              onClick={() => setManageModalOpen(true)}
               className="rounded-md border border-input p-2 hover:bg-muted"
               aria-label="픽스처 설정"
             >
@@ -105,6 +125,24 @@ export function ImplantPlacementSheet({
           )}
         </div>
       </Row>
+
+      <FixtureSelectModal
+        open={selectModalOpen}
+        onOpenChange={setSelectModalOpen}
+        implantItems={implantItems}
+        currentItemId={value.fixtureItemId}
+        onSelect={(itemId, label) => {
+          update({
+            fixtureItemId: itemId ?? undefined,
+            fixture: label || undefined,
+          });
+        }}
+      />
+      <FixtureManageModal
+        open={manageModalOpen}
+        onOpenChange={setManageModalOpen}
+        onSaved={onFixtureListChange}
+      />
 
       <Row label="초기고정">
         <div className="flex flex-wrap gap-3">

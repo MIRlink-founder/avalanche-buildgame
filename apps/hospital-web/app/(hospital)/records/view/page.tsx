@@ -351,26 +351,23 @@ function RecordViewContent() {
                             )}
                             {abutmentLabel && (
                               <p>
-                                - 어벗: {abutmentLabel}{' '}
-                                {fd.torque && `/ ${fd.torque}`}
-                              </p>
-                            )}
-                            {fd.hexStatus && (
-                              <p>
-                                - HEX:{' '}
-                                {fd.hexStatus === 'hex' ? 'Hex' : 'Non-Hex'}{' '}
-                                {!fd.sizeNotEntered &&
+                                - 어벗 선택: {abutmentLabel}
+                                {fd.hexStatus &&
+                                  (!fd.sizeNotEntered &&
                                   (fd.diameter != null ||
                                     fd.cuff != null ||
-                                    fd.height != null) && (
+                                    fd.height != null) ? (
                                     <>
-                                      (ø={fd.diameter ?? '-'}, C=
+                                      {' '}
+                                      (Hex - Φ={fd.diameter ?? '-'}, C=
                                       {fd.cuff ?? '-'}, H={fd.height ?? '-'})
                                     </>
-                                  )}
+                                  ) : (
+                                    <> (Non-Hex)</>
+                                  ))}
+                                {fd.torque && ` - ${fd.torque}`}
                               </p>
                             )}
-                            {fd.sizeNotEntered && <p>- 사이즈: 입력 안함</p>}
                             {fd.comment && <p>- {fd.comment}</p>}
                           </div>
                         );

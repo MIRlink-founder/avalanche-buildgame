@@ -4,6 +4,7 @@ import { Badge, Button } from '@mire/ui';
 import { RotateCcw, X } from 'lucide-react';
 import { FRAME_TOOTH_PATHS } from './frame-tooth-paths';
 import { ImplantPlacementSheet } from './ImplantPlacementSheet';
+import type { ImplantItemOption } from './ImplantPlacementSheet';
 import { ImplantProsthesisSheet } from './ImplantProsthesisSheet';
 import { LaminateSheet } from './LaminateSheet';
 import type {
@@ -36,6 +37,10 @@ export interface ToothChartProps {
   onRemoveSheet?: (sheetId: string) => void;
   savedTeeth?: number[]; // 임시 저장된 데이터가 있는 치아 번호
   readOnly?: boolean;
+  /** DB ImplantItem 목록 — 임플란트 식립 Fixture 선택용 */
+  implantItems?: ImplantItemOption[];
+  /** 픽스처 목록 갱신 시 (관리 모달 저장 후) */
+  onFixtureListChange?: () => void;
 }
 
 export function ToothChart({
@@ -51,6 +56,8 @@ export function ToothChart({
   onRemoveSheet,
   savedTeeth = [],
   readOnly = false,
+  implantItems = [],
+  onFixtureListChange,
 }: ToothChartProps) {
   const savedSet = new Set(savedTeeth);
 
@@ -236,6 +243,8 @@ export function ToothChart({
                           onUpdateSheetFormData?.(sheet.id, formData)
                         }
                         readOnly={readOnly}
+                        implantItems={implantItems}
+                        onFixtureListChange={onFixtureListChange}
                       />
                     );
                   }

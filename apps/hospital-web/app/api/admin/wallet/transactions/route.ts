@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@mire/database';
 import { requireAuth, AuthError, isAdminRole } from '@/lib/auth-guard';
-import { avalanche } from '@mire/blockchain/wagmi/chains';
+import { avalanche, avalancheFuji } from '@mire/blockchain/wagmi/chains';
 
 const PAGE_SIZE = 10;
 
@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, Number(searchParams.get('page')) || 1);
-    const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit')) || PAGE_SIZE));
+    const limit = Math.min(
+      50,
+      Math.max(1, Number(searchParams.get('limit')) || PAGE_SIZE),
+    );
     const skip = (page - 1) * limit;
 
     const [items, totalCount] = await Promise.all([
@@ -42,7 +45,8 @@ export async function GET(request: NextRequest) {
       prisma.blockchainTransaction.count(),
     ]);
 
-    const explorerUrl = avalanche.blockExplorers?.default?.url ?? 'https://snowtrace.io';
+    const explorerUrl =
+      avalancheFuji.blockExplorers?.default?.url ?? 'https://snowtrace.io';
 
     const data = items.map((tx) => {
       const hospital = tx.medicalRecord?.hospital;
@@ -61,7 +65,13 @@ export async function GET(request: NextRequest) {
         txHash: tx.txHash,
         txHashShort,
         explorerUrl: `${explorerUrl}/tx/${tx.txHash}`,
-        gasUsed: '-', // 스키마에 가스비 필드 없음, 추후 확장 시 채움
+        gasUsed:
+          tx.gasUsed != null
+            ? (() => {
+                const avax = Number(tx.gasUsed) / 1e18;
+                return avax < 1e-6 ? '< 0.000001' : avax.toFixed(6);
+              })()
+            : null,
         status: success ? '성공' : '실패',
         statusValue: tx.status,
       };

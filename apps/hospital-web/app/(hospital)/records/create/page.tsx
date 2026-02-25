@@ -73,6 +73,9 @@ function CreateContent() {
   const [activeSheetId, setActiveSheetId] = useState<string | 'add'>('add'); // 현재 선택된 진료 시트 탭
   const consumedSessionRef = useRef(false);
   const fromEditPayloadRef = useRef(false);
+  const [implantItems, setImplantItems] = useState<
+    { id: number; manufacturerName: string; brandName: string; size: string }[]
+  >([]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -133,6 +136,48 @@ function CreateContent() {
     }
     consumedSessionRef.current = true;
   }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const doFetch = () =>
+      fetch('/api/implant-items', { headers: getAuthHeaders() })
+        .then((res: Response) => (res.ok ? res.json() : []))
+        .then(
+          (
+            data: {
+              id: number;
+              manufacturerName: string;
+              brandName: string;
+              size: string;
+            }[],
+          ) => {
+            if (!cancelled) setImplantItems(Array.isArray(data) ? data : []);
+          },
+        )
+        .catch(() => {
+          if (!cancelled) setImplantItems([]);
+        });
+    doFetch();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refetchImplantItems = useCallback(() => {
+    fetch('/api/implant-items', { headers: getAuthHeaders() })
+      .then((res: Response) => (res.ok ? res.json() : []))
+      .then(
+        (
+          data: {
+            id: number;
+            manufacturerName: string;
+            brandName: string;
+            size: string;
+          }[],
+        ) => setImplantItems(Array.isArray(data) ? data : []),
+      )
+      .catch(() => setImplantItems([]));
+  }, []);
 
   useEffect(() => {
     if (!patientId) return;
@@ -313,6 +358,7 @@ function CreateContent() {
   };
 
   const handleRegisterConfirmClick = () => {
+    // TODO: 추후 draft - paid - onchained 순으로 변경되게 수정
     setRegisterConfirmOpen(false);
     setPaymentConfirmOpen(true);
   };
@@ -621,28 +667,23 @@ function CreateContent() {
                             )}
                             {abutmentLabel && (
                               <p>
-                                - 어벗: {abutmentLabel}{' '}
-                                {fd.torque && `/ ${fd.torque}`}
-                              </p>
-                            )}
-
-                            {fd.hexStatus && (
-                              <p>
-                                - HEX:{' '}
-                                {fd.hexStatus === 'hex' ? 'Hex' : 'Non-Hex'}{' '}
-                                {!fd.sizeNotEntered &&
+                                - 어벗 선택: {abutmentLabel}
+                                {fd.hexStatus &&
+                                  (!fd.sizeNotEntered &&
                                   (fd.diameter != null ||
                                     fd.cuff != null ||
-                                    fd.height != null) && (
+                                    fd.height != null) ? (
                                     <>
-                                      (ø={fd.diameter ?? '-'}, C=
+                                      {' '}
+                                      (Hex - Φ={fd.diameter ?? '-'}, C=
                                       {fd.cuff ?? '-'}, H={fd.height ?? '-'})
                                     </>
-                                  )}
+                                  ) : (
+                                    <> (Non-Hex)</>
+                                  ))}
+                                {fd.torque && ` - ${fd.torque}`}
                               </p>
                             )}
-
-                            {fd.sizeNotEntered && <p>- 사이즈: 입력 안함</p>}
                             {fd.comment && <p>- {fd.comment}</p>}
                           </div>
                         );
@@ -690,6 +731,8 @@ function CreateContent() {
             onActiveSheetChange={setActiveSheetId}
             onRemoveSheet={handleRemoveSheet}
             savedTeeth={savedTeeth}
+            implantItems={implantItems}
+            onFixtureListChange={refetchImplantItems}
           />
         </div>
       </div>

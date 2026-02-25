@@ -13,7 +13,8 @@
     "db:migrate:reset": "nx run @mire/database:migrate-reset",
     "db:seed": "nx run @mire/database:seed",
     "db:push": "nx run @mire/database:push",
-    "db:studio": "nx run @mire/database:studio"
+    "db:studio": "nx run @mire/database:studio",
+    "db:import-implant": "nx run @mire/database:import-implant --"
   },
   "private": true,
   "devDependencies": {
