@@ -26,20 +26,29 @@ export function AlertModal({
   primaryButton,
   secondaryButton,
 }: AlertModalProps) {
+  const hasBothButtons = !!primaryButton && !!secondaryButton;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false}>
-        <DialogHeader>
-          <div className="text-center font-semibold text-lg text-foreground">
-            {title}
-          </div>
-        </DialogHeader>
-        <p className="text-center text-muted-foreground">{message}</p>
-        <DialogFooter>
+        {title && (
+          <DialogHeader>
+            <div className="text-center font-semibold text-lg text-foreground">
+              {title}
+            </div>
+          </DialogHeader>
+        )}
+        <p className="whitespace-pre-line text-center text-muted-foreground">
+          {message}
+        </p>
+        <DialogFooter
+          className={
+            hasBothButtons ? undefined : 'sm:justify-center'
+          }
+        >
           {secondaryButton && (
             <Button
-              variant="outline"
-              className="w-1/2"
+              className={`${hasBothButtons ? 'w-1/2' : 'w-1/2'} bg-foreground text-background hover:bg-foreground/90`}
               size="xl"
               onClick={secondaryButton.onClick}
             >
@@ -47,7 +56,11 @@ export function AlertModal({
             </Button>
           )}
           {primaryButton && (
-            <Button className="w-1/2" size="xl" onClick={primaryButton.onClick}>
+            <Button
+              className={hasBothButtons ? 'w-1/2' : 'w-1/2'}
+              size="xl"
+              onClick={primaryButton.onClick}
+            >
               {primaryButton.label}
             </Button>
           )}
