@@ -338,7 +338,7 @@ function SettlementListTab() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `은행이체용_정산내역_${selectedMonth || '전체'}.csv`;
+      anchor.download = `은행이체용_정산내역_${selectedMonth || '전체'}.xlsx`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);

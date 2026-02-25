@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@mire/database';
 import { AuthError, isAdminRole, requireAuth } from '@/lib/auth-guard';
+import ExcelJS from 'exceljs';
 
 export const runtime = 'nodejs';
 
-// 정산 내역 CSV 다운로드
+// 정산 내역 XLSX 다운로드
 export async function GET(request: Request) {
   try {
     const { user } = await requireAuth(request);
@@ -46,24 +47,46 @@ export async function GET(request: Request) {
       },
     });
 
-    const BOM = '\uFEFF';
-    const header = '병원명,계좌번호,지급액,은행,예금주';
-    const rows = settlements.map((s) => {
-      const name =
-        s.hospital?.displayName || s.hospital?.officialName || '';
-      const account = s.hospital?.accountNumber || '';
-      const payback = Number(s.paybackAmount).toLocaleString('ko-KR');
-      const bank = s.hospital?.accountBank || '';
-      const holder = s.hospital?.accountHolder || '';
-      return `"${name}","${account}","${payback}","${bank}","${holder}"`;
-    });
+    // ── xlsx 생성 ──
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('정산내역');
 
-    const csv = BOM + header + '\n' + rows.join('\n');
+    // 열 너비 설정
+    ws.columns = [
+      { header: '병원명', key: 'name', width: 24 },
+      { header: '계좌번호', key: 'account', width: 24 },
+      { header: '지급액', key: 'payback', width: 18 },
+      { header: '은행', key: 'bank', width: 12 },
+      { header: '예금주', key: 'holder', width: 24 },
+    ];
 
-    return new NextResponse(csv, {
+    // 헤더 스타일
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // 데이터 행
+    for (const s of settlements) {
+      ws.addRow({
+        name: s.hospital?.displayName || s.hospital?.officialName || '',
+        account: s.hospital?.accountNumber || '',
+        payback: Number(s.paybackAmount),
+        bank: s.hospital?.accountBank || '',
+        holder: s.hospital?.accountHolder || '',
+      });
+    }
+
+    // 지급액 열 숫자 포맷
+    ws.getColumn('payback').numFmt = '#,##0';
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const filename = `settlements-${month || 'all'}.xlsx`;
+
+    return new NextResponse(buffer, {
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="settlements-${month || 'all'}.csv"`,
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {
