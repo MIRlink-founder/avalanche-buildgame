@@ -23,6 +23,10 @@ import {
 } from '@mire/ui/components/table';
 import { Select } from '@mire/ui/components/select';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import {
+  HOSPITAL_STATUS_COLORS,
+  HOSPITAL_STATUS_LABELS,
+} from '@/lib/admin-hospital-format';
 
 /* ------------------------------------------------------------------ */
 /*  타입 정의                                                          */
@@ -661,35 +665,12 @@ function PaybackSettingsTab() {
     loadHospitals();
   }, []);
 
-  /** 상태 뱃지 스타일 */
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return (
-          <Badge className="bg-green-600 text-white hover:bg-green-600">
-            정상
-          </Badge>
-        );
-      case 'PENDING':
-        return (
-          <Badge className="bg-amber-400 text-amber-950 hover:bg-amber-400">
-            대기
-          </Badge>
-        );
-      case 'SUSPENDED':
-        return (
-          <Badge className="bg-red-600 text-white hover:bg-red-600">
-            정지
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-gray-400 text-white hover:bg-gray-400">
-            {status}
-          </Badge>
-        );
-    }
-  };
+  /** 상태 뱃지 스타일 (병원 관리와 동일) */
+  const getStatusBadge = (status: string) => (
+    <Badge className={HOSPITAL_STATUS_COLORS[status] ?? 'bg-gray-400 text-white hover:bg-gray-400'}>
+      {HOSPITAL_STATUS_LABELS[status] ?? status}
+    </Badge>
+  );
 
   /* 클라이언트 사이드 페이지네이션 */
   const totalHospitalPages = Math.max(
