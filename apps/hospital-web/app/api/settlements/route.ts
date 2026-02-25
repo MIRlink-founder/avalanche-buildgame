@@ -83,13 +83,13 @@ export async function GET(request: Request) {
       where.status = status;
     }
 
-    // month 필터 (YYYY-MM 형식)
+    // month 필터 (YYYY-MM 형식) — UTC 기준
     if (month && /^\d{4}-\d{2}$/.test(month)) {
       const [yearStr, monthStr] = month.split('-');
       const year = Number(yearStr);
       const mon = Number(monthStr);
-      const start = new Date(year, mon - 1, 1);
-      const end = new Date(year, mon, 0);
+      const start = new Date(Date.UTC(year, mon - 1, 1));
+      const end = new Date(Date.UTC(year, mon, 0, 23, 59, 59, 999));
       where.settlementPeriodStart = { gte: start };
       where.settlementPeriodEnd = { lte: end };
     }

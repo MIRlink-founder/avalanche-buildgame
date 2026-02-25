@@ -40,6 +40,8 @@ async function main() {
       accountBank: '신한',
       accountNumber: '110-123-456789',
       accountHolder: '미르치과의원',
+      paybackRate: 3.5,
+      paybackRateUpdatedAt: new Date('2026-01-15T09:00:00.000Z'),
     },
     create: {
       businessNumber: '123-45-67890',
@@ -55,6 +57,8 @@ async function main() {
       accountBank: '신한',
       accountNumber: '110-123-456789',
       accountHolder: '미르치과의원',
+      paybackRate: 3.5,
+      paybackRateUpdatedAt: new Date('2026-01-15T09:00:00.000Z'),
     },
   });
 
