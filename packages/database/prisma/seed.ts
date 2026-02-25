@@ -199,6 +199,7 @@ async function main() {
     start: string;
     end: string;
     totalVolume: string;
+    caseCount: number;
     appliedRate: string;
     paybackAmount: string;
     status: string;
@@ -206,34 +207,38 @@ async function main() {
   }
 
   const settlementSeeds: SettlementSeed[] = [
+    // ── 2026-02 (이번 달, PENDING = 집계 중) ──
+    { publicId: 'a1000000-0000-4000-8000-000000000001', hospitalIdx: 0, start: '2026-02-01T00:00:00.000Z', end: '2026-02-28T00:00:00.000Z', totalVolume: '4300000', caseCount: 18, appliedRate: '3.50', paybackAmount: '150500', status: 'PENDING', settledAt: null },
+    { publicId: 'a1000000-0000-4000-8000-000000000002', hospitalIdx: 1, start: '2026-02-01T00:00:00.000Z', end: '2026-02-28T00:00:00.000Z', totalVolume: '6200000', caseCount: 25, appliedRate: '4.50', paybackAmount: '279000', status: 'PENDING', settledAt: null },
+
     // ── 2026-01 (전월, 기본 선택) ──
-    { publicId: 'b1b6f8ab-2fd6-4d31-90d7-2d6e0cb8a95e', hospitalIdx: 0, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '8200000', appliedRate: '3.50', paybackAmount: '287000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
-    { publicId: 'a1000001-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '12500000', appliedRate: '4.50', paybackAmount: '562500', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
-    { publicId: 'a1000001-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '6800000', appliedRate: '5.00', paybackAmount: '340000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
-    { publicId: 'a1000001-0001-4001-8001-000000000003', hospitalIdx: 3, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '9100000', appliedRate: '5.00', paybackAmount: '455000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
-    { publicId: 'a1000001-0001-4001-8001-000000000004', hospitalIdx: 4, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '5400000', appliedRate: '5.00', paybackAmount: '270000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
+    { publicId: 'b1b6f8ab-2fd6-4d31-90d7-2d6e0cb8a95e', hospitalIdx: 0, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '8200000', caseCount: 34, appliedRate: '3.50', paybackAmount: '287000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
+    { publicId: 'a1000001-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '12500000', caseCount: 52, appliedRate: '4.50', paybackAmount: '562500', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
+    { publicId: 'a1000001-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '6800000', caseCount: 28, appliedRate: '5.00', paybackAmount: '340000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
+    { publicId: 'a1000001-0001-4001-8001-000000000003', hospitalIdx: 3, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '9100000', caseCount: 38, appliedRate: '5.00', paybackAmount: '455000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
+    { publicId: 'a1000001-0001-4001-8001-000000000004', hospitalIdx: 4, start: '2026-01-01T00:00:00.000Z', end: '2026-01-31T00:00:00.000Z', totalVolume: '5400000', caseCount: 22, appliedRate: '5.00', paybackAmount: '270000', status: 'SETTLED', settledAt: '2026-02-05T10:00:00.000Z' },
 
     // ── 2025-12 ──
-    { publicId: '2c8f66e9-7f0f-4f1a-9d7f-9d6b1b44586e', hospitalIdx: 0, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '7500000', appliedRate: '3.50', paybackAmount: '262500', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
-    { publicId: 'a1000002-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '11200000', appliedRate: '4.50', paybackAmount: '504000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
-    { publicId: 'a1000002-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '5900000', appliedRate: '5.00', paybackAmount: '295000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
-    { publicId: 'a1000002-0001-4001-8001-000000000003', hospitalIdx: 3, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '8600000', appliedRate: '5.00', paybackAmount: '430000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
-    { publicId: 'a1000002-0001-4001-8001-000000000004', hospitalIdx: 4, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '4800000', appliedRate: '5.00', paybackAmount: '240000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
+    { publicId: '2c8f66e9-7f0f-4f1a-9d7f-9d6b1b44586e', hospitalIdx: 0, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '7500000', caseCount: 31, appliedRate: '3.50', paybackAmount: '262500', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
+    { publicId: 'a1000002-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '11200000', caseCount: 46, appliedRate: '4.50', paybackAmount: '504000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
+    { publicId: 'a1000002-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '5900000', caseCount: 24, appliedRate: '5.00', paybackAmount: '295000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
+    { publicId: 'a1000002-0001-4001-8001-000000000003', hospitalIdx: 3, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '8600000', caseCount: 36, appliedRate: '5.00', paybackAmount: '430000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
+    { publicId: 'a1000002-0001-4001-8001-000000000004', hospitalIdx: 4, start: '2025-12-01T00:00:00.000Z', end: '2025-12-31T00:00:00.000Z', totalVolume: '4800000', caseCount: 20, appliedRate: '5.00', paybackAmount: '240000', status: 'SETTLED', settledAt: '2026-01-05T10:00:00.000Z' },
 
     // ── 2025-11 ──
-    { publicId: 'b2148d58-47fd-4f07-8d4f-16b07c3ab89c', hospitalIdx: 0, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '6900000', appliedRate: '3.50', paybackAmount: '241500', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
-    { publicId: 'a1000003-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '10800000', appliedRate: '4.50', paybackAmount: '486000', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
-    { publicId: 'a1000003-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '6200000', appliedRate: '5.00', paybackAmount: '310000', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
-    { publicId: 'a1000003-0001-4001-8001-000000000003', hospitalIdx: 3, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '7800000', appliedRate: '5.00', paybackAmount: '390000', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
+    { publicId: 'b2148d58-47fd-4f07-8d4f-16b07c3ab89c', hospitalIdx: 0, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '6900000', caseCount: 29, appliedRate: '3.50', paybackAmount: '241500', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
+    { publicId: 'a1000003-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '10800000', caseCount: 45, appliedRate: '4.50', paybackAmount: '486000', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
+    { publicId: 'a1000003-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '6200000', caseCount: 26, appliedRate: '5.00', paybackAmount: '310000', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
+    { publicId: 'a1000003-0001-4001-8001-000000000003', hospitalIdx: 3, start: '2025-11-01T00:00:00.000Z', end: '2025-11-30T00:00:00.000Z', totalVolume: '7800000', caseCount: 32, appliedRate: '5.00', paybackAmount: '390000', status: 'SETTLED', settledAt: '2025-12-05T10:00:00.000Z' },
 
     // ── 2025-10 ──
-    { publicId: '3f2db9b5-f87a-45f5-8a74-7c2f0b1ad1a4', hospitalIdx: 0, start: '2025-10-01T00:00:00.000Z', end: '2025-10-31T00:00:00.000Z', totalVolume: '7200000', appliedRate: '3.50', paybackAmount: '252000', status: 'SETTLED', settledAt: '2025-11-04T10:00:00.000Z' },
-    { publicId: 'a1000004-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-10-01T00:00:00.000Z', end: '2025-10-31T00:00:00.000Z', totalVolume: '9500000', appliedRate: '4.50', paybackAmount: '427500', status: 'SETTLED', settledAt: '2025-11-04T10:00:00.000Z' },
-    { publicId: 'a1000004-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2025-10-01T00:00:00.000Z', end: '2025-10-31T00:00:00.000Z', totalVolume: '5600000', appliedRate: '5.00', paybackAmount: '280000', status: 'SETTLED', settledAt: '2025-11-04T10:00:00.000Z' },
+    { publicId: '3f2db9b5-f87a-45f5-8a74-7c2f0b1ad1a4', hospitalIdx: 0, start: '2025-10-01T00:00:00.000Z', end: '2025-10-31T00:00:00.000Z', totalVolume: '7200000', caseCount: 30, appliedRate: '3.50', paybackAmount: '252000', status: 'SETTLED', settledAt: '2025-11-04T10:00:00.000Z' },
+    { publicId: 'a1000004-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-10-01T00:00:00.000Z', end: '2025-10-31T00:00:00.000Z', totalVolume: '9500000', caseCount: 40, appliedRate: '4.50', paybackAmount: '427500', status: 'SETTLED', settledAt: '2025-11-04T10:00:00.000Z' },
+    { publicId: 'a1000004-0001-4001-8001-000000000002', hospitalIdx: 2, start: '2025-10-01T00:00:00.000Z', end: '2025-10-31T00:00:00.000Z', totalVolume: '5600000', caseCount: 23, appliedRate: '5.00', paybackAmount: '280000', status: 'SETTLED', settledAt: '2025-11-04T10:00:00.000Z' },
 
     // ── 2025-09 ──
-    { publicId: '6f8c8b5b-1c3b-4bb6-9d64-41b2a3db8c73', hospitalIdx: 0, start: '2025-09-01T00:00:00.000Z', end: '2025-09-30T00:00:00.000Z', totalVolume: '6500000', appliedRate: '3.50', paybackAmount: '227500', status: 'SETTLED', settledAt: '2025-10-06T10:00:00.000Z' },
-    { publicId: 'a1000005-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-09-01T00:00:00.000Z', end: '2025-09-30T00:00:00.000Z', totalVolume: '8900000', appliedRate: '4.50', paybackAmount: '400500', status: 'SETTLED', settledAt: '2025-10-06T10:00:00.000Z' },
+    { publicId: '6f8c8b5b-1c3b-4bb6-9d64-41b2a3db8c73', hospitalIdx: 0, start: '2025-09-01T00:00:00.000Z', end: '2025-09-30T00:00:00.000Z', totalVolume: '6500000', caseCount: 27, appliedRate: '3.50', paybackAmount: '227500', status: 'SETTLED', settledAt: '2025-10-06T10:00:00.000Z' },
+    { publicId: 'a1000005-0001-4001-8001-000000000001', hospitalIdx: 1, start: '2025-09-01T00:00:00.000Z', end: '2025-09-30T00:00:00.000Z', totalVolume: '8900000', caseCount: 37, appliedRate: '4.50', paybackAmount: '400500', status: 'SETTLED', settledAt: '2025-10-06T10:00:00.000Z' },
   ];
 
   const settlementMap = new Map<string, number>();
@@ -246,6 +251,7 @@ async function main() {
         settlementPeriodStart: new Date(seed.start),
         settlementPeriodEnd: new Date(seed.end),
         totalVolume: seed.totalVolume,
+        caseCount: seed.caseCount,
         appliedRate: seed.appliedRate,
         paybackAmount: seed.paybackAmount,
         isNftBoosted: false,
@@ -258,6 +264,7 @@ async function main() {
         settlementPeriodStart: new Date(seed.start),
         settlementPeriodEnd: new Date(seed.end),
         totalVolume: seed.totalVolume,
+        caseCount: seed.caseCount,
         appliedRate: seed.appliedRate,
         paybackAmount: seed.paybackAmount,
         isNftBoosted: false,
@@ -377,7 +384,7 @@ async function main() {
     email: hospitalUser.email,
   });
 
-  console.log(`✅ 정산 데이터 ${settlementSeeds.length}건 생성 완료 (5개 병원, 2025-09 ~ 2026-01)`);
+  console.log(`✅ 정산 데이터 ${settlementSeeds.length}건 생성 완료 (5개 병원, 2025-09 ~ 2026-02)`);
 }
 
 main()

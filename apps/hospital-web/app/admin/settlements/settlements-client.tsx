@@ -473,7 +473,14 @@ function SettlementListTab() {
       )}
 
       {/* 테이블 */}
-      <Table>
+      <Table className="w-full table-fixed">
+        <colgroup>
+          <col className="w-[22%]" />
+          <col className="w-[20%]" />
+          <col className="w-[14%]" />
+          <col className="w-[22%]" />
+          <col className="w-[22%]" />
+        </colgroup>
         <TableHeader>
           <TableRow>
             <TableHead>병원명</TableHead>
@@ -754,7 +761,14 @@ function PaybackSettingsTab() {
           </div>
         )}
 
-        <Table>
+        <Table className="w-full table-fixed">
+          <colgroup>
+            <col className="w-[25%]" />
+            <col className="w-[20%]" />
+            <col className="w-[18%]" />
+            <col className="w-[20%]" />
+            <col className="w-[17%]" />
+          </colgroup>
           <TableHeader>
             <TableRow>
               <TableHead>병원</TableHead>
