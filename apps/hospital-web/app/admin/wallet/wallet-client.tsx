@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Copy, FileSpreadsheet } from 'lucide-react';
+import {
+  Clipboard,
+  Copy,
+  FileSpreadsheet,
+  SquareArrowOutUpRight,
+  SquareArrowUpRight,
+} from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -59,7 +65,7 @@ function formatBalance(value: string): string {
   if (!Number.isFinite(n)) return value;
   return new Intl.NumberFormat('ko-KR', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
+    maximumFractionDigits: 20,
   }).format(n);
 }
 
@@ -400,25 +406,39 @@ export function WalletClient() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
+            {/* 
+              [폭 균일화]
+              각 열의 너비를 거의 동일하게 맞추고(약 1/6씩), 일부 단어 길이에 맞는 최소 폭만 부여.
+              table-layout: fixed를 사용하므로, min-w-0으로 오버플로우되는 내용을 정리하여
+              가독성과 라인 정렬을 개선합니다.
+            */}
             <table className="w-full min-w-[720px] table-fixed">
+              <colgroup>
+                <col style={{ width: '16.66%' }} />
+                <col style={{ width: '16.66%' }} />
+                <col style={{ width: '16.66%' }} />
+                <col style={{ width: '16.66%' }} />
+                <col style={{ width: '16.66%' }} />
+                <col style={{ width: '16.66%' }} />
+              </colgroup>
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="w-[140px] whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
                     일시
                   </th>
-                  <th className="w-[120px] whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
                     병원명
                   </th>
-                  <th className="w-[120px] whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
                     구분
                   </th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">
                     TXID (HASH)
                   </th>
-                  <th className="w-[100px] whitespace-nowrap px-4 py-3 text-right text-muted-foreground font-medium">
+                  <th className="whitespace-nowrap px-4 py-3 text-right text-muted-foreground font-medium">
                     소모 가스비
                   </th>
-                  <th className="w-[80px] whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-muted-foreground font-medium">
                     상태
                   </th>
                 </tr>
@@ -445,29 +465,30 @@ export function WalletClient() {
                 ) : (
                   txList.map((tx) => (
                     <tr key={tx.id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                      <td className="whitespace-nowrap px-4 py-3 min-w-0 overflow-hidden text-ellipsis">
                         {formatDateTime(tx.uploadedAt)}
                       </td>
-                      <td className="max-w-[120px] truncate px-4 py-3 text-sm">
+                      <td className="px-4 py-3 min-w-0 overflow-hidden text-ellipsis">
                         {tx.hospitalName}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                      <td className="whitespace-nowrap px-4 py-3 min-w-0">
                         {tx.kind}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 min-w-0 overflow-hidden text-ellipsis">
                         <a
                           href={tx.explorerUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-mono text-sm text-primary hover:underline"
+                          className="flex gap-1 items-center font-mono text-primary hover:underline"
                         >
                           {tx.txHashShort}
+                          <SquareArrowOutUpRight className="h-4 w-4" />
                         </a>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
+                      <td className="whitespace-nowrap px-4 py-3 text-right min-w-0">
                         {tx.gasUsed}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 min-w-0">
                         <Badge
                           variant={
                             tx.statusValue === 'CONFIRMED'

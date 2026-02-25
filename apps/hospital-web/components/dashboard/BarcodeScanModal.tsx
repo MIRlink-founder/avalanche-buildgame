@@ -6,8 +6,10 @@ import { Button, Dialog, DialogContent, DialogTitle } from '@mire/ui';
 import { getAuthHeaders } from '@/lib/get-auth-headers';
 import { redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
-  SESSION_KEY_RECORD_PATIENT_ID,
   DUMMY_BARCODE,
+  SESSION_KEY_RECORD_PATIENT_ID,
+  SESSION_KEY_RECORD_PIN_CODE,
+  parseBarcode,
 } from '@/lib/records-session';
 
 interface BarcodeScanModalProps {
@@ -40,16 +42,26 @@ export function BarcodeScanModal({
     e.preventDefault();
     const value = inputRef.current?.value?.trim();
     if (!value) return;
+    const parsed = parseBarcode(DUMMY_BARCODE); // TODO: value 로 변경
+    if (!parsed) {
+      alert(
+        '바코드 형식이 올바르지 않습니다. 환자ID#PIN 형식으로 스캔해주세요.',
+      );
+      return;
+    }
     onOpenChange(false);
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem(
-        SESSION_KEY_RECORD_PATIENT_ID,
-        encodeURIComponent(value),
-      );
+      sessionStorage.setItem(SESSION_KEY_RECORD_PATIENT_ID, parsed.patientId);
+      sessionStorage.setItem(SESSION_KEY_RECORD_PIN_CODE, parsed.pin);
     }
     setChecking(true);
-    fetch(`/api/records/patient?patientId=${encodeURIComponent(value)}`, {
-      headers: getAuthHeaders(),
+    fetch('/api/records/latest', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ patientId: parsed.patientId, metaOnly: true }),
     })
       .then((res) => {
         if (redirectIfUnauthorized(res)) return null;

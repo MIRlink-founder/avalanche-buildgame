@@ -5,7 +5,7 @@ import { AuthError, requireAuth } from '@/lib/auth-guard';
 export const runtime = 'nodejs';
 
 /** 해당 patientId(바코드)의 진료 기록 목록 반환 (최신순) */
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   try {
     const { user } = await requireAuth(request);
     const hospitalId = user.hospitalId;
@@ -16,8 +16,9 @@ export async function GET(request: Request) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const patientId = searchParams.get('patientId')?.trim();
+    const body = await request.json();
+    const patientId =
+      typeof body?.patientId === 'string' ? body.patientId.trim() : '';
     if (!patientId) {
       return NextResponse.json(
         { error: 'patientId가 필요합니다.' },

@@ -14,6 +14,8 @@ declare namespace NodeJS {
     SMTP_PASS?: string;
     SMTP_FROM?: string;
     CRON_SECRET?: string;
+    MEDICAL_RECORD_ENCRYPTION_SALT?: string;
+    MASTER_WALLET_PRIVATE_KEY?: string;
 
     // 클라이언트 노출 가능 (NEXT_PUBLIC_ 접두사)
     NEXT_PUBLIC_CHAIN_ID: string;

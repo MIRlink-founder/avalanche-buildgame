@@ -190,6 +190,32 @@ async function main() {
     },
   });
 
+  // 같은 병원의 추가 의사 계정 (테스트용)
+  const doctor2PasswordHash = bcrypt.hashSync('doctor123', 10);
+  const doctor2User = await prisma.user.upsert({
+    where: { email: 'doctor2@mire.com' },
+    update: {
+      hospitalId: hospital.id,
+      role: 'DEPT_ADMIN',
+      status: 'ACTIVE',
+      name: '미르치과 진료의사2',
+    },
+    create: {
+      email: 'doctor2@mire.com',
+      passwordHash: doctor2PasswordHash,
+      name: '미르치과 진료의사2',
+      role: 'DEPT_ADMIN',
+      status: 'ACTIVE',
+      hospitalId: hospital.id,
+      departmentId: null,
+    },
+  });
+
+  console.log('✅ DEPT_ADMIN 계정 생성 완료:', {
+    doctor1: { email: doctorUser.email, password: 'doctor123' },
+    doctor2: { email: doctor2User.email, password: 'doctor123' },
+  });
+
   // ── 4. 정산 데이터 (2025-09 ~ 2026-01, 5개월 × 5개 병원) ──
   // 2026-02는 아직 진행 중이므로 정산 없음
   // 비율: 3.0~5.0% 현실적 범위

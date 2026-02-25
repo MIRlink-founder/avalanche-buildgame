@@ -547,6 +547,8 @@ model BlockchainTransaction {
   /// 원문 데이터 해시
   dataHash String @db.VarChar(100) @map("data_hash")
   blockNumber BigInt? @map("block_number")
+  /// 트랜잭션에서 실제 사용한 가스량
+  gasUsed BigInt? @map("gas_used")
   /// PENDING, IN_PROGRESS, CONFIRMED, FAILED (CronJob 이 중복으로 트랜잭션을 날리지 않게 하기 위한 용도)
   status String @db.VarChar(20)
   uploadedAt DateTime @default(now()) @map("uploaded_at")

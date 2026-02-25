@@ -35,6 +35,7 @@ export interface ToothChartProps {
   onActiveSheetChange?: (id: string | 'add') => void;
   onRemoveSheet?: (sheetId: string) => void;
   savedTeeth?: number[]; // 임시 저장된 데이터가 있는 치아 번호
+  readOnly?: boolean;
 }
 
 export function ToothChart({
@@ -49,13 +50,14 @@ export function ToothChart({
   onActiveSheetChange,
   onRemoveSheet,
   savedTeeth = [],
+  readOnly = false,
 }: ToothChartProps) {
   const savedSet = new Set(savedTeeth);
 
   return (
     <div className="flex flex-col space-y-4 py-6 h-full">
       <div className="flex items-center justify-end">
-        {onReset && (
+        {onReset && !readOnly && (
           <Button
             variant="ghost"
             size="sm"
@@ -157,34 +159,38 @@ export function ToothChart({
                   >
                     {TREATMENT_TYPE_LABELS[sheet.type]}
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveSheet?.(sheet.id);
-                    }}
-                    className="rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                    aria-label={`${TREATMENT_TYPE_LABELS[sheet.type]} 제거`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveSheet?.(sheet.id);
+                      }}
+                      className="rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                      aria-label={`${TREATMENT_TYPE_LABELS[sheet.type]} 제거`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => onActiveSheetChange?.('add')}
-                className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                  activeSheetId === 'add'
-                    ? 'border-primary text-foreground bg-muted/30'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                + 새 진료 추가
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => onActiveSheetChange?.('add')}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    activeSheetId === 'add'
+                      ? 'border-primary text-foreground bg-muted/30'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  + 새 진료 추가
+                </button>
+              )}
             </div>
             {/* 탭 내용: "add"일 때만 3버튼, 아니면 해당 시트 폼 */}
             <div className="p-3 flex-1 min-h-0 overflow-auto">
-              {activeSheetId === 'add' ? (
+              {activeSheetId === 'add' && !readOnly ? (
                 <div className="flex flex-col gap-4 justify-center items-center h-full">
                   <div className="font-medium">
                     기록할 수술의 종류를 선택해주세요.
@@ -214,24 +220,35 @@ export function ToothChart({
                   const sheet = sheetsForSelectedTooth.find(
                     (s) => s.id === activeSheetId,
                   );
-                  if (!sheet) return null;
+                  if (!sheet)
+                    return readOnly ? (
+                      <div className="p-3 text-sm text-muted-foreground">
+                        치아를 선택하면 진료 내용을 볼 수 있습니다.
+                      </div>
+                    ) : null;
                   if (sheet.type === 'implant_placement') {
                     return (
                       <ImplantPlacementSheet
-                        value={(sheet.formData ?? {}) as ImplantPlacementFormData}
+                        value={
+                          (sheet.formData ?? {}) as ImplantPlacementFormData
+                        }
                         onChange={(formData) =>
                           onUpdateSheetFormData?.(sheet.id, formData)
                         }
+                        readOnly={readOnly}
                       />
                     );
                   }
                   if (sheet.type === 'implant_prosthesis') {
                     return (
                       <ImplantProsthesisSheet
-                        value={(sheet.formData ?? {}) as ImplantProsthesisFormData}
+                        value={
+                          (sheet.formData ?? {}) as ImplantProsthesisFormData
+                        }
                         onChange={(formData) =>
                           onUpdateSheetFormData?.(sheet.id, formData)
                         }
+                        readOnly={readOnly}
                       />
                     );
                   }
@@ -242,6 +259,7 @@ export function ToothChart({
                         onChange={(formData) =>
                           onUpdateSheetFormData?.(sheet.id, formData)
                         }
+                        readOnly={readOnly}
                       />
                     );
                   }
