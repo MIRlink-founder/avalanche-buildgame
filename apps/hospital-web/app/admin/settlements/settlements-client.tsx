@@ -272,15 +272,16 @@ function SettlementListTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* 정산 내역 로드 */
+  /* 정산 내역 로드 (월이 선택되어야만 호출) */
   const fetchSettlements = useCallback(
     async (pageNum: number) => {
+      if (!selectedMonth) return;
       setIsLoading(true);
       setError(null);
 
       try {
         const params = new URLSearchParams();
-        if (selectedMonth) params.set('month', selectedMonth);
+        params.set('month', selectedMonth);
         if (search.trim()) params.set('search', search.trim());
         params.set('page', String(pageNum));
         params.set('limit', String(ITEMS_PER_PAGE));
