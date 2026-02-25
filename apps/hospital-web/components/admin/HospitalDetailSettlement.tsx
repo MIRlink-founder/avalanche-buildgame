@@ -1,16 +1,351 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import type { HospitalDetail } from '@/lib/admin-hospital-types';
+import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
+import { Card, CardContent, CardHeader, CardTitle } from '@mire/ui/components/card';
+import { Button } from '@mire/ui/components/button';
+import { Input } from '@mire/ui/components/input';
+import { Badge } from '@mire/ui/components/badge';
+import { Label } from '@mire/ui/components/label';
+import { Select } from '@mire/ui/components/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@mire/ui/components/table';
+
+// ── 정산 내역 항목 타입 ──
+interface SettlementItem {
+  id: number;
+  publicId: string;
+  settlementPeriodStart: string;
+  settlementPeriodEnd: string;
+  totalVolume: string;
+  caseCount: number;
+  appliedRate: string;
+  paybackAmount: string;
+  status: 'PENDING' | 'CONFIRMED' | 'PAID';
+  settledAt: string | null;
+  createdAt: string;
+}
+
+// ── 정산 API 응답 타입 ──
+interface SettlementResponse {
+  data: SettlementItem[];
+  summary: {
+    totalPayback: number;
+    totalCaseCount: number;
+  };
+  hospital: {
+    paybackRate: string | null;
+    paybackRateUpdatedAt: string | null;
+  };
+}
+
+// ── 상태 Badge 매핑 ──
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: '대기',
+  CONFIRMED: '확인',
+  PAID: '지급완료',
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
+  CONFIRMED: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+  PAID: 'bg-green-100 text-green-800 hover:bg-green-100',
+};
+
+// ── 금액 포맷 (원 단위, 천 단위 콤마) ──
+function formatAmount(value: number | string): string {
+  const num = typeof value === 'string' ? Number(value) : value;
+  if (Number.isNaN(num)) return '-';
+  return num.toLocaleString('ko-KR') + '원';
+}
+
+// ── 지급 월 포맷: settlementPeriodStart → "YYYY년 MM월" ──
+function formatPeriod(dateStr: string): string {
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}년 ${m}월`;
+}
+
+// ── 연도 선택 옵션 (현재 연도 ~ 2025) ──
+function getYearOptions(): number[] {
+  const current = new Date().getFullYear();
+  const years: number[] = [];
+  for (let y = current; y >= 2025; y--) {
+    years.push(y);
+  }
+  return years;
+}
 
 interface HospitalDetailSettlementProps {
   hospital: HospitalDetail;
   onRefresh: () => void;
 }
 
-export function HospitalDetailSettlement({ hospital, onRefresh }: HospitalDetailSettlementProps) {
+export function HospitalDetailSettlement({
+  hospital,
+  onRefresh,
+}: HospitalDetailSettlementProps) {
+  // ── 페이백 비율 설정 상태 ──
+  const [rateInput, setRateInput] = useState('');
+  const [rateSaving, setRateSaving] = useState(false);
+
+  // ── 정산 내역 상태 ──
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [settlements, setSettlements] = useState<SettlementItem[]>([]);
+  const [summary, setSummary] = useState<SettlementResponse['summary']>({
+    totalPayback: 0,
+    totalCaseCount: 0,
+  });
+  const [loading, setLoading] = useState(false);
+
+  // ── API에서 돌아온 최신 hospital.paybackRate 상태 ──
+  const [currentRate, setCurrentRate] = useState<string | null>(
+    hospital.paybackRate,
+  );
+  const [currentRateUpdatedAt, setCurrentRateUpdatedAt] = useState<
+    string | null
+  >(hospital.paybackRateUpdatedAt);
+
+  // hospital prop 변경 시 동기화
+  useEffect(() => {
+    setCurrentRate(hospital.paybackRate);
+    setCurrentRateUpdatedAt(hospital.paybackRateUpdatedAt);
+  }, [hospital.paybackRate, hospital.paybackRateUpdatedAt]);
+
+  // ── 정산 데이터 조회 ──
+  const fetchSettlements = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/hospitals/${hospital.id}/settlements?year=${selectedYear}`,
+        { headers: getAuthHeaders() },
+      );
+      if (redirectIfUnauthorized(res)) return;
+      if (!res.ok) {
+        const json = await res.json();
+        alert(json.error || '정산 데이터를 불러오지 못했습니다.');
+        return;
+      }
+      const json: SettlementResponse = await res.json();
+      setSettlements(json.data);
+      setSummary(json.summary);
+      // API 응답의 병원 정보 동기화
+      setCurrentRate(json.hospital.paybackRate);
+      setCurrentRateUpdatedAt(json.hospital.paybackRateUpdatedAt);
+    } catch {
+      alert('정산 데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, [hospital.id, selectedYear]);
+
+  useEffect(() => {
+    fetchSettlements();
+  }, [fetchSettlements]);
+
+  // ── 페이백 비율 저장 ──
+  const handleSaveRate = async () => {
+    if (rateSaving) return;
+
+    // 빈 값이면 null(기본값 리셋)으로 전송
+    const trimmed = rateInput.trim();
+    const payload: { paybackRate: number | null } =
+      trimmed === '' ? { paybackRate: null } : { paybackRate: Number(trimmed) };
+
+    if (payload.paybackRate !== null) {
+      if (Number.isNaN(payload.paybackRate) || payload.paybackRate < 0 || payload.paybackRate > 100) {
+        alert('비율은 0~100 사이의 숫자를 입력해 주세요.');
+        return;
+      }
+    }
+
+    setRateSaving(true);
+    try {
+      const res = await fetch(
+        `/api/admin/hospitals/${hospital.id}/payback-rate`,
+        {
+          method: 'PATCH',
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+      );
+      if (redirectIfUnauthorized(res)) return;
+      if (res.ok) {
+        setRateInput('');
+        onRefresh();
+        // 정산 데이터 다시 불러오기 (비율 반영)
+        await fetchSettlements();
+      } else {
+        const json = await res.json();
+        alert(json.error || '페이백 비율 저장에 실패했습니다.');
+      }
+    } catch {
+      alert('페이백 비율 저장 중 오류가 발생했습니다.');
+    } finally {
+      setRateSaving(false);
+    }
+  };
+
+  // ── 최종 수정일 표시 ──
+  const rateUpdatedLabel = currentRateUpdatedAt
+    ? `최종 수정일: ${new Date(currentRateUpdatedAt).toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`
+    : null;
+
   return (
-    <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
-      준비 중입니다.
+    <div className="space-y-6">
+      {/* ── 1. 페이백 비율 설정 카드 ── */}
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle>페이백 비율 설정</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* 현재 비율 안내 */}
+          {currentRate !== null ? (
+            <p className="text-sm text-muted-foreground">
+              현재 적용 비율: <span className="font-semibold text-foreground">{currentRate}%</span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              시스템 기본값 사용 중
+            </p>
+          )}
+
+          {/* 비율 입력 */}
+          <div className="flex items-end gap-3">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="payback-rate">리워드 비율 (%)</Label>
+              <Input
+                id="payback-rate"
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                placeholder={currentRate ?? '기본값'}
+                value={rateInput}
+                onChange={(e) => setRateInput(e.target.value)}
+                className="h-10 text-sm"
+              />
+            </div>
+            <Button onClick={handleSaveRate} disabled={rateSaving}>
+              {rateSaving ? '저장 중...' : '설정 저장'}
+            </Button>
+          </div>
+
+          {/* 최종 수정일 */}
+          {rateUpdatedLabel && (
+            <p className="text-xs text-muted-foreground">{rateUpdatedLabel}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── 2. 요약 카드 ── */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-base">총 받은 리워드 금액</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">
+              {formatAmount(summary.totalPayback)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-base">총 등록 건 수</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">
+              {summary.totalCaseCount.toLocaleString('ko-KR')}건
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── 3. 월별 리워드 지급 내역 ── */}
+      <Card className="border-border">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>월별 리워드 지급 내역</CardTitle>
+          <Select
+            value={String(selectedYear)}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="w-32"
+          >
+            {getYearOptions().map((y) => (
+              <option key={y} value={y}>
+                {y}년
+              </option>
+            ))}
+          </Select>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              불러오는 중...
+            </p>
+          ) : settlements.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              해당 연도에 정산 내역이 없습니다.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>지급 월</TableHead>
+                  <TableHead className="text-right">등록 건 수</TableHead>
+                  <TableHead className="text-right">적용 비율(%)</TableHead>
+                  <TableHead className="text-right">산정 금액</TableHead>
+                  <TableHead className="text-right">실지급액</TableHead>
+                  <TableHead className="text-center">상태</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {settlements.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      {formatPeriod(item.settlementPeriodStart)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {item.caseCount.toLocaleString('ko-KR')}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {item.appliedRate}%
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatAmount(item.totalVolume)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatAmount(item.paybackAmount)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        className={STATUS_COLOR[item.status] ?? ''}
+                      >
+                        {STATUS_LABEL[item.status] ?? item.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

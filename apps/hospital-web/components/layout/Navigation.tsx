@@ -17,7 +17,6 @@ const HOSPITAL_MENU_PATHS = [
   '/settlements',
   '/reports',
   '/support',
-  '/hospital/staff',
   '/settings',
 ];
 
@@ -102,14 +101,6 @@ export default function Navigation() {
             <NavLink href="/support" current={pathname === '/support'}>
               고객지원
             </NavLink>
-            {userRole === 'MASTER_ADMIN' && (
-              <NavLink
-                href="/hospital/staff"
-                current={pathname === '/hospital/staff'}
-              >
-                직원 관리
-              </NavLink>
-            )}
             <NavLink href="/settings" current={pathname === '/settings'}>
               설정
             </NavLink>

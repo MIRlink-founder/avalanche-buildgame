@@ -1,17 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Badge } from '@mire/ui';
 import { Button } from '@mire/ui';
 import { Input } from '@mire/ui';
 import { Label } from '@mire/ui';
-import { Tabs } from '@/components/layout/Tabs';
+import { cn } from '@mire/ui';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -21,21 +19,31 @@ import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import { getPayloadFromToken } from '@/lib/decode-token';
 import {
   ACCOUNT_ROLE_LABELS,
-  ACCOUNT_STATUS_LABELS,
   USER_ROLE_COLORS,
-  USER_STATUS_COLORS,
 } from '@/lib/admin-hospital-format';
 import { Pagination } from '@/components/admin/Pagination';
-import { Search, UserPlus } from 'lucide-react';
+import { Plus, Settings } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 const SUGGESTION_PAGE_SIZE = 6;
-const STAFF_TABS = [
-  { id: 'all', label: '전체' },
-  { id: 'active', label: '활성' },
-  { id: 'inactive', label: '비활성/탈퇴' },
-  { id: 'pending', label: '초대 수락 대기' },
-];
+
+const STAFF_STATUS_TEXT: Record<string, string> = {
+  ACTIVE: '정상',
+  PENDING: '초대대기',
+  DISABLED: '비활성화',
+  WITHDRAWN: '탈퇴',
+};
+
+function formatAccessDate(dateStr: string | null): string {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}.${m}.${day} ${h}:${min}`;
+}
 
 type StaffSummary = {
   total: number;
@@ -66,32 +74,21 @@ interface UsersApiResponse {
   summary: StaffSummary;
 }
 
-function getStatusFilter(tab: string): string[] | null {
-  switch (tab) {
-    case 'active':
-      return ['ACTIVE'];
-    case 'pending':
-      return ['PENDING'];
-    case 'inactive':
-      return ['DISABLED', 'WITHDRAWN'];
-    case 'disabled':
-      return ['DISABLED'];
-    case 'withdrawn':
-      return ['WITHDRAWN'];
-    default:
-      return null;
-  }
+interface HospitalStaffPanelProps {
+  basePath?: string;
+  tabParamName?: string;
 }
 
-export function HospitalStaffPanel() {
+export function HospitalStaffPanel({
+  basePath: basePathProp = '/hospital/staff',
+  tabParamName = 'tab',
+}: HospitalStaffPanelProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const currentTab = searchParams.get('tab') ?? 'all';
   const searchQuery = searchParams.get('search') ?? '';
   const pageParam = searchParams.get('page') ?? '1';
   const page = Math.max(1, parseInt(pageParam, 10) || 1);
-  const statusFilter = useMemo(() => getStatusFilter(currentTab), [currentTab]);
 
   const [data, setData] = useState<UsersApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,9 +100,12 @@ export function HospitalStaffPanel() {
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
 
+  // 초대 다이얼로그
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteDepartment, setInviteDepartment] = useState('');
+  const [inviteRole, setInviteRole] = useState('MASTER_ADMIN');
   const [inviteError, setInviteError] = useState('');
   const [inviteSending, setInviteSending] = useState(false);
 
@@ -113,13 +113,25 @@ export function HospitalStaffPanel() {
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
 
-  const summary: StaffSummary = data?.summary ?? {
-    total: 0,
-    active: 0,
-    pending: 0,
-    disabled: 0,
-    withdrawn: 0,
-  };
+  // 톱니바퀴 메뉴
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // 상태 변경 다이얼로그
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusDialogUser, setStatusDialogUser] = useState<HospitalUser | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string>('ACTIVE');
+
+  // 정보 수정 모달
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDialogUser, setEditDialogUser] = useState<HospitalUser | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDepartment, setEditDepartment] = useState('');
+  const [editRole, setEditRole] = useState('DEPT_ADMIN');
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // 토스트
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setSearchInput(searchQuery);
@@ -143,9 +155,6 @@ export function HospitalStaffPanel() {
         params.set('page', '1');
         params.set('pageSize', String(SUGGESTION_PAGE_SIZE));
         params.set('search', query);
-        if (statusFilter && statusFilter.length > 0) {
-          params.set('status', statusFilter.join(','));
-        }
 
         const res = await fetch(`/api/hospitals/staff?${params.toString()}`, {
           headers: getAuthHeaders(),
@@ -177,7 +186,7 @@ export function HospitalStaffPanel() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [searchFocused, searchInput, statusFilter]);
+  }, [searchFocused, searchInput]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -197,16 +206,13 @@ export function HospitalStaffPanel() {
     params.set('page', String(page));
     params.set('pageSize', String(PAGE_SIZE));
     if (searchQuery.trim()) params.set('search', searchQuery.trim());
-    if (statusFilter && statusFilter.length > 0) {
-      params.set('status', statusFilter.join(','));
-    }
 
     fetch(`/api/hospitals/staff?${params.toString()}`, {
       headers: getAuthHeaders(),
     })
       .then((res) => {
         if (redirectIfUnauthorized(res)) return null;
-        if (!res.ok) throw new Error('직원 목록 조회에 실패했습니다.');
+        if (!res.ok) throw new Error('멤버 목록 조회에 실패했습니다.');
         return res.json();
       })
       .then((json: UsersApiResponse | null) => {
@@ -226,16 +232,23 @@ export function HospitalStaffPanel() {
     return () => {
       cancelled = true;
     };
-  }, [page, searchQuery, statusFilter, refreshTrigger]);
+  }, [page, searchQuery, refreshTrigger]);
 
   const users = useMemo(() => data?.users ?? [], [data]);
-  const listQueryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (currentTab && currentTab !== 'all') params.set('tab', currentTab);
-    if (searchQuery.trim()) params.set('search', searchQuery.trim());
-    if (page > 1) params.set('page', String(page));
-    return params.toString();
-  }, [currentTab, searchQuery, page]);
+  const basePath = basePathProp;
+
+  // 톱니바퀴 메뉴 외부 클릭 닫기
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-gear-menu]')) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [openMenuId]);
 
   const handleSearch = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -246,17 +259,24 @@ export function HospitalStaffPanel() {
     }
     params.set('page', '1');
     setShowSuggestions(false);
-    router.push(`/hospital/staff?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
+  };
+
+  const resetInviteForm = () => {
+    setInviteEmail('');
+    setInviteName('');
+    setInviteDepartment('');
+    setInviteRole('MASTER_ADMIN');
+    setInviteError('');
   };
 
   const handleInvite = async () => {
-    if (!inviteName.trim()) {
-      setInviteError('이름을 입력해주세요.');
-      return;
-    }
-
     if (!inviteEmail.trim()) {
       setInviteError('이메일을 입력해주세요.');
+      return;
+    }
+    if (!inviteName.trim()) {
+      setInviteError('이름을 입력해주세요.');
       return;
     }
 
@@ -270,12 +290,14 @@ export function HospitalStaffPanel() {
         body: JSON.stringify({
           email: inviteEmail.trim(),
           name: inviteName.trim(),
+          department: inviteDepartment.trim() || undefined,
+          role: inviteRole,
         }),
       });
       if (redirectIfUnauthorized(res)) return;
       const result = await res.json();
       if (!res.ok) {
-        setInviteError(result.error || '직원 초대에 실패했습니다.');
+        setInviteError(result.error || '멤버 초대에 실패했습니다.');
         return;
       }
 
@@ -285,52 +307,135 @@ export function HospitalStaffPanel() {
         );
       }
       setInviteOpen(false);
-      setInviteName('');
-      setInviteEmail('');
-      setInviteError('');
+      resetInviteForm();
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       console.error(err);
-      setInviteError('직원 초대 중 오류가 발생했습니다.');
+      setInviteError('멤버 초대 중 오류가 발생했습니다.');
     } finally {
       setInviteSending(false);
     }
   };
 
-  const handleResendInvite = async (email: string) => {
-    if (!email) return;
-    setActionLoadingId(email);
+  // 토스트 자동 소멸
+  useEffect(() => {
+    if (!toastMessage) return;
+    const t = setTimeout(() => setToastMessage(null), 2500);
+    return () => clearTimeout(t);
+  }, [toastMessage]);
+
+  // 정보 수정 모달 열기
+  const handleOpenEditDialog = async (user: HospitalUser) => {
+    setOpenMenuId(null);
+    setEditDialogUser(user);
+    setEditName(user.name);
+    setEditDepartment(user.departmentName ?? '');
+    setEditRole(user.role);
+    setEditError('');
+    setEditDialogOpen(true);
+  };
+
+  // 정보 수정 저장
+  const handleEditSave = async () => {
+    if (!editDialogUser) return;
+
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      setEditError('이름을 입력해주세요.');
+      return;
+    }
+    if (trimmedName.length > 20) {
+      setEditError('이름은 최대 20자까지 입력 가능합니다.');
+      return;
+    }
+
+    setEditSaving(true);
+    setEditError('');
+
     try {
-      const res = await fetch('/api/hospitals/staff', {
-        method: 'POST',
+      const payload: { name?: string; role?: string; departmentName?: string } = {};
+      if (trimmedName !== editDialogUser.name) {
+        payload.name = trimmedName;
+      }
+      if (editRole !== editDialogUser.role) {
+        payload.role = editRole;
+      }
+      const trimmedDept = editDepartment.trim();
+      if (trimmedDept !== (editDialogUser.departmentName ?? '')) {
+        payload.departmentName = trimmedDept;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setEditDialogOpen(false);
+        return;
+      }
+
+      const res = await fetch(`/api/hospitals/staff/${editDialogUser.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(payload),
       });
       if (redirectIfUnauthorized(res)) return;
       const result = await res.json();
       if (!res.ok) {
-        alert(result.error || '재발송에 실패했습니다.');
+        setEditError(result.error || '정보 수정에 실패했습니다.');
         return;
       }
-      if (result.mailSent === false) {
-        alert('재발송 처리되었습니다. 단, 메일 발송에 실패했습니다.');
-      } else {
-        alert('초대 메일을 재발송했습니다.');
-      }
+
+      setEditDialogOpen(false);
+      setEditDialogUser(null);
+      setToastMessage('계정 정보가 수정되었습니다.');
       setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      console.error(err);
-      alert('재발송 중 오류가 발생했습니다.');
+    } catch {
+      setEditError('정보 수정 중 오류가 발생했습니다.');
     } finally {
-      setActionLoadingId(null);
+      setEditSaving(false);
     }
   };
 
-  const basePath = '/hospital/staff';
+  const editNameValid = editName.trim().length > 0 && editName.trim().length <= 20;
+
+  const handleOpenStatusDialog = (user: HospitalUser) => {
+    setOpenMenuId(null);
+    setStatusDialogUser(user);
+    setSelectedStatus(user.status === 'DISABLED' ? 'DISABLED' : 'ACTIVE');
+    setStatusDialogOpen(true);
+  };
+
+  const handleStatusApply = async () => {
+    if (!statusDialogUser) return;
+    if (selectedStatus !== statusDialogUser.status) {
+      setActionLoadingId(statusDialogUser.id);
+      try {
+        const res = await fetch(`/api/hospitals/staff/${statusDialogUser.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({ status: selectedStatus }),
+        });
+        if (redirectIfUnauthorized(res)) return;
+        const result = await res.json();
+        if (!res.ok) {
+          setToastMessage(result.error || '설정 변경에 실패했습니다.');
+          return;
+        }
+        setToastMessage('계정 설정이 변경되었습니다.');
+        setRefreshTrigger((prev) => prev + 1);
+      } catch {
+        setToastMessage('설정 변경에 실패했습니다.');
+      } finally {
+        setActionLoadingId(null);
+      }
+    }
+    setStatusDialogOpen(false);
+    setStatusDialogUser(null);
+  };
+
+  const showGearIcon = (user: HospitalUser) =>
+    user.status !== 'PENDING' && user.status !== 'WITHDRAWN';
 
   if (error) {
     return (
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         <div className="rounded-lg border bg-card p-6">
           <p className="text-destructive">{error}</p>
         </div>
@@ -339,284 +444,556 @@ export function HospitalStaffPanel() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">전체 직원</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {summary.total.toLocaleString('ko-KR')}명
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">활성 직원</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {summary.active.toLocaleString('ko-KR')}명
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">초대 수락 대기</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {summary.pending.toLocaleString('ko-KR')}명
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <p className="text-muted-foreground text-sm">비활성/탈퇴</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {(summary.disabled + summary.withdrawn).toLocaleString('ko-KR')}명
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-6 rounded-lg border bg-card p-6">
-        <Tabs tabs={STAFF_TABS} basePath={basePath} defaultTab="all" />
-
-        <div className="flex flex-wrap items-center gap-3">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleSearch();
-            }}
-            className="flex w-full flex-wrap items-center gap-2 md:w-auto"
-          >
-            <div className="w-full md:w-[360px]">
-              <div className="relative">
-                <Input
-                  value={searchInput}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setSearchInput(value);
-                    if (!value.trim()) {
-                      setShowSuggestions(false);
-                    }
-                  }}
-                  onFocus={() => {
-                    setSearchFocused(true);
-                    if (searchInput.trim()) {
-                      setShowSuggestions(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    window.setTimeout(() => {
-                      setSearchFocused(false);
-                      setShowSuggestions(false);
-                    }, 150);
-                  }}
-                  aria-label="직원 검색"
-                  placeholder="이름 또는 이메일 검색"
-                  className="bg-background"
-                />
-                {showSuggestions && (
-                  <div className="border-border bg-background absolute left-0 top-full z-20 mt-0 w-full rounded-md border shadow-sm">
-                    {isSuggesting ? (
-                      <div className="text-muted-foreground px-3 py-2 text-xs">
-                        검색 중...
-                      </div>
-                    ) : suggestions.length === 0 ? (
-                      <div className="text-muted-foreground px-3 py-2 text-xs">
-                        검색 결과가 없습니다.
-                      </div>
-                    ) : (
-                      suggestions.map((user) => {
-                        const primaryLabel = user.name || user.email;
-                        const secondaryLabel =
-                          user.name && user.email ? user.email : '';
-                        return (
-                          <button
-                            key={user.id}
-                            type="button"
-                            className="hover:bg-secondary flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => {
-                              setSearchInput(primaryLabel);
-                              setShowSuggestions(false);
-                            }}
-                          >
-                            <span className="font-medium">{primaryLabel}</span>
-                            {secondaryLabel && (
-                              <span className="text-muted-foreground text-xs">
-                                {secondaryLabel}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })
-                    )}
+    <div className="space-y-6">
+      {/* 검색 + 멤버 초대 */}
+      <div className="flex items-center justify-between gap-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSearch();
+          }}
+          className="flex items-center gap-2"
+        >
+          <div className="relative w-[320px]">
+            <Input
+              value={searchInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchInput(value);
+                if (!value.trim()) setShowSuggestions(false);
+              }}
+              onFocus={() => {
+                setSearchFocused(true);
+                if (searchInput.trim()) setShowSuggestions(true);
+              }}
+              onBlur={() => {
+                window.setTimeout(() => {
+                  setSearchFocused(false);
+                  setShowSuggestions(false);
+                }, 150);
+              }}
+              placeholder="이름, 이메일 검색"
+              className="h-10 bg-background"
+            />
+            {showSuggestions && (
+              <div className="absolute left-0 top-full z-20 mt-0 w-full rounded-md border border-border bg-background shadow-sm">
+                {isSuggesting ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    검색 중...
                   </div>
-                )}
-              </div>
-            </div>
-            <Button
-              type="submit"
-              size="xl"
-              variant="outline"
-              className="w-full md:w-auto"
-            >
-              <Search className="h-4 w-4" />
-              조회
-            </Button>
-          </form>
-          {canManage && (
-            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full md:w-auto md:ml-auto" type="button">
-                  <UserPlus className="h-4 w-4" />
-                  직원 추가
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>직원 추가</DialogTitle>
-                  <DialogDescription>
-                    직원 이메일을 등록하면 가입 링크가 발송됩니다.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="invite-name">이름</Label>
-                    <Input
-                      id="invite-name"
-                      value={inviteName}
-                      onChange={(e) => setInviteName(e.target.value)}
-                      placeholder="이름을 입력해주세요"
-                    />
+                ) : suggestions.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    검색 결과가 없습니다.
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="invite-email">이메일</Label>
-                    <Input
-                      id="invite-email"
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="example@email.com"
-                    />
-                  </div>
-                  {inviteError && (
-                    <p className="text-sm text-destructive">{inviteError}</p>
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => setInviteOpen(false)}
-                  >
-                    취소
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleInvite}
-                    disabled={inviteSending}
-                  >
-                    {inviteSending ? '발송 중...' : '링크 발송'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-
-        <div className="rounded-lg border">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    이름
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    이메일
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    상태
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    관리
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-4 py-8 text-center text-muted-foreground"
-                    >
-                      불러오는 중...
-                    </td>
-                  </tr>
-                ) : users.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-4 py-8 text-center text-muted-foreground"
-                    >
-                      등록된 직원이 없습니다.
-                    </td>
-                  </tr>
                 ) : (
-                  users.map((u) => {
-                    const isSelf = currentUserEmail === u.email;
-                    const isPending = u.status === 'PENDING';
-                    const detailHref =
-                      `/hospital/staff/${u.id}` +
-                      (listQueryString ? `?${listQueryString}` : '');
+                  suggestions.map((user) => {
+                    const primaryLabel = user.name || user.email;
+                    const secondaryLabel =
+                      user.name && user.email ? user.email : '';
                     return (
-                      <tr key={u.id}>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={USER_ROLE_COLORS[u.role] ?? ''}>
-                              {ACCOUNT_ROLE_LABELS[u.role] ?? u.role}
-                            </Badge>
-                            <span>{u.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-sm">
-                          {u.email}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge className={USER_STATUS_COLORS[u.status] ?? ''}>
-                            {ACCOUNT_STATUS_LABELS[u.status] ?? u.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          {isPending && canManage ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleResendInvite(u.email)}
-                              disabled={actionLoadingId === u.email}
-                            >
-                              {actionLoadingId === u.email
-                                ? '발송 중...'
-                                : '초대 재발송'}
-                            </Button>
-                          ) : isPending ? (
-                            <span className="text-xs text-muted-foreground">
-                              권한 없음
-                            </span>
-                          ) : (
-                            <Button size="sm" variant="outline" asChild>
-                              <Link href={detailHref}>상세</Link>
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
+                      <button
+                        key={user.id}
+                        type="button"
+                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-secondary"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSearchInput(primaryLabel);
+                          setShowSuggestions(false);
+                        }}
+                      >
+                        <span className="font-medium">{primaryLabel}</span>
+                        {secondaryLabel && (
+                          <span className="text-xs text-muted-foreground">
+                            {secondaryLabel}
+                          </span>
+                        )}
+                      </button>
                     );
                   })
                 )}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
-        </div>
-
-        <Pagination
-          currentPage={data?.page ?? page}
-          totalPages={data?.totalPages ?? 1}
-          totalCount={data?.totalCount ?? 0}
-          pageSize={data?.pageSize ?? PAGE_SIZE}
-          basePath={basePath}
-        />
+          <Button type="submit" className="h-10">
+            검색
+          </Button>
+        </form>
+        {canManage && (
+          <Dialog
+            open={inviteOpen}
+            onOpenChange={(open) => {
+              setInviteOpen(open);
+              if (!open) resetInviteForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button type="button" className="h-10">
+                <Plus className="h-4 w-4" />
+                멤버 초대
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[480px]">
+              <DialogHeader>
+                <DialogTitle>멤버 초대하기</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-5 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">
+                    이메일 <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="example@mirlink.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-name">
+                    이름 <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="invite-name"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    placeholder="홍길동"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-department">소속 부서</Label>
+                  <Input
+                    id="invite-department"
+                    value={inviteDepartment}
+                    onChange={(e) => setInviteDepartment(e.target.value)}
+                    placeholder="소속 부서를 입력하세요"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <Label>
+                    권한 설정 <span className="text-destructive">*</span>
+                  </Label>
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                      inviteRole === 'MASTER_ADMIN'
+                        ? 'border-primary'
+                        : 'border-border',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="invite-role"
+                      value="MASTER_ADMIN"
+                      checked={inviteRole === 'MASTER_ADMIN'}
+                      onChange={() => setInviteRole('MASTER_ADMIN')}
+                      className="mt-0.5 h-4 w-4 accent-primary"
+                    />
+                    <div>
+                      <span className="font-medium">관리자</span>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        모든 권한 및 설정 관리 가능
+                      </p>
+                    </div>
+                  </label>
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                      inviteRole === 'DEPT_ADMIN'
+                        ? 'border-primary'
+                        : 'border-border',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="invite-role"
+                      value="DEPT_ADMIN"
+                      checked={inviteRole === 'DEPT_ADMIN'}
+                      onChange={() => setInviteRole('DEPT_ADMIN')}
+                      className="mt-0.5 h-4 w-4 accent-primary"
+                    />
+                    <div>
+                      <span className="font-medium">일반</span>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        환자 정보 조회 및 진료 기록 작성
+                      </p>
+                    </div>
+                  </label>
+                </div>
+                {inviteError && (
+                  <p className="text-sm text-destructive">{inviteError}</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    setInviteOpen(false);
+                    resetInviteForm();
+                  }}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleInvite}
+                  disabled={inviteSending}
+                >
+                  {inviteSending ? '발송 중...' : '초대 메일 발송'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
+
+      {/* 테이블 */}
+      <div className="rounded-lg border">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px]">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="w-[10%] px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+                  이름
+                </th>
+                <th className="w-[20%] px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+                  이메일
+                </th>
+                <th className="w-[10%] px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+                  부서
+                </th>
+                <th className="w-[10%] px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+                  권한
+                </th>
+                <th className="w-[10%] px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+                  상태
+                </th>
+                <th className="w-[18%] px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+                  최근 접속
+                </th>
+                <th className="w-[10%] px-4 py-3 text-center text-sm font-medium text-muted-foreground">
+                  관리
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-4 py-8 text-center text-muted-foreground"
+                  >
+                    불러오는 중...
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-4 py-8 text-center text-muted-foreground"
+                  >
+                    등록된 멤버가 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                users.map((u) => (
+                    <tr key={u.id}>
+                      <td className="px-4 py-4 text-center text-sm">
+                        {u.name}
+                      </td>
+                      <td className="px-4 py-4 text-center text-sm">
+                        {u.email}
+                      </td>
+                      <td className="px-4 py-4 text-center text-sm">
+                        {u.departmentName || '-'}
+                      </td>
+                      <td className="px-4 py-4 text-center text-sm">
+                        <Badge className={USER_ROLE_COLORS[u.role] ?? ''}>
+                          {ACCOUNT_ROLE_LABELS[u.role] ?? u.role}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-4 text-center text-sm">
+                        {STAFF_STATUS_TEXT[u.status] ?? u.status}
+                      </td>
+                      <td className="px-4 py-4 text-center text-sm">
+                        {formatAccessDate(u.lastAccessAt)}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        {showGearIcon(u) ? (
+                          <div
+                            className="relative inline-block"
+                            data-gear-menu
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenMenuId(
+                                  openMenuId === u.id ? null : u.id,
+                                )
+                              }
+                              className="rounded p-1 text-muted-foreground hover:text-foreground"
+                            >
+                              <Settings className="h-5 w-5" />
+                            </button>
+                            {openMenuId === u.id && (
+                              <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-md border bg-background py-1 shadow-md">
+                                <button
+                                  type="button"
+                                  className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+                                  onClick={() => handleOpenEditDialog(u)}
+                                >
+                                  정보 수정
+                                </button>
+                                {canManage &&
+                                  currentUserEmail !== u.email && (
+                                    <button
+                                      type="button"
+                                      className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+                                      onClick={() =>
+                                        handleOpenStatusDialog(u)
+                                      }
+                                    >
+                                      계정 상태 변경
+                                    </button>
+                                  )}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 페이지네이션 */}
+      <Pagination
+        currentPage={data?.page ?? page}
+        totalPages={data?.totalPages ?? 1}
+        totalCount={data?.totalCount ?? 0}
+        pageSize={data?.pageSize ?? PAGE_SIZE}
+        basePath={basePath}
+      />
+
+      {/* 계정 상태 변경 다이얼로그 */}
+      <Dialog
+        open={statusDialogOpen}
+        onOpenChange={(open) => {
+          setStatusDialogOpen(open);
+          if (!open) setStatusDialogUser(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>계정 상태 변경</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <label
+              className={cn(
+                'flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors',
+                selectedStatus === 'ACTIVE'
+                  ? 'border-primary'
+                  : 'border-border',
+              )}
+            >
+              <input
+                type="radio"
+                name="account-status"
+                value="ACTIVE"
+                checked={selectedStatus === 'ACTIVE'}
+                onChange={() => setSelectedStatus('ACTIVE')}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="font-medium">활성화</span>
+            </label>
+            <label
+              className={cn(
+                'flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors',
+                selectedStatus === 'DISABLED'
+                  ? 'border-primary'
+                  : 'border-border',
+              )}
+            >
+              <input
+                type="radio"
+                name="account-status"
+                value="DISABLED"
+                checked={selectedStatus === 'DISABLED'}
+                onChange={() => setSelectedStatus('DISABLED')}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="font-medium">비활성화</span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setStatusDialogOpen(false);
+                setStatusDialogUser(null);
+              }}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              onClick={handleStatusApply}
+              disabled={
+                statusDialogUser
+                  ? actionLoadingId === statusDialogUser.id
+                  : false
+              }
+            >
+              {statusDialogUser && actionLoadingId === statusDialogUser.id
+                ? '처리 중...'
+                : '완료'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 정보 수정 모달 */}
+      <Dialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) {
+            setEditDialogUser(null);
+            setEditError('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>정보 수정</DialogTitle>
+          </DialogHeader>
+          {editDialogUser && (
+            <div className="space-y-5 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">
+                  이메일 <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-email"
+                  value={editDialogUser.email}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">
+                  이름 <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="홍길동"
+                  maxLength={20}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-department">소속 부서</Label>
+                <Input
+                  id="edit-department"
+                  value={editDepartment}
+                  onChange={(e) => setEditDepartment(e.target.value)}
+                  placeholder="운영부"
+                  maxLength={100}
+                />
+              </div>
+              {canManage && editDialogUser && currentUserEmail !== editDialogUser.email && (
+                <div className="space-y-3">
+                  <Label>
+                    권한 설정 <span className="text-destructive">*</span>
+                  </Label>
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                      editRole === 'MASTER_ADMIN'
+                        ? 'border-primary'
+                        : 'border-border',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="edit-role"
+                      value="MASTER_ADMIN"
+                      checked={editRole === 'MASTER_ADMIN'}
+                      onChange={() => setEditRole('MASTER_ADMIN')}
+                      className="mt-0.5 h-4 w-4 accent-primary"
+                    />
+                    <div>
+                      <span className="font-medium">관리자</span>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        모든 권한 및 설정 관리 가능
+                      </p>
+                    </div>
+                  </label>
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                      editRole === 'DEPT_ADMIN'
+                        ? 'border-primary'
+                        : 'border-border',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="edit-role"
+                      value="DEPT_ADMIN"
+                      checked={editRole === 'DEPT_ADMIN'}
+                      onChange={() => setEditRole('DEPT_ADMIN')}
+                      className="mt-0.5 h-4 w-4 accent-primary"
+                    />
+                    <div>
+                      <span className="font-medium">일반</span>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        환자 정보 조회 및 진료 기록 작성
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+              {editError && (
+                <p className="text-sm text-destructive">{editError}</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setEditDialogOpen(false);
+                setEditDialogUser(null);
+                setEditError('');
+              }}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              onClick={handleEditSave}
+              disabled={editSaving || !editNameValid}
+            >
+              {editSaving ? '저장 중...' : '변경 사항 저장'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 토스트 */}
+      {toastMessage && (
+        <div className="fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-lg bg-primary px-5 py-3 text-sm text-primary-foreground shadow-lg">
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

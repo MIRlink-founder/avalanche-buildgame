@@ -20,7 +20,6 @@ export const adminMenuItems: SidebarMenuItem[] = [
   { title: '정산 관리', icon: Receipt, href: '/admin/settlements' },
   { title: '지갑 관리', icon: Wallet, href: '/admin/wallet' },
   { title: 'AS 관리', icon: Package, href: '/admin/items' },
-  { title: '내 계정', icon: User, href: '/admin/account' },
   { title: '시스템 설정', icon: Settings, href: '/admin/systems' },
 ];
 

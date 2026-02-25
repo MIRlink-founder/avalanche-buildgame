@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Tabs } from '@/components/layout/Tabs';
 import { SettingsBasicForm } from '@/components/settings/SettingsBasicForm';
 import { SettingsAccountsPanel } from '@/components/settings/SettingsAccountsPanel';
+import { HospitalStaffPanel } from '@/components/settings/HospitalStaffPanel';
 import { getPayloadFromToken } from '@/lib/decode-token';
 
 const SETTINGS_TABS = [
@@ -43,7 +44,7 @@ export default function SettingsPage() {
     <>
       <header className="sticky top-0 z-10 flex h-20 shrink-0 items-center bg-background px-6 lg:px-8">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold">설정</h1>
+          <h1 className="text-2xl font-bold">계정 및 권한 관리</h1>
         </div>
       </header>
 
@@ -56,7 +57,11 @@ export default function SettingsPage() {
 
         <div className="mt-6">
           {activeTab === 'basic' && <SettingsBasicForm />}
-          {activeTab === 'accounts' && <SettingsAccountsPanel />}
+          {activeTab === 'accounts' && (
+            currentRole === 'MASTER_ADMIN'
+              ? <HospitalStaffPanel basePath="/settings" tabParamName="staffTab" />
+              : <SettingsAccountsPanel />
+          )}
           {activeTab === 'items' && (
             <p className="text-muted-foreground">준비 중입니다.</p>
           )}

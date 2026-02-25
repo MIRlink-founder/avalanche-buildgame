@@ -102,6 +102,12 @@ model Hospital {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   
+  // 6. 페이백 비율
+  /// 개별 페이백 비율 (%), NULL이면 시스템 기본값 사용
+  paybackRate Decimal? @db.Decimal(5, 2) @map("payback_rate")
+  /// 비율 최종 수정일
+  paybackRateUpdatedAt DateTime? @map("payback_rate_updated_at")
+
   // Relations
   documents HospitalDocument[]
   registrationRequests RegistrationRequest[]
@@ -461,6 +467,23 @@ model TestPaymentSession {
 }
 
 // ============================================================
+// 시스템 설정
+// ============================================================
+
+model SystemConfig {
+  id Int @id @default(autoincrement())
+  /// 설정 키 (예: DEFAULT_PAYBACK_RATE, POS_FEE_RATE, FIXED_PAYMENT_PER_CASE)
+  key String @unique @db.VarChar(100)
+  /// 설정 값 (문자열로 저장)
+  value String @db.VarChar(500)
+  /// 설정 설명
+  description String? @db.VarChar(500)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}
+
+// ============================================================
 // 정산 관리
 // ============================================================
 
@@ -471,19 +494,21 @@ model Settlement {
   settlementPeriodStart DateTime @db.Date @map("settlement_period_start")
   settlementPeriodEnd DateTime @db.Date @map("settlement_period_end")
   totalVolume Decimal @db.Decimal(15, 2) @map("total_volume")
+  /// 등록 건 수
+  caseCount Int @default(0) @map("case_count")
   /// 정산율 (%)
   appliedRate Decimal @db.Decimal(5, 2) @map("applied_rate")
   /// 실제 지급액
   paybackAmount Decimal @db.Decimal(15, 2) @map("payback_amount")
-  /// NFT 보유 여부
+  /// NFT 보유 여부 (레거시, 미사용)
   isNftBoosted Boolean @default(false) @map("is_nft_boosted")
-  /// PENDING_PAYMENT, SETTLED
+  /// PENDING, CONFIRMED, PAID
   status String @db.VarChar(20)
   settledAt DateTime? @map("settled_at")
   createdAt DateTime @default(now()) @map("created_at")
-  
+
   hospital Hospital @relation(fields: [hospitalId], references: [id])
-  
+
   payments Payment[]
   bankTransfers BankTransfer[]
 

@@ -133,10 +133,13 @@ export async function PATCH(
       name?: string;
       role?: string;
       departmentId?: number | null;
+      departmentName?: string;
     };
 
     const status = body.status?.trim().toUpperCase();
     const role = body.role?.trim().toUpperCase();
+    const nameRaw = body.name;
+    const departmentNameRaw = body.departmentName;
     const departmentIdRaw = body.departmentId;
     const departmentId =
       departmentIdRaw === undefined || departmentIdRaw === null
@@ -165,11 +168,41 @@ export async function PATCH(
       );
     }
 
-    if (body.name !== undefined) {
-      return NextResponse.json(
-        { error: '이름은 수정할 수 없습니다.' },
-        { status: 400 },
-      );
+    if (nameRaw !== undefined) {
+      if (typeof nameRaw !== 'string') {
+        return NextResponse.json(
+          { error: '이름 형식이 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
+      const trimmedName = nameRaw.trim();
+      if (!trimmedName) {
+        return NextResponse.json(
+          { error: '이름은 공백일 수 없습니다.' },
+          { status: 400 },
+        );
+      }
+      if (trimmedName.length > 20) {
+        return NextResponse.json(
+          { error: '이름은 최대 20자까지 입력 가능합니다.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (departmentNameRaw !== undefined) {
+      if (typeof departmentNameRaw !== 'string') {
+        return NextResponse.json(
+          { error: '부서명 형식이 올바르지 않습니다.' },
+          { status: 400 },
+        );
+      }
+      if (departmentNameRaw.trim().length > 100) {
+        return NextResponse.json(
+          { error: '부서명은 최대 100자까지 입력 가능합니다.' },
+          { status: 400 },
+        );
+      }
     }
 
     if (departmentId !== undefined && departmentId !== null) {
@@ -188,7 +221,7 @@ export async function PATCH(
       );
     }
 
-    if (isSelf && role && user.role !== 'MASTER_ADMIN') {
+    if (isSelf && role) {
       return NextResponse.json(
         { error: '내 계정의 권한은 변경할 수 없습니다.' },
         { status: 400 },
@@ -236,6 +269,7 @@ export async function PATCH(
       status?: string;
       statusChangedAt?: Date;
       role?: string;
+      name?: string;
       departmentId?: number | null;
     } = {};
 
@@ -248,7 +282,41 @@ export async function PATCH(
       updateData.role = role;
     }
 
-    if (departmentId !== undefined) {
+    if (nameRaw !== undefined) {
+      updateData.name = nameRaw.trim();
+    }
+
+    if (departmentNameRaw !== undefined) {
+      const deptName = departmentNameRaw.trim();
+      if (!deptName) {
+        updateData.departmentId = null;
+      } else {
+        let dept = await prisma.department.findFirst({
+          where: { hospitalId: user.hospitalId!, name: deptName },
+          select: { id: true },
+        });
+        if (!dept) {
+          try {
+            dept = await prisma.department.create({
+              data: { hospitalId: user.hospitalId!, name: deptName },
+              select: { id: true },
+            });
+          } catch {
+            dept = await prisma.department.findFirst({
+              where: { hospitalId: user.hospitalId!, name: deptName },
+              select: { id: true },
+            });
+            if (!dept) {
+              return NextResponse.json(
+                { error: '부서 생성에 실패했습니다.' },
+                { status: 500 },
+              );
+            }
+          }
+        }
+        updateData.departmentId = dept.id;
+      }
+    } else if (departmentId !== undefined) {
       if (departmentId === null) {
         updateData.departmentId = null;
       } else {
@@ -279,6 +347,7 @@ export async function PATCH(
         data: updateData,
         select: {
           id: true,
+          name: true,
           status: true,
           statusChangedAt: true,
           role: true,
@@ -300,6 +369,7 @@ export async function PATCH(
       success: true,
       user: {
         id: updated.id,
+        name: updated.name,
         status: updated.status,
         statusChangedAt: updated.statusChangedAt?.toISOString() ?? null,
         role: updated.role,
