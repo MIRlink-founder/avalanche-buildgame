@@ -497,8 +497,8 @@ export function WalletClient() {
                           }
                           className={
                             tx.statusValue === 'CONFIRMED'
-                              ? 'bg-green-600 hover:bg-green-600'
-                              : ''
+                              ? 'bg-success'
+                              : 'bg-destructive'
                           }
                         >
                           {tx.status}

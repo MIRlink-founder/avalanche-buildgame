@@ -57,8 +57,7 @@ export function OnboardingCarousel() {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-blue-400 via-blue-300 to-blue-200">
-      {/* <div className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl bg-[#8ED5FF]"> */}
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl bg-[#8ED5FF]">
       <Carousel
         setApi={setApi}
         plugins={[plugin.current]}
@@ -87,7 +86,7 @@ export function OnboardingCarousel() {
                 <>
                   {/* 텍스트 영역 */}
                   <div className="space-y-4 text-center">
-                    <p className="text-lg font-medium text-blue-700">
+                    <p className="text-lg font-medium text-primary">
                       {slide.subtitle}
                     </p>
                     <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
@@ -108,8 +107,8 @@ export function OnboardingCarousel() {
               onClick={() => scrollTo(index)}
               className={`h-2 rounded-full transition-all duration-300 ${
                 current === index
-                  ? 'w-3 bg-blue-500'
-                  : 'w-2 bg-white hover:bg-blue-400'
+                  ? 'w-3 bg-primary'
+                  : 'w-2 bg-white hover:bg-primary/80'
               }`}
               aria-label={`슬라이드 ${index + 1}로 이동`}
             />

@@ -69,10 +69,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  PENDING: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
-  CONFIRMED: 'bg-blue-600 text-white hover:bg-blue-600',
-  PAID: 'bg-emerald-600 text-white hover:bg-emerald-600',
-  SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
+  PENDING: 'border-2 border-warning bg-white text-warning',
+  CONFIRMED: 'border-2 border-success bg-white text-success',
+  PAID: 'border-2 border-primary bg-white text-primary',
+  SETTLED: 'border-2 border-primary bg-white text-primary',
 };
 
 // ── 금액 포맷 (원 단위, 천 단위 콤마) ──

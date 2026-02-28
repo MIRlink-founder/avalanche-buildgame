@@ -27,8 +27,8 @@ export function StatsCards(props: StatsCardsProps) {
                 {props.pendingCount} 건
               </p>
             </div>
-            <div className="rounded-full bg-orange-100 p-3">
-              <AlertCircle className="h-6 w-6 text-orange-600" />
+            <div className="rounded-full bg-warning/20 p-3">
+              <AlertCircle className="h-6 w-6 text-warning" />
             </div>
           </div>
         </div>
@@ -42,8 +42,8 @@ export function StatsCards(props: StatsCardsProps) {
                 {props.activeCount} 개
               </p>
             </div>
-            <div className="rounded-full bg-green-100 p-3">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="rounded-full bg-success/10 p-3">
+              <CheckCircle className="h-6 w-6 text-success" />
             </div>
           </div>
         </div>
@@ -57,8 +57,8 @@ export function StatsCards(props: StatsCardsProps) {
                 {props.newThisMonthCount} 개
               </p>
             </div>
-            <div className="rounded-full bg-blue-100 p-3">
-              <TrendingUp className="h-6 w-6 text-blue-600" />
+            <div className="rounded-full bg-primary/10 p-3">
+              <TrendingUp className="h-6 w-6 text-primary" />
             </div>
           </div>
         </div>
@@ -74,8 +74,8 @@ export function StatsCards(props: StatsCardsProps) {
             <p className="text-sm text-muted-foreground">전체 병원</p>
             <p className="mt-2 text-3xl font-semibold">{props.totalCount} 개</p>
           </div>
-          <div className="rounded-full bg-gray-100 p-3">
-            <Hospital className="h-6 w-6 text-gray-600" />
+          <div className="rounded-full bg-light-3 p-3">
+            <Hospital className="h-6 w-6 text-dark-3" />
           </div>
         </div>
       </div>
@@ -89,8 +89,8 @@ export function StatsCards(props: StatsCardsProps) {
               {props.newThisMonthCount} 개
             </p>
           </div>
-          <div className="rounded-full bg-gray-100 p-3">
-            <TrendingUp className="h-6 w-6 text-gray-600" />
+          <div className="rounded-full bg-light-3 p-3">
+            <TrendingUp className="h-6 w-6 text-dark-3" />
           </div>
         </div>
       </div>
@@ -104,8 +104,8 @@ export function StatsCards(props: StatsCardsProps) {
               {props.withdrawnCount} 개
             </p>
           </div>
-          <div className="rounded-full bg-gray-100 p-3">
-            <CheckCircle className="h-6 w-6 text-gray-600" />
+          <div className="rounded-full bg-light-3 p-3">
+            <CheckCircle className="h-6 w-6 text-dark-3" />
           </div>
         </div>
       </div>

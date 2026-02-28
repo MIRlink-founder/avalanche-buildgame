@@ -70,10 +70,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  READY: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
-  PAID: 'bg-blue-600 text-white hover:bg-blue-600',
-  SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
-  CANCELLED: 'bg-red-500 text-white hover:bg-red-500',
+  READY: 'bg-warning text-white hover:bg-warning',
+  PAID: 'bg-primary text-white hover:bg-primary',
+  SETTLED: 'bg-primary text-white hover:bg-primary',
+  CANCELLED: 'bg-destructive text-white hover:bg-destructive',
 };
 
 const METHOD_LABELS: Record<string, string> = {

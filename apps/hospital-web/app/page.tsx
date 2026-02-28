@@ -23,7 +23,7 @@ export default function Home() {
         break;
       case 'MASTER_ADMIN':
       case 'DEPT_ADMIN':
-        router.replace('/dashboard');
+        router.replace('/home');
         break;
     }
   }, []);

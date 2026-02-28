@@ -23,7 +23,6 @@ export const adminMenuItems: SidebarMenuItem[] = [
 
 // 병원 Admin 사이드바 메뉴
 export const hospitalMenuItems: SidebarMenuItem[] = [
-  { title: '대시보드', icon: LayoutDashboard, href: '/dashboard' },
   { title: '환자 관리', icon: Users2, href: '/patients' },
   { title: '예약 관리', icon: CalendarCheck2, href: '/appointments' },
   { title: '진료 기록', icon: NotebookPen, href: '/records' },

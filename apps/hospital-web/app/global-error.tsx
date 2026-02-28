@@ -9,43 +9,26 @@ export default function GlobalError({
 }) {
   return (
     <html lang="ko">
-      <body>
-        <div style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          fontFamily: 'system-ui, -apple-system, sans-serif'
-        }}>
-          <div style={{ maxWidth: '28rem', textAlign: 'center' }}>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-              심각한 오류가 발생했습니다
-            </h1>
-            <p style={{ color: '#666', marginBottom: '1rem' }}>
-              페이지를 새로고침하거나 다시 시도해주세요.
+      <body className="min-h-screen flex flex-col items-center justify-center p-4 bg-background text-foreground font-sans antialiased">
+        <div className="max-w-[28rem] text-center">
+          <h1 className="text-2xl font-bold mb-4">
+            심각한 오류가 발생했습니다
+          </h1>
+          <p className="text-muted-foreground mb-4">
+            페이지를 새로고침하거나 다시 시도해주세요.
+          </p>
+          {error.digest && (
+            <p className="text-sm text-dark-4 mb-4">
+              오류 코드: {error.digest}
             </p>
-            {error.digest && (
-              <p style={{ fontSize: '0.875rem', color: '#999', marginBottom: '1rem' }}>
-                오류 코드: {error.digest}
-              </p>
-            )}
-            <button
-              onClick={() => reset()}
-              style={{
-                backgroundColor: '#5B7FFF',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.625rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '1rem'
-              }}
-            >
-              다시 시도
-            </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={() => reset()}
+            className="bg-primary text-primary-foreground rounded-[--radius] px-4 py-2 border-0 cursor-pointer text-base hover:bg-primary-darker transition-colors"
+          >
+            다시 시도
+          </button>
         </div>
       </body>
     </html>

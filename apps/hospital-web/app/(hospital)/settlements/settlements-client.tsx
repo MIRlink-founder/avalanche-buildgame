@@ -73,10 +73,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-amber-400 text-amber-950 hover:bg-amber-400',
-  CONFIRMED: 'bg-blue-600 text-white hover:bg-blue-600',
-  PAID: 'bg-blue-600 text-white hover:bg-blue-600',
-  SETTLED: 'bg-blue-600 text-white hover:bg-blue-600',
+  PENDING: 'bg-warning text-white hover:bg-warning',
+  CONFIRMED: 'bg-primary text-white hover:bg-primary',
+  PAID: 'bg-primary text-white hover:bg-primary',
+  SETTLED: 'bg-primary text-white hover:bg-primary',
 };
 
 const SETTLEMENT_POLICIES_BASE = [

@@ -46,7 +46,9 @@ export default function DashboardPage() {
         const currentMonth = now.getMonth();
         const currentMonthSettlements = json.data.filter((s) => {
           const d = new Date(s.settlementPeriodStart);
-          return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+          return (
+            d.getFullYear() === currentYear && d.getMonth() === currentMonth
+          );
         });
 
         const reward = currentMonthSettlements.reduce(
@@ -136,11 +138,15 @@ export default function DashboardPage() {
                 <span className="text-muted-foreground">
                   이번 달 데이터 업로드
                 </span>
-                <span className="font-medium">{isLoading ? '-' : `${monthlyUploadCount}건`}</span>
+                <span className="font-medium">
+                  {isLoading ? '-' : `${monthlyUploadCount}건`}
+                </span>
               </li>
               <li className="flex justify-between">
                 <span className="text-muted-foreground">누적 적립액</span>
-                <span className="font-medium">{isLoading ? '-' : `${accumulatedReward}원`}</span>
+                <span className="font-medium">
+                  {isLoading ? '-' : `${accumulatedReward}원`}
+                </span>
               </li>
             </ul>
             <Separator />

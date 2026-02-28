@@ -43,12 +43,12 @@ export const HOSPITAL_STATUS_LABELS: Record<string, string> = {
 };
 
 export const HOSPITAL_STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
-  APPROVED: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
-  ACTIVE: 'bg-blue-600 text-white hover:bg-blue-600',
-  REJECTED: 'bg-red-100 text-red-800 hover:bg-red-100',
-  DISABLED: 'bg-red-600 text-white hover:bg-red-600',
-  WITHDRAWN: 'bg-gray-400 text-white hover:bg-gray-400',
+  PENDING: 'border-2 border-warning bg-white text-warning',
+  APPROVED: 'border-2 border-success bg-white text-success',
+  ACTIVE: 'border-2 border-primary bg-white text-primary',
+  REJECTED: 'border-2 border-destructive bg-white text-destructive',
+  DISABLED: 'border-2 border-destructive bg-white text-destructive',
+  WITHDRAWN: 'border-2 border-dark-4 bg-white text-dark-4',
 };
 
 /** 병원 소속 사용자 역할 라벨 (계정 관리 탭용) */
@@ -95,9 +95,9 @@ export const ACCOUNT_STATUS_LABELS: Record<string, string> = {
 
 /** 사용자 계정 상태 뱃지 색상 */
 export const USER_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: 'bg-blue-600 text-white hover:bg-blue-600',
-  PENDING: 'bg-orange-600 text-white hover:bg-orange-600',
-  DISABLED: 'bg-yellow-500 text-black hover:bg-yellow-500',
-  DELETED: 'bg-gray-500 text-white hover:bg-gray-500',
-  WITHDRAWN: 'bg-red-600 text-white hover:bg-red-600',
+  ACTIVE: 'border-2 border-primary bg-white text-primary',
+  PENDING: 'border-2 border-warning bg-white text-warning',
+  DISABLED: 'border-2 border-destructive bg-white text-destructive',
+  DELETED: 'border-2 border-dark-4 bg-white text-dark-4',
+  WITHDRAWN: 'border-2 border-dark-4 bg-white text-dark-4',
 };

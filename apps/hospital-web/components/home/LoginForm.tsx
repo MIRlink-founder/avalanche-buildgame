@@ -124,9 +124,9 @@ export function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           onBlur={handleEmailBlur}
           disabled={isLoading}
-          className={emailError ? 'border-red-500' : ''}
+          className={emailError ? 'border-destructive' : ''}
         />
-        {emailError && <p className="text-sm text-red-500">{emailError}</p>}
+        {emailError && <p className="text-sm text-destructive">{emailError}</p>}
       </div>
 
       <div className="space-y-2">
