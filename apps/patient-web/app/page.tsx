@@ -33,8 +33,7 @@ export default function PatientHome() {
       }
       const data = (await res.json()) as { hasPin?: boolean };
       const path = data.hasPin ? '/auth/login' : '/auth/set-password';
-      const hash = typeof window !== 'undefined' ? window.location.hash : '';
-      router.push(path + hash);
+      router.push(path);
     } catch {
       setLoading(false);
     }
