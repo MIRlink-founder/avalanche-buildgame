@@ -14,11 +14,8 @@ import {
 type PathItem = { tooth: number; d: string; cx: number; cy: number };
 
 interface ToothChartReadOnlyProps {
-  /** 시술된 치아 번호 목록 (강조 표시) */
   savedTeeth: number[];
-  /** 선택된 치아 (클릭 시 해당 치아만 상세 표시) */
   selectedTooth?: number | null;
-  /** 치아 클릭 시 호출. 동일 치아 재클릭 시 null로 해제 */
   onToothSelect?: (tooth: number | null) => void;
 }
 
@@ -45,14 +42,14 @@ function QuadrantSvg({
         const hasSaved = savedSet.has(tooth);
         const selected = selectedTooth === tooth;
         const fill = selected
-          ? 'color-mix(in srgb, var(--primary) 70%, transparent)'
+          ? 'color-mix(in srgb, var(--primary) 50%, transparent)'
           : hasSaved
-            ? 'color-mix(in srgb, var(--primary) 50%, transparent)'
+            ? 'color-mix(in srgb, hsl(0 84% 60%) 50%, transparent)'
             : 'color-mix(in srgb, var(--muted-foreground) 20%, transparent)';
         const stroke = selected
-          ? 'var(--primary)'
+          ? 'color-mix(in srgb, var(--primary) 50%, transparent)'
           : hasSaved
-            ? 'var(--primary)'
+            ? 'hsl(0 84% 60%)'
             : 'color-mix(in srgb, var(--muted-foreground) 20%, transparent)';
         return (
           <g key={tooth}>
@@ -61,7 +58,7 @@ function QuadrantSvg({
               fill={fill}
               stroke={stroke}
               strokeWidth={selected || hasSaved ? 2 : 1}
-              className="transition-colors cursor-pointer hover:opacity-90"
+              className="transition-colors cursor-pointer hover:opacity-90 outline-none focus:outline-none"
               role="button"
               tabIndex={0}
               aria-pressed={selected}
