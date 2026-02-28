@@ -105,9 +105,6 @@ export default function Navigation() {
 
         {showMenu ? (
           <div className="flex items-center gap-1">
-            <NavLink href="/dashboard" current={pathname === '/dashboard'}>
-              대시보드
-            </NavLink>
             {canAccessSettlements && (
               <NavLink
                 href="/settlements"
@@ -116,11 +113,11 @@ export default function Navigation() {
                 정산 관리
               </NavLink>
             )}
-            {canAccessReports && (
-              <NavLink href="/reports" current={pathname === '/reports'}>
-                데이터 리포트
-              </NavLink>
-            )}
+            {/* {canAccessReports && ( */}
+            <NavLink href="/reports" current={pathname === '/reports'}>
+              데이터 리포트
+            </NavLink>
+            {/* )} */}
             <NavLink href="/support" current={pathname === '/support'}>
               고객지원
             </NavLink>

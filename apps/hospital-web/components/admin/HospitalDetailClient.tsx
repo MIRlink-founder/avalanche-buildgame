@@ -100,7 +100,7 @@ export function HospitalDetailClient() {
         <Badge className={HOSPITAL_STATUS_COLORS[hospital.status]}>
           {HOSPITAL_STATUS_LABELS[hospital.status] || hospital.status}
         </Badge>
-        <Badge className="bg-gray-400 text-white hover:bg-gray-400">
+        <Badge className="bg-dark-4 text-white">
           {hospital.type === 'UNIVERSITY' ? '대학병원' : '일반병원'}
         </Badge>
       </div>
