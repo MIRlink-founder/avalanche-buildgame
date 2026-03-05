@@ -41,6 +41,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // 결제 정보 (MVP: 수동 입력)
+    const paymentAmount =
+      typeof body?.amount === 'number' ? body.amount : null;
+    const paymentApproveNo =
+      typeof body?.approveNo === 'string' ? body.approveNo.trim() || null : null;
+    const paymentMethod =
+      typeof body?.paymentMethod === 'string'
+        ? body.paymentMethod.trim()
+        : 'CARD';
+
     const salt = process.env.MEDICAL_RECORD_ENCRYPTION_SALT;
     if (!salt) {
       return NextResponse.json(
@@ -84,6 +94,22 @@ export async function POST(request: Request) {
         status: 'PAID',
       },
     });
+
+    // MVP: 수동 입력된 결제 정보로 Payment 레코드 생성
+    if (paymentAmount != null && paymentAmount > 0) {
+      await prisma.payment.create({
+        data: {
+          medicalRecordId: medicalRecord.id,
+          hospitalId,
+          subMid: 'MANUAL',
+          amount: paymentAmount,
+          approveNo: paymentApproveNo,
+          paymentMethod,
+          status: 'PAID',
+          paidAt: new Date(),
+        },
+      });
+    }
 
     const walletClient = createLocalWalletClient(privateKey, chain);
     const publicClient = createPublicViemClient(chain);

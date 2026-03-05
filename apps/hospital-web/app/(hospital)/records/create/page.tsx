@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@mire/ui';
+import { Button, Input } from '@mire/ui';
 import { AlertModal } from '@/components/layout/AlertModal';
 import {
   PreInfoModal,
@@ -61,6 +61,9 @@ function CreateContent() {
   const [registerConfirmOpen, setRegisterConfirmOpen] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<string>('');
+  const [paymentApproveNo, setPaymentApproveNo] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('CARD');
   const [registerResult, setRegisterResult] = useState<
     | null
     | { status: 'signing' }
@@ -364,6 +367,13 @@ function CreateContent() {
   };
 
   const handleRegisterConfirm = async () => {
+    // 결제 금액 검증
+    const parsedAmount = parseFloat(paymentAmount);
+    if (!paymentAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      alert('결제 금액을 올바르게 입력해주세요.');
+      return;
+    }
+
     setPaymentConfirmOpen(false);
     if (!preInfo) {
       alert('사전 정보를 입력해주세요.');
@@ -415,6 +425,9 @@ function CreateContent() {
         body: JSON.stringify({
           patientId,
           encryptedPayload,
+          amount: parsedAmount,
+          approveNo: paymentApproveNo || undefined,
+          paymentMethod: paymentMethod || 'CARD',
         }),
       });
       if (redirectIfUnauthorized(res)) {
@@ -792,12 +805,51 @@ function CreateContent() {
       <AlertModal
         open={paymentConfirmOpen}
         onOpenChange={setPaymentConfirmOpen}
-        title="단말기 결제 확인"
+        title="결제 정보 입력"
         message={
-          <div>
-            단말기 결제를 완료하셨습니까?
-            <br />
-            확인 시 진료 기록이 블록체인에 등록됩니다.
+          <div className="flex flex-col gap-3 text-left">
+            <p className="text-center text-sm text-muted-foreground">
+              단말기 결제 정보를 입력해주세요.
+              <br />
+              확인 시 진료 기록이 블록체인에 등록됩니다.
+            </p>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-foreground">
+                결제 금액 <span className="text-destructive">*</span>
+              </label>
+              <Input
+                type="number"
+                placeholder="결제 금액 (원)"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                min={0}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-foreground">
+                승인번호
+              </label>
+              <Input
+                type="text"
+                placeholder="승인번호 (선택)"
+                value={paymentApproveNo}
+                onChange={(e) => setPaymentApproveNo(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-foreground">
+                결제수단
+              </label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              >
+                <option value="CARD">카드</option>
+                <option value="CASH">현금</option>
+                <option value="MIXED">복합</option>
+              </select>
+            </div>
           </div>
         }
         secondaryButton={{
@@ -805,9 +857,9 @@ function CreateContent() {
           onClick: () => setPaymentConfirmOpen(false),
         }}
         primaryButton={{
-          label: registerLoading ? '처리 중…' : '확인',
+          label: registerLoading ? '처리 중…' : '결제 완료 및 등록',
           onClick: handleRegisterConfirm,
-          disabled: registerLoading,
+          disabled: registerLoading || !paymentAmount,
         }}
       />
 
