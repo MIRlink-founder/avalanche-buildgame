@@ -34,8 +34,9 @@ import {
   SESSION_KEY_RECORD_EDIT_PAYLOAD,
 } from '@/lib/records-session';
 import { encryptWithPin } from '@/lib/records-encrypt-client';
-import { BookSearch, ClipboardClock, ClipboardPen, Copy } from 'lucide-react';
+import { BookSearch, ClipboardPen, Copy } from 'lucide-react';
 import { ToothQuadrantCell } from '@/components/records/ToothQuadrantCell';
+import { getDefaultFormDataForSheet } from '@/components/records/sheet-defaults';
 
 function generateSheetId() {
   return `sheet-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -128,15 +129,14 @@ function CreateContent() {
           setSavedRecords(asSaved);
           const first = editSavedRecords[0];
           setSelectedTeeth(first.tooth);
-          const sheetsForFirst = asSaved
-            .filter((r) => r.tooth === first.tooth)
-            .map((r) => ({
+          setTreatmentSheets(
+            asSaved.map((r) => ({
               id: r.id,
               tooth: r.tooth,
               type: r.type,
               formData: r.formData,
-            }));
-          setTreatmentSheets(sheetsForFirst);
+            })),
+          );
           setActiveSheetId(first.id);
         } else if (Array.isArray(editSheets) && editSheets.length > 0) {
           const asSaved: SavedTreatmentRecord[] = editSheets.map((s) => ({
@@ -151,15 +151,14 @@ function CreateContent() {
           setSavedRecords(asSaved);
           const first = editSheets[0];
           setSelectedTeeth(first.tooth);
-          const sheetsForFirst = editSheets
-            .filter((r) => r.tooth === first.tooth)
-            .map((r) => ({
+          setTreatmentSheets(
+            editSheets.map((r) => ({
               id: r.id,
               tooth: r.tooth,
               type: r.type,
               formData: r.formData,
-            }));
-          setTreatmentSheets(sheetsForFirst);
+            })),
+          );
           setActiveSheetId(first.id);
         }
       } catch {
@@ -260,26 +259,23 @@ function CreateContent() {
     setPreInfoModalOpen(false);
   };
 
-  // 치아 선택
+  // 치아 선택 (treatmentSheets는 유지, 선택/활성 시트만 변경)
   const toggleTooth = useCallback(
-    (n: number) => {
+    (tooth: number) => {
       setSelectedTeeth((prev) => {
-        if (prev !== null && prev !== n) {
-          const sheetsForN = savedRecords
-            .filter((r) => r.tooth === n)
-            .map((r) => ({
-              id: r.id,
-              tooth: r.tooth,
-              type: r.type,
-              formData: r.formData,
-            }));
-          setTreatmentSheets(sheetsForN);
-          setActiveSheetId(sheetsForN[0]?.id ?? 'add');
+        const n = prev === tooth ? null : tooth;
+        if (n !== null) {
+          const sheetsForN = treatmentSheets.filter((s) => s.tooth === n);
+          const latestExceptAdd =
+            sheetsForN.length >= 2
+              ? sheetsForN[sheetsForN.length - 1]
+              : sheetsForN[0];
+          setActiveSheetId(latestExceptAdd?.id ?? 'add');
         }
         return n;
       });
     },
-    [savedRecords],
+    [treatmentSheets],
   );
 
   const handleResetTooth = useCallback(() => {
@@ -295,42 +291,42 @@ function CreateContent() {
         id: generateSheetId(),
         tooth,
         type,
-        formData:
-          type === 'implant_placement' ||
-          type === 'implant_prosthesis' ||
-          type === 'laminate'
-            ? {}
-            : undefined,
+        formData: getDefaultFormDataForSheet(type) ?? undefined,
       };
       setTreatmentSheets((prev) => [...prev, newSheet]);
+      setSavedRecords((prev) => [
+        ...prev,
+        {
+          id: newSheet.id,
+          tooth: newSheet.tooth,
+          type: newSheet.type,
+          formData: newSheet.formData,
+          date: preInfo?.treatmentDate
+            ? new Date(preInfo.treatmentDate)
+            : new Date(),
+        },
+      ]);
       setActiveSheetId(newSheet.id);
     },
-    [],
+    [preInfo?.treatmentDate],
   );
 
-  // 왼쪽 임시 저장된 행 클릭 시 오른쪽 탭에서 수정
-  const handleOpenSavedRecord = useCallback(
-    (record: SavedTreatmentRecord) => {
-      setSelectedTeeth(record.tooth);
-      const sheetsForTooth = savedRecords
-        .filter((r) => r.tooth === record.tooth)
-        .map((r) => ({
-          id: r.id,
-          tooth: r.tooth,
-          type: r.type,
-          formData: r.formData,
-        }));
-      setTreatmentSheets(sheetsForTooth);
-      setActiveSheetId(record.id);
-    },
-    [savedRecords],
-  );
+  // 왼쪽 목록 행 클릭 시 해당 치아로 선택만 변경 (treatmentSheets 덮어쓰지 않음)
+  const handleOpenSavedRecord = useCallback((record: SavedTreatmentRecord) => {
+    setSelectedTeeth(record.tooth);
+    setActiveSheetId(record.id);
+  }, []);
 
   const handleUpdateSheetFormData = useCallback(
     (sheetId: string, formData: TreatmentSheet['formData']) => {
       setTreatmentSheets((prev) =>
         prev.map((s) =>
           s.id === sheetId ? { ...s, formData: formData ?? {} } : s,
+        ),
+      );
+      setSavedRecords((prev) =>
+        prev.map((r) =>
+          r.id === sheetId ? { ...r, formData: formData ?? r.formData } : r,
         ),
       );
     },
@@ -358,28 +354,10 @@ function CreateContent() {
     [selectedTeeth],
   );
 
-  // 임시 저장: 기존 id면 갱신, 없으면 새 id로 추가
+  // 자동 임시저장으로 동기화되므로 호출 시 등록 확인만 닫음 (레거시 호환)
   const handleDraftSave = useCallback(() => {
-    setSavedRecords((prev) => {
-      const byId = new Map(prev.map((r) => [r.id, r]));
-      for (const s of treatmentSheets) {
-        const existing = prev.find((r) => r.id === s.id);
-        byId.set(s.id, {
-          id: s.id,
-          date: existing
-            ? existing.date
-            : preInfo?.treatmentDate
-              ? new Date(preInfo.treatmentDate)
-              : new Date(),
-          tooth: s.tooth,
-          type: s.type,
-          formData: s.formData,
-        });
-      }
-      return Array.from(byId.values());
-    });
     setRegisterConfirmOpen(false);
-  }, [treatmentSheets]);
+  }, []);
 
   const sheetsForSelectedTooth =
     selectedTeeth !== null
@@ -576,19 +554,6 @@ function CreateContent() {
             생성 취소
           </Button>
           <Button
-            onClick={() => {
-              if (treatmentSheets.length === 0) {
-                alert(
-                  '추가된 진료 시트가 없습니다. 치아를 선택한 뒤 진료 타입을 추가해주세요.',
-                );
-                return;
-              }
-              handleDraftSave();
-            }}
-          >
-            <ClipboardClock /> 임시 저장
-          </Button>
-          <Button
             onClick={() => setRegisterConfirmOpen(true)}
             disabled={registerLoading}
           >
@@ -598,7 +563,7 @@ function CreateContent() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3 flex-1 min-h-0 border-t">
-        {/* 왼쪽: 임시 저장된 진료 목록 (날짜 = 임시 저장 시점) */}
+        {/* 왼쪽: 진료 목록 (시트 추가/수정 시 자동 저장) */}
         <div className="lg:col-span-1 flex flex-col min-h-0 border-r">
           <div className="flex-1 min-h-0 bg-muted/20 overflow-auto">
             <div className="grid grid-cols-[auto_auto_1fr] gap-0 content-start">
@@ -703,9 +668,18 @@ function CreateContent() {
                               <p>
                                 - 수술 횟수: {fd.surgeryCount}{' '}
                                 {fd.healingInput &&
-                                  (fd.healingInput
-                                    ? '(힐링 입력: O)'
-                                    : '(힐링 입력: X)')}
+                                  (() => {
+                                    const phi = fd.healingPhi;
+                                    const height = fd.healingHeight;
+                                    let detail = '';
+                                    if (phi || height) {
+                                      const parts: string[] = [];
+                                      if (phi) parts.push(`Φ=${phi}`);
+                                      if (height) parts.push(`H=${height}`);
+                                      detail = ` - ${parts.join(', ')}`;
+                                    }
+                                    return `(힐링 입력${detail})`;
+                                  })()}
                               </p>
                             )}
                             {fd.prosthesisTiming && (
@@ -732,7 +706,7 @@ function CreateContent() {
                           fd.abutmentType === 'Transfer(SCRP)'
                         ) {
                           abutmentLabel = fd.abutmentSubType
-                            ? `${fd.abutmentType} / ${fd.abutmentSubType}`
+                            ? `${fd.abutmentType} / ${fd.abutmentSubType}${fd.abutmentZirconia ? ' / 지르코니아 Abut' : ''}`
                             : fd.abutmentType;
                         } else if (fd.abutmentType === '오버덴취용') {
                           abutmentLabel = fd.abutmentOverdent
@@ -741,6 +715,10 @@ function CreateContent() {
                               ? `오버덴취용 / ${fd.abutmentDirectInput ?? fd.abutmentPreset}`
                               : `오버덴취용 / ${fd.abutmentOverdent}`
                             : fd.abutmentType;
+                        } else if (fd.abutmentType === 'UCLA') {
+                          abutmentLabel = fd.abutmentDirectInput
+                            ? `UCLA / ${fd.abutmentDirectInput}`
+                            : 'UCLA';
                         } else {
                           abutmentLabel = fd.abutmentType;
                         }
@@ -757,19 +735,25 @@ function CreateContent() {
                             {abutmentLabel && (
                               <p>
                                 - 어벗 선택: {abutmentLabel}
-                                {fd.hexStatus &&
-                                  (!fd.sizeNotEntered &&
-                                  (fd.diameter != null ||
-                                    fd.cuff != null ||
-                                    fd.height != null) ? (
-                                    <>
-                                      {' '}
-                                      (Hex - Φ={fd.diameter ?? '-'}, C=
-                                      {fd.cuff ?? '-'}, H={fd.height ?? '-'})
-                                    </>
-                                  ) : (
-                                    <> (Non-Hex)</>
-                                  ))}
+                                {fd.hexStatus && (
+                                  <>
+                                    {' '}
+                                    (
+                                    {fd.hexStatus === 'hex'
+                                      ? 'Hex'
+                                      : fd.hexStatus === 'non_hex'
+                                        ? 'Non-Hex'
+                                        : '-'}
+                                    {fd.sizeNotEntered === false ? (
+                                      <>
+                                        {' - '}
+                                        Φ={fd.diameter ?? '-'}, C=
+                                        {fd.cuff ?? '-'}, H={fd.height ?? '-'}
+                                      </>
+                                    ) : null}
+                                    )
+                                  </>
+                                )}
                                 {fd.torque && ` - ${fd.torque}`}
                               </p>
                             )}

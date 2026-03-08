@@ -159,6 +159,20 @@ function RecordViewContent() {
     [treatmentSheets],
   );
 
+  const handleToothToggle = useCallback(
+    (tooth: number | null) => {
+      setSelectedTeeth(tooth);
+      if (tooth !== null) {
+        const sheets = treatmentSheets.filter((s) => s.tooth === tooth);
+        const latest = sheets.length > 0 ? sheets[sheets.length - 1] : null;
+        setActiveSheetId(latest?.id ?? 'add');
+      } else {
+        setActiveSheetId('add');
+      }
+    },
+    [treatmentSheets],
+  );
+
   const handleEditClick = () => {
     if (!preInfo || !treatmentSheets.length) return;
     sessionStorage.setItem(
@@ -315,9 +329,7 @@ function RecordViewContent() {
                               <p>
                                 - 수술 횟수: {fd.surgeryCount}{' '}
                                 {fd.healingInput != null &&
-                                  (fd.healingInput
-                                    ? '(힐링 입력: O)'
-                                    : '(힐링 입력: X)')}
+                                  (fd.healingInput ? '(힐링 입력: O)' : '')}
                               </p>
                             )}
                             {fd.prosthesisTiming && (
@@ -435,7 +447,7 @@ function RecordViewContent() {
         <div className="lg:col-span-2">
           <ToothChart
             selectedTeeth={selectedTeeth}
-            onToggle={setSelectedTeeth}
+            onToggle={handleToothToggle}
             emptyLabel="치식에서 치아를 선택하면 진료 내용을 볼 수 있습니다."
             sheetsForSelectedTooth={sheetsForSelectedTooth}
             activeSheetId={activeSheetId}
