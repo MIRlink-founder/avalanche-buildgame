@@ -29,14 +29,30 @@ const ABUTMENT_PRESET_OPTIONS = [
   '하이니스 어버트먼트',
 ] as const;
 const TORQUE_OPTIONS = [
-  '15N under',
+  '15N ↓',
   '20N',
   '25N',
   '30N',
   '35N',
   '40N',
-  '45N upper',
+  '45N ↑',
 ] as const;
+const DEFAULT_TORQUE_BY_ABUTMENT: Record<string, string> = {
+  'Solid(Rigid)': '25N',
+  'Transfer(SCRP)': '30N',
+  오버덴취용: '25N',
+  UCLA: '30N',
+  '직접 입력': '30N',
+};
+const SIZE_MIN = 0;
+const SIZE_MAX = 10;
+
+function clampSizeInput(raw: string): number | undefined {
+  if (raw === '') return undefined;
+  const num = Number(raw);
+  if (Number.isNaN(num)) return undefined;
+  return Math.min(SIZE_MAX, Math.max(SIZE_MIN, num));
+}
 
 export interface ImplantProsthesisSheetProps {
   value: ImplantProsthesisFormData;
@@ -70,9 +86,7 @@ export function ImplantProsthesisSheet({
 
   const isMethodDirect = (value.method ?? '') === '직접 입력';
   const isAbutmentDirect = (value.abutmentType ?? '') === '직접 입력';
-  const isSolidOrTransfer =
-    value.abutmentType === 'Solid(Rigid)' ||
-    value.abutmentType === 'Transfer(SCRP)';
+  const isTransfer = value.abutmentType === 'Transfer(SCRP)';
   const isOverdent = value.abutmentType === '오버덴취용';
   const isUCLA = value.abutmentType === 'UCLA';
   const isOverdentEtc = isOverdent && (value.abutmentOverdent ?? '') === '기타';
@@ -81,9 +95,12 @@ export function ImplantProsthesisSheet({
     update({
       abutmentType: opt,
       abutmentSubType: undefined,
+      abutmentZirconia: false,
       abutmentOverdent: undefined,
       abutmentPreset: undefined,
       abutmentDirectInput: undefined,
+      hexStatus: undefined,
+      torque: DEFAULT_TORQUE_BY_ABUTMENT[opt] ?? value.torque,
     });
   };
 
@@ -189,29 +206,62 @@ export function ImplantProsthesisSheet({
           </div>
 
           {/* 어벗 타입별 박스: 선택지 + HEX(조건부) */}
-          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
-            {/* Solid(Rigid), Transfer(SCRP): 서브 라디오 + HEX */}
-            {isSolidOrTransfer && (
-              <>
+          <>
+            {isTransfer && (
+              <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
                 <div className="flex flex-wrap gap-3">
-                  {ABUTMENT_SUB_SOLID_TRANSFER.map((opt) => (
-                    <label
-                      key={opt}
-                      className="flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <input
-                        type="radio"
-                        name="abutmentSubType"
-                        checked={(value.abutmentSubType ?? '') === opt}
-                        onChange={() => update({ abutmentSubType: opt })}
-                        disabled={readOnly}
-                        className="rounded-full border-input"
-                      />
-                      <span>{opt}</span>
-                    </label>
-                  ))}
+                  {ABUTMENT_SUB_SOLID_TRANSFER.map((opt) =>
+                    opt === '지르코니아 Abut' ? (
+                      <label
+                        key={opt}
+                        className="flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          name="abutmentZirconia"
+                          checked={value.abutmentZirconia === true}
+                          onChange={(e) => {
+                            update({ abutmentZirconia: e.target.checked });
+                          }}
+                          disabled={
+                            readOnly ||
+                            !(
+                              value.abutmentSubType === '기성 Abut' ||
+                              value.abutmentSubType === 'Custom Abut'
+                            )
+                          }
+                          className="rounded border-input"
+                        />
+                        <span>{opt}</span>
+                      </label>
+                    ) : (
+                      <label
+                        key={opt}
+                        className="flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <input
+                          type="radio"
+                          name="abutmentSubType"
+                          checked={(value.abutmentSubType ?? '') === opt}
+                          onChange={() => {
+                            if (opt !== '기성 Abut' && opt !== 'Custom Abut') {
+                              update({
+                                abutmentSubType: opt,
+                                abutmentZirconia: false,
+                              });
+                            } else {
+                              update({ abutmentSubType: opt });
+                            }
+                          }}
+                          disabled={readOnly}
+                          className="rounded-full border-input"
+                        />
+                        <span>{opt}</span>
+                      </label>
+                    ),
+                  )}
                 </div>
-                <div className="flex flex-row items-center gap-3 pt-2 border-t border-border/50">
+                <div className="flex flex-row items-center gap-3">
                   <span className="text-muted-foreground flex items-center">
                     HEX 여부
                   </span>
@@ -238,12 +288,12 @@ export function ImplantProsthesisSheet({
                     <span>Non-Hex</span>
                   </label>
                 </div>
-              </>
+              </div>
             )}
 
             {/* 오버덴취용: Ball/Locator/Magnetic/기타, 기타일 때만 input+select+HEX */}
             {isOverdent && (
-              <>
+              <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
                 <div className="flex flex-wrap gap-3">
                   {ABUTMENT_OVERDENT_OPTIONS.map((opt) => (
                     <label
@@ -271,9 +321,7 @@ export function ImplantProsthesisSheet({
                       <span>{opt}</span>
                     </label>
                   ))}
-                </div>
-                {isOverdentEtc && (
-                  <div className="space-y-2 pt-2 border-t border-border/50">
+                  {isOverdentEtc && (
                     <div className="flex flex-wrap gap-2 items-center">
                       <input
                         type="text"
@@ -285,7 +333,7 @@ export function ImplantProsthesisSheet({
                         }
                         disabled={readOnly}
                         placeholder="직접 입력"
-                        className="border-input bg-background h-9 flex-1 min-w-[120px] rounded-md border px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="border-input bg-background h-8 flex-1 min-w-[120px] rounded-md border px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                       <select
                         value={value.abutmentPreset ?? ''}
@@ -297,7 +345,7 @@ export function ImplantProsthesisSheet({
                           });
                         }}
                         disabled={readOnly}
-                        className="border-input bg-background h-9 min-w-[140px] rounded-md border px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="border-input bg-background h-8 min-w-[140px] rounded-md border px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <option value="">선택</option>
                         {ABUTMENT_PRESET_OPTIONS.map((o) => (
@@ -307,68 +355,41 @@ export function ImplantProsthesisSheet({
                         ))}
                       </select>
                     </div>
-                    <div className="flex flex-row items-center gap-3">
-                      <span className="text-muted-foreground">HEX 여부</span>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="hexStatusOverdent"
-                          checked={(value.hexStatus ?? '') === 'hex'}
-                          onChange={() => update({ hexStatus: 'hex' })}
-                          disabled={readOnly}
-                          className="rounded-full border-input"
-                        />
-                        <span>Hex</span>
-                      </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="hexStatusOverdent"
-                          checked={(value.hexStatus ?? '') === 'non_hex'}
-                          onChange={() => update({ hexStatus: 'non_hex' })}
-                          disabled={readOnly}
-                          className="rounded-full border-input"
-                        />
-                        <span>Non-Hex</span>
-                      </label>
-                    </div>
+                  )}
+                </div>
+                {isOverdentEtc && (
+                  <div className="flex flex-row items-center gap-3">
+                    <span className="text-muted-foreground">HEX 여부</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="hexStatusOverdent"
+                        checked={(value.hexStatus ?? '') === 'hex'}
+                        onChange={() => update({ hexStatus: 'hex' })}
+                        disabled={readOnly}
+                        className="rounded-full border-input"
+                      />
+                      <span>Hex</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="hexStatusOverdent"
+                        checked={(value.hexStatus ?? '') === 'non_hex'}
+                        onChange={() => update({ hexStatus: 'non_hex' })}
+                        disabled={readOnly}
+                        className="rounded-full border-input"
+                      />
+                      <span>Non-Hex</span>
+                    </label>
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {/* UCLA: HEX만 */}
             {isUCLA && (
-              <div className="flex flex-row items-center gap-3">
-                <span className="text-muted-foreground">HEX 여부</span>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="hexStatusUCLA"
-                    checked={(value.hexStatus ?? '') === 'hex'}
-                    onChange={() => update({ hexStatus: 'hex' })}
-                    disabled={readOnly}
-                    className="rounded-full border-input"
-                  />
-                  <span>Hex</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="hexStatusUCLA"
-                    checked={(value.hexStatus ?? '') === 'non_hex'}
-                    onChange={() => update({ hexStatus: 'non_hex' })}
-                    disabled={readOnly}
-                    className="rounded-full border-input"
-                  />
-                  <span>Non-Hex</span>
-                </label>
-              </div>
-            )}
-
-            {/* 직접 입력: input + select(커스텀/하이니스) + HEX */}
-            {isAbutmentDirect && (
-              <>
+              <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
                 <div className="flex flex-wrap gap-2 items-center">
                   <input
                     type="text"
@@ -380,7 +401,7 @@ export function ImplantProsthesisSheet({
                     }
                     disabled={readOnly}
                     placeholder="직접 입력"
-                    className="border-input bg-background h-9 flex-1 min-w-[120px] rounded-md border px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="border-input bg-background h-8 flex-1 min-w-[120px] rounded-md border px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                   <select
                     value={value.abutmentPreset ?? ''}
@@ -392,7 +413,7 @@ export function ImplantProsthesisSheet({
                       });
                     }}
                     disabled={readOnly}
-                    className="border-input bg-background h-9 min-w-[140px] rounded-md border px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="border-input bg-background h-8 min-w-[140px] rounded-md border px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="">선택</option>
                     {ABUTMENT_PRESET_OPTIONS.map((o) => (
@@ -402,12 +423,12 @@ export function ImplantProsthesisSheet({
                     ))}
                   </select>
                 </div>
-                <div className="flex flex-row items-center gap-3 pt-2 border-t border-border/50">
+                <div className="flex flex-row items-center gap-3">
                   <span className="text-muted-foreground">HEX 여부</span>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
-                      name="hexStatusDirect"
+                      name="hexStatusUCLA"
                       checked={(value.hexStatus ?? '') === 'hex'}
                       onChange={() => update({ hexStatus: 'hex' })}
                       disabled={readOnly}
@@ -418,7 +439,7 @@ export function ImplantProsthesisSheet({
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
-                      name="hexStatusDirect"
+                      name="hexStatusUCLA"
                       checked={(value.hexStatus ?? '') === 'non_hex'}
                       onChange={() => update({ hexStatus: 'non_hex' })}
                       disabled={readOnly}
@@ -427,9 +448,73 @@ export function ImplantProsthesisSheet({
                     <span>Non-Hex</span>
                   </label>
                 </div>
-              </>
+              </div>
             )}
-          </div>
+
+            {/* 직접 입력: input + select(커스텀/하이니스) + HEX */}
+            {isAbutmentDirect && (
+              <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <input
+                    type="text"
+                    value={value.abutmentDirectInput ?? ''}
+                    onChange={(e) =>
+                      update({
+                        abutmentDirectInput: e.target.value || undefined,
+                      })
+                    }
+                    disabled={readOnly}
+                    placeholder="직접 입력"
+                    className="border-input bg-background h-8 flex-1 min-w-[120px] rounded-md border px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <select
+                    value={value.abutmentPreset ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value || undefined;
+                      update({
+                        abutmentPreset: v,
+                        abutmentDirectInput: v,
+                      });
+                    }}
+                    disabled={readOnly}
+                    className="border-input bg-background h-8 min-w-[140px] rounded-md border px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">선택</option>
+                    {ABUTMENT_PRESET_OPTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-row items-center gap-3">
+                  <span className="text-muted-foreground">HEX 여부</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="hexStatusUCLA"
+                      checked={(value.hexStatus ?? '') === 'hex'}
+                      onChange={() => update({ hexStatus: 'hex' })}
+                      disabled={readOnly}
+                      className="rounded-full border-input"
+                    />
+                    <span>Hex</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="hexStatusUCLA"
+                      checked={(value.hexStatus ?? '') === 'non_hex'}
+                      onChange={() => update({ hexStatus: 'non_hex' })}
+                      disabled={readOnly}
+                      className="rounded-full border-input"
+                    />
+                    <span>Non-Hex</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </>
         </div>
       </Row>
 
@@ -454,9 +539,24 @@ export function ImplantProsthesisSheet({
           <label className="flex items-center gap-1.5 cursor-pointer">
             <Checkbox
               checked={value.sizeNotEntered ?? false}
-              onCheckedChange={(c) =>
-                !readOnly && update({ sizeNotEntered: c === true })
-              }
+              onCheckedChange={(c) => {
+                if (readOnly) return;
+                const checked = c === true;
+                update({
+                  sizeNotEntered: checked,
+                  ...(checked
+                    ? {
+                        diameter: 0,
+                        cuff: 0,
+                        height: 0,
+                      }
+                    : {
+                        diameter: value.diameter ?? 10,
+                        cuff: value.cuff ?? 2,
+                        height: value.height ?? 10,
+                      }),
+                });
+              }}
               disabled={readOnly}
             />
             <span>입력 안함</span>
@@ -466,13 +566,11 @@ export function ImplantProsthesisSheet({
               <span className="text-muted-foreground text-xs">Diameter</span>
               <input
                 type="number"
-                step={0.1}
+                step={0.5}
                 value={value.diameter ?? ''}
                 onChange={(e) =>
                   update({
-                    diameter: e.target.value
-                      ? Number(e.target.value)
-                      : undefined,
+                    diameter: clampSizeInput(e.target.value),
                   })
                 }
                 disabled={readOnly || value.sizeNotEntered}
@@ -483,11 +581,11 @@ export function ImplantProsthesisSheet({
               <span className="text-muted-foreground text-xs">Cuff</span>
               <input
                 type="number"
-                step={0.1}
+                step={0.5}
                 value={value.cuff ?? ''}
                 onChange={(e) =>
                   update({
-                    cuff: e.target.value ? Number(e.target.value) : undefined,
+                    cuff: clampSizeInput(e.target.value),
                   })
                 }
                 disabled={readOnly || value.sizeNotEntered}
@@ -498,11 +596,11 @@ export function ImplantProsthesisSheet({
               <span className="text-muted-foreground text-xs">Height</span>
               <input
                 type="number"
-                step={0.1}
+                step={0.5}
                 value={value.height ?? ''}
                 onChange={(e) =>
                   update({
-                    height: e.target.value ? Number(e.target.value) : undefined,
+                    height: clampSizeInput(e.target.value),
                   })
                 }
                 disabled={readOnly || value.sizeNotEntered}

@@ -221,7 +221,18 @@ export function ImplantPlacementSheet({
                   type="radio"
                   name="sinusLift"
                   checked={(value.sinusLift ?? '') === opt}
-                  onChange={() => update({ sinusLift: opt })}
+                  onChange={() => {
+                    // "안함" 선택 시 재료 선택 초기화
+                    if (!readOnly) {
+                      update({
+                        sinusLift: opt,
+                        sinusLiftMaterials:
+                          opt === '안함'
+                            ? []
+                            : (value.sinusLiftMaterials ?? []),
+                      });
+                    }
+                  }}
                   disabled={readOnly}
                   className="rounded-full border-input"
                 />
@@ -229,23 +240,25 @@ export function ImplantPlacementSheet({
               </label>
             ))}
           </div>
-          <div className="flex flex-wrap gap-3 pt-1">
-            {SINUS_LIFT_MATERIALS.map((opt) => (
-              <label
-                key={opt}
-                className="flex items-center gap-1.5 cursor-pointer"
-              >
-                <Checkbox
-                  checked={(value.sinusLiftMaterials ?? []).includes(opt)}
-                  onCheckedChange={() =>
-                    !readOnly && toggleArray('sinusLiftMaterials', opt)
-                  }
-                  disabled={readOnly}
-                />
-                <span>{opt}</span>
-              </label>
-            ))}
-          </div>
+          {(value.sinusLift === 'Crestal' || value.sinusLift === 'Lateral') && (
+            <div className="flex flex-wrap gap-3 pt-1">
+              {SINUS_LIFT_MATERIALS.map((opt) => (
+                <label
+                  key={opt}
+                  className="flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={(value.sinusLiftMaterials ?? []).includes(opt)}
+                    onCheckedChange={() =>
+                      !readOnly && toggleArray('sinusLiftMaterials', opt)
+                    }
+                    disabled={readOnly}
+                  />
+                  <span>{opt}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       </Row>
 
@@ -302,6 +315,58 @@ export function ImplantPlacementSheet({
               disabled={readOnly}
             />
             <span>힐링 입력</span>
+            {value.healingInput && (
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs">Φ</span>
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={1}
+                    max={9}
+                    value={
+                      value.healingPhi === undefined
+                        ? ''
+                        : Math.max(1, Math.min(9, Number(value.healingPhi)))
+                    }
+                    onChange={(e) => {
+                      if (readOnly) return;
+                      let val = parseFloat(e.target.value);
+                      if (val !== undefined) {
+                        val = Math.max(1, Math.min(9, val));
+                      }
+                      update({ healingPhi: val });
+                    }}
+                    disabled={readOnly}
+                    className="border-input bg-background h-10 w-20 rounded-md border px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs">Height</span>
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={1}
+                    max={15}
+                    value={
+                      value.healingHeight === undefined
+                        ? ''
+                        : Math.max(1, Math.min(15, Number(value.healingHeight)))
+                    }
+                    onChange={(e) => {
+                      if (readOnly) return;
+                      let val = parseFloat(e.target.value);
+                      if (val !== undefined) {
+                        val = Math.max(1, Math.min(15, val));
+                      }
+                      update({ healingHeight: val });
+                    }}
+                    disabled={readOnly}
+                    className="border-input bg-background h-10 w-20 rounded-md border px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+              </div>
+            )}
           </label>
         </div>
       </Row>

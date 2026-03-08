@@ -1,6 +1,7 @@
 export type TreatmentSheetType =
   | 'implant_placement'
   | 'implant_prosthesis'
+  | 'implant_remove'
   | 'laminate';
 
 export interface ImplantPlacementFormData {
@@ -36,6 +37,11 @@ export interface ImplantProsthesisFormData {
   comment?: string;
 }
 
+export interface ImplantRemoveFormData {
+  method?: string;
+  comment?: string;
+}
+
 export interface LaminateFormData {
   manufacturer?: string;
   product?: string;
@@ -52,6 +58,7 @@ export interface TreatmentSheet {
   formData?:
     | ImplantPlacementFormData
     | ImplantProsthesisFormData
+    | ImplantRemoveFormData
     | LaminateFormData;
 }
 

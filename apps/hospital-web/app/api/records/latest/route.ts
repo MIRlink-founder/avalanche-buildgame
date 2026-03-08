@@ -46,6 +46,7 @@ export async function POST(request: Request) {
       const stats = record.stats;
       return NextResponse.json({
         exists: true,
+        latestRecordStatus: record.status,
         patientGender: stats?.patientGender ?? null,
         patientAgeGroup: stats?.patientAgeGroup ?? null,
         treatedAt: record.treatedAt?.toISOString() ?? null,

@@ -2,12 +2,19 @@
 export type TreatmentSheetType =
   | 'implant_placement'
   | 'implant_prosthesis'
+  | 'implant_remove'
   | 'laminate';
+
+// 치식도에서 치아 하나의 표시 상태
+export type ToothState =
+  | 'empty' // 비어 있음
+  | 'selected' // 선택됨
+  | 'has_value' // 저장된 데이터 있음
+  | 'implant_removed'; // 임플란트 제거됨
 
 // 임플란트 식립 진료 시트 폼 데이터
 export interface ImplantPlacementFormData {
   fixture?: string;
-  /** DB ImplantItem id (Fixture 선택 시 저장, 목록/뷰 표시는 fixture 문자열 사용) */
   fixtureItemId?: number;
   initialFixation?: string;
   boneQuality?: 'D1' | 'D2' | 'D3' | 'D4';
@@ -17,6 +24,8 @@ export interface ImplantPlacementFormData {
   boneGraft?: string[];
   surgeryCount?: '1회법' | '2회법';
   healingInput?: boolean;
+  healingPhi?: number;
+  healingHeight?: number;
   prosthesisTiming?: string;
   comment?: string;
 }
@@ -28,6 +37,7 @@ export interface ImplantProsthesisFormData {
   cementationType?: '영구 접착' | '임시 접착';
   abutmentType?: string;
   abutmentSubType?: string;
+  abutmentZirconia?: boolean;
   abutmentOverdent?: string;
   abutmentPreset?: string;
   abutmentDirectInput?: string;
@@ -37,6 +47,12 @@ export interface ImplantProsthesisFormData {
   diameter?: number;
   cuff?: number;
   height?: number;
+  comment?: string;
+}
+
+// 임플란트 제거 시트 폼 데이터
+export interface ImplantRemoveFormData {
+  method?: string;
   comment?: string;
 }
 
@@ -55,6 +71,7 @@ export interface TreatmentSheet {
   id: string;
   tooth: number;
   type: TreatmentSheetType;
+  date?: string;
   formData?:
     | ImplantPlacementFormData
     | ImplantProsthesisFormData
@@ -70,5 +87,6 @@ export interface SavedTreatmentRecord {
   formData?:
     | ImplantPlacementFormData
     | ImplantProsthesisFormData
+    | ImplantRemoveFormData
     | LaminateFormData;
 }
