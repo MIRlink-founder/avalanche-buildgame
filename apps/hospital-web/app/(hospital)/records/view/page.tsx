@@ -308,6 +308,7 @@ function RecordViewContent() {
                                 )}
                               </p>
                             )}
+
                             {fd.sinusLift && (
                               <p>
                                 - 상악동거상: {fd.sinusLift}{' '}
@@ -328,8 +329,19 @@ function RecordViewContent() {
                             {fd.surgeryCount && (
                               <p>
                                 - 수술 횟수: {fd.surgeryCount}{' '}
-                                {fd.healingInput != null &&
-                                  (fd.healingInput ? '(힐링 입력: O)' : '')}
+                                {fd.healingInput &&
+                                  (() => {
+                                    const phi = fd.healingPhi;
+                                    const height = fd.healingHeight;
+                                    let detail = '';
+                                    if (phi || height) {
+                                      const parts: string[] = [];
+                                      if (phi) parts.push(`Φ=${phi}`);
+                                      if (height) parts.push(`H=${height}`);
+                                      detail = ` - ${parts.join(', ')}`;
+                                    }
+                                    return `(힐링 입력${detail})`;
+                                  })()}
                               </p>
                             )}
                             {fd.prosthesisTiming && (
@@ -356,7 +368,7 @@ function RecordViewContent() {
                           fd.abutmentType === 'Transfer(SCRP)'
                         ) {
                           abutmentLabel = fd.abutmentSubType
-                            ? `${fd.abutmentType} / ${fd.abutmentSubType}`
+                            ? `${fd.abutmentType} / ${fd.abutmentSubType}${fd.abutmentZirconia ? ' / 지르코니아 Abut' : ''}`
                             : fd.abutmentType;
                         } else if (fd.abutmentType === '오버덴취용') {
                           abutmentLabel = fd.abutmentOverdent
@@ -365,6 +377,10 @@ function RecordViewContent() {
                               ? `오버덴취용 / ${fd.abutmentDirectInput ?? fd.abutmentPreset}`
                               : `오버덴취용 / ${fd.abutmentOverdent}`
                             : fd.abutmentType;
+                        } else if (fd.abutmentType === 'UCLA') {
+                          abutmentLabel = fd.abutmentDirectInput
+                            ? `UCLA / ${fd.abutmentDirectInput}`
+                            : 'UCLA';
                         } else {
                           abutmentLabel = fd.abutmentType;
                         }
@@ -381,19 +397,25 @@ function RecordViewContent() {
                             {abutmentLabel && (
                               <p>
                                 - 어벗 선택: {abutmentLabel}
-                                {fd.hexStatus &&
-                                  (!fd.sizeNotEntered &&
-                                  (fd.diameter != null ||
-                                    fd.cuff != null ||
-                                    fd.height != null) ? (
-                                    <>
-                                      {' '}
-                                      (Hex - Φ={fd.diameter ?? '-'}, C=
-                                      {fd.cuff ?? '-'}, H={fd.height ?? '-'})
-                                    </>
-                                  ) : (
-                                    <> (Non-Hex)</>
-                                  ))}
+                                {fd.hexStatus && (
+                                  <>
+                                    {' '}
+                                    (
+                                    {fd.hexStatus === 'hex'
+                                      ? 'Hex'
+                                      : fd.hexStatus === 'non_hex'
+                                        ? 'Non-Hex'
+                                        : '-'}
+                                    {fd.sizeNotEntered === false ? (
+                                      <>
+                                        {' - '}
+                                        Φ={fd.diameter ?? '-'}, C=
+                                        {fd.cuff ?? '-'}, H={fd.height ?? '-'}
+                                      </>
+                                    ) : null}
+                                    )
+                                  </>
+                                )}
                                 {fd.torque && ` - ${fd.torque}`}
                               </p>
                             )}
