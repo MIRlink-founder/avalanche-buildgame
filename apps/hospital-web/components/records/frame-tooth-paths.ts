@@ -60,6 +60,71 @@ function pathCentroid(d: string): { cx: number; cy: number } {
   };
 }
 
+// path d 문자열에서 바운딩 박스를 구함. 치아 이미지 배치 시 크기 참고용
+function pathBounds(d: string): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  const points: { x: number; y: number }[] = [];
+  let x = 0;
+  let y = 0;
+  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|-?[\d.]+/g) ?? [];
+  let i = 0;
+  while (i < tokens.length) {
+    const cmd = tokens[i++];
+    if (!cmd || cmd.length !== 1) continue;
+    if (cmd === 'Z' || cmd === 'z') continue;
+    const n = parseFloat(tokens[i]);
+    if (Number.isNaN(n)) continue;
+    switch (cmd) {
+      case 'M':
+      case 'L': {
+        x = n;
+        y = parseFloat(tokens[i + 1] ?? '0');
+        i += 2;
+        points.push({ x, y });
+        break;
+      }
+      case 'H': {
+        x = n;
+        i += 1;
+        points.push({ x, y });
+        break;
+      }
+      case 'V': {
+        y = n;
+        i += 1;
+        points.push({ x, y });
+        break;
+      }
+      case 'C': {
+        const x1 = n;
+        const y1 = parseFloat(tokens[i + 1] ?? '0');
+        const x2 = parseFloat(tokens[i + 2] ?? '0');
+        const y2 = parseFloat(tokens[i + 3] ?? '0');
+        const xe = parseFloat(tokens[i + 4] ?? '0');
+        const ye = parseFloat(tokens[i + 5] ?? '0');
+        i += 6;
+        points.push({ x: x1, y: y1 }, { x: x2, y: y2 }, { x: xe, y: ye });
+        x = xe;
+        y = ye;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  if (points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return {
+    minX: Math.min(...points.map((p) => p.x)),
+    minY: Math.min(...points.map((p) => p.y)),
+    maxX: Math.max(...points.map((p) => p.x)),
+    maxY: Math.max(...points.map((p) => p.y)),
+  };
+}
+
 export const RAW_PATHS: { tooth: number; d: string }[] = [
   // 상악 우→좌: 18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28
   {
@@ -202,4 +267,23 @@ export const FRAME_TOOTH_PATHS: {
 }[] = RAW_PATHS.map(({ tooth, d }) => {
   const { cx, cy } = pathCentroid(d);
   return { tooth, d, cx, cy };
+});
+
+// 치식도에서 치아별 위치·크기만 담은 데이터. 이미지 배치 시 사용 (path d 미포함)
+export const FRAME_TOOTH_POSITIONS: {
+  tooth: number;
+  cx: number;
+  cy: number;
+  width: number;
+  height: number;
+}[] = RAW_PATHS.map(({ tooth, d }) => {
+  const { cx, cy } = pathCentroid(d);
+  const { minX, minY, maxX, maxY } = pathBounds(d);
+  return {
+    tooth,
+    cx,
+    cy,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
 });

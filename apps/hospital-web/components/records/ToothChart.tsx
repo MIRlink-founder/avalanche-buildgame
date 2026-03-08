@@ -1,8 +1,8 @@
 'use client';
 
 import { Badge, Button } from '@mire/ui';
-import { RotateCcw, X } from 'lucide-react';
-import { FRAME_TOOTH_PATHS } from './frame-tooth-paths';
+import { RotateCcw, Trash, X } from 'lucide-react';
+import { getToothImagePath } from './tooth-image-paths';
 import { ImplantPlacementSheet } from './ImplantPlacementSheet';
 import type { ImplantItemOption } from './ImplantPlacementSheet';
 import { ImplantProsthesisSheet } from './ImplantProsthesisSheet';
@@ -10,14 +10,28 @@ import { LaminateSheet } from './LaminateSheet';
 import type {
   TreatmentSheet,
   TreatmentSheetType,
+  ToothState,
   ImplantPlacementFormData,
   ImplantProsthesisFormData,
   LaminateFormData,
+  ImplantRemoveFormData,
 } from './treatment-sheet-types';
+import { ImplantRemoveSheet } from './ImplantRemoveSheet';
+
+// 치식도 4줄
+const TOOTH_ROWS: number[][] = [
+  [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28],
+  [55, 54, 53, 52, 51, 61, 62, 63, 64, 65],
+  [85, 84, 83, 82, 81, 71, 72, 73, 74, 75],
+  [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38],
+];
+
+const TOOTH_CELL_SIZE = 56;
 
 const TREATMENT_TYPE_LABELS: Record<TreatmentSheetType, string> = {
   implant_placement: '임플란트 식립',
   implant_prosthesis: '임플란트 보철',
+  implant_remove: '임플란트 제거',
   laminate: '라미네이트',
 };
 
@@ -36,10 +50,9 @@ export interface ToothChartProps {
   onActiveSheetChange?: (id: string | 'add') => void;
   onRemoveSheet?: (sheetId: string) => void;
   savedTeeth?: number[]; // 임시 저장된 데이터가 있는 치아 번호
+  implantRemovedTeeth?: number[];
   readOnly?: boolean;
-  /** DB ImplantItem 목록 — 임플란트 식립 Fixture 선택용 */
   implantItems?: ImplantItemOption[];
-  /** 픽스처 목록 갱신 시 (관리 모달 저장 후) */
   onFixtureListChange?: () => void;
 }
 
@@ -55,14 +68,24 @@ export function ToothChart({
   onActiveSheetChange,
   onRemoveSheet,
   savedTeeth = [],
+  implantRemovedTeeth = [],
   readOnly = false,
   implantItems = [],
   onFixtureListChange,
 }: ToothChartProps) {
   const savedSet = new Set(savedTeeth);
+  const implantRemovedSet = new Set(implantRemovedTeeth);
+
+  /** 치아별 표시 상태 (이미지 경로·스타일 결정) */
+  function getToothState(tooth: number): ToothState {
+    if (implantRemovedSet.has(tooth)) return 'implant_removed';
+    if (savedSet.has(tooth)) return 'has_value'; // 저장된 치아는 선택돼도 has_value 이미지 유지
+    if (selectedTeeth === tooth) return 'selected';
+    return 'empty';
+  }
 
   return (
-    <div className="flex flex-col space-y-4 py-6 h-full">
+    <div className="flex flex-col space-y-6 py-6 h-full">
       <div className="flex items-center justify-end">
         {onReset && !readOnly && (
           <Button
@@ -77,60 +100,88 @@ export function ToothChart({
         )}
       </div>
 
-      {/* 치식 그리드: 저장된 치아는 붉은색, 선택된 치아는 primary */}
-      <div className="flex justify-center overflow-x-auto">
-        <svg
-          viewBox="0 0 758 140"
-          className="w-full max-w-full min-w-[280px] h-auto"
-          aria-label="치식도"
-        >
-          {FRAME_TOOTH_PATHS.map(({ tooth, d, cx, cy }) => {
-            const selected = selectedTeeth === tooth;
-            const hasSaved = savedSet.has(tooth);
-            const fill = selected
-              ? 'color-mix(in srgb, var(--primary) 50%, transparent)'
-              : hasSaved
-                ? 'color-mix(in srgb, hsl(0 84% 60%) 50%, transparent)'
-                : 'color-mix(in srgb, var(--muted-foreground) 20%, transparent)';
-            const stroke = selected
-              ? 'color-mix(in srgb, var(--primary) 50%, transparent)'
-              : hasSaved
-                ? 'hsl(0 84% 60%)'
-                : 'color-mix(in srgb, var(--muted-foreground) 20%, transparent)';
-            return (
-              <g key={tooth}>
-                <path
-                  d={d}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={selected || hasSaved ? 2 : 1}
-                  className="cursor-pointer transition-colors hover:opacity-90 outline-none focus:outline-none"
-                  role="button"
-                  tabIndex={0}
+      {/* 치식 그리드: 4줄 격자, 일정 간격 */}
+      <div className="flex flex-col items-center gap-2 overflow-x-auto">
+        {TOOTH_ROWS.map((row, rowIndex) => (
+          <div
+            key={rowIndex}
+            className="flex justify-center gap-1"
+            role="row"
+            aria-label={
+              rowIndex === 0
+                ? '상악 영구치'
+                : rowIndex === 1
+                  ? '상악 유치'
+                  : rowIndex === 2
+                    ? '하악 유치'
+                    : '하악 영구치'
+            }
+          >
+            {row.map((tooth) => {
+              const state = getToothState(tooth);
+              const selected = state === 'selected';
+              const imageHref = getToothImagePath(tooth, state);
+              const label =
+                state === 'implant_removed'
+                  ? `${tooth} Ext`
+                  : state === 'has_value'
+                    ? `IMPL ${tooth}`
+                    : String(tooth);
+              const textColorClass =
+                state === 'empty'
+                  ? 'text-muted-foreground'
+                  : state === 'selected'
+                    ? 'text-primary'
+                    : state === 'has_value'
+                      ? 'text-white'
+                      : 'text-destructive';
+              return (
+                <button
+                  key={tooth}
+                  type="button"
+                  className="flex flex-col items-center justify-center shrink-0 rounded transition-opacity hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  style={{
+                    width: TOOTH_CELL_SIZE,
+                    height: TOOTH_CELL_SIZE,
+                  }}
                   aria-pressed={selected}
                   aria-label={`치아 ${tooth}`}
                   data-tooth={tooth}
                   onClick={() => onToggle(tooth)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      onToggle(tooth);
-                    }
-                  }}
-                />
-                <text
-                  x={cx}
-                  y={cy}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  className="fill-foreground text-[10px] font-medium pointer-events-none"
                 >
-                  {tooth}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+                  <span className="relative block w-full h-full">
+                    <img
+                      src={imageHref}
+                      alt=""
+                      width={TOOTH_CELL_SIZE}
+                      height={TOOTH_CELL_SIZE}
+                      className="object-contain w-full h-full pointer-events-none"
+                    />
+                    <span
+                      className={`absolute inset-0 flex flex-col justify-center text-sm font-medium leading-tight ${textColorClass}`}
+                    >
+                      {state === 'has_value' ? (
+                        <div
+                          className={`text-[10px] flex flex-col h-[70%] ${rowIndex < 2 ? '' : 'justify-end'}`}
+                        >
+                          <span>IMPL</span>
+                          <span>{tooth}</span>
+                        </div>
+                      ) : state === 'implant_removed' ? (
+                        <div className="text-[11px] flex flex-col">
+                          <span>{tooth}</span>
+                          <span>Ext</span>
+                        </div>
+                      ) : (
+                        label
+                      )}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <p className="font-medium text-foreground">
@@ -158,7 +209,7 @@ export function ToothChart({
                   <button
                     type="button"
                     onClick={() => onActiveSheetChange?.(sheet.id)}
-                    className={`pl-3 py-2 text-sm font-medium transition-colors ${
+                    className={`pl-3 ${readOnly && 'pr-3'} py-2 text-sm font-medium transition-colors ${
                       activeSheetId === sheet.id
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
@@ -173,7 +224,7 @@ export function ToothChart({
                         e.stopPropagation();
                         onRemoveSheet?.(sheet.id);
                       }}
-                      className="rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                      className="pr-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                       aria-label={`${TREATMENT_TYPE_LABELS[sheet.type]} 제거`}
                     >
                       <X className="h-3.5 w-3.5" />
@@ -207,16 +258,17 @@ export function ToothChart({
                       [
                         'implant_placement',
                         'implant_prosthesis',
-                        'laminate',
+                        'implant_remove',
                       ] as const
                     ).map((type) => (
                       <Button
                         key={type}
                         variant="outline"
                         size="xl"
-                        className="border-primary border-2 hover:bg-primary/20 h-20 w-40"
+                        className="border-primary border-2 hover:bg-primary/10 h-20 w-40"
                         onClick={() => onAddSheet?.(selectedTeeth, type)}
                       >
+                        {type === 'implant_remove' ? '🗑️' : '🦷'}{' '}
                         {TREATMENT_TYPE_LABELS[type]}
                       </Button>
                     ))}
@@ -261,10 +313,10 @@ export function ToothChart({
                       />
                     );
                   }
-                  if (sheet.type === 'laminate') {
+                  if (sheet.type === 'implant_remove') {
                     return (
-                      <LaminateSheet
-                        value={(sheet.formData ?? {}) as LaminateFormData}
+                      <ImplantRemoveSheet
+                        value={(sheet.formData ?? {}) as ImplantRemoveFormData}
                         onChange={(formData) =>
                           onUpdateSheetFormData?.(sheet.id, formData)
                         }

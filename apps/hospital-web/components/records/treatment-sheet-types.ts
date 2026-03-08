@@ -2,7 +2,15 @@
 export type TreatmentSheetType =
   | 'implant_placement'
   | 'implant_prosthesis'
+  | 'implant_remove'
   | 'laminate';
+
+// 치식도에서 치아 하나의 표시 상태
+export type ToothState =
+  | 'empty' // 비어 있음
+  | 'selected' // 선택됨
+  | 'has_value' // 저장된 데이터 있음
+  | 'implant_removed'; // 임플란트 제거됨
 
 // 임플란트 식립 진료 시트 폼 데이터
 export interface ImplantPlacementFormData {
@@ -40,6 +48,12 @@ export interface ImplantProsthesisFormData {
   comment?: string;
 }
 
+// 임플란트 제거 시트 폼 데이터
+export interface ImplantRemoveFormData {
+  method?: string;
+  comment?: string;
+}
+
 // 라미네이트 진료 시트 폼 데이터
 export interface LaminateFormData {
   manufacturer?: string;
@@ -55,6 +69,7 @@ export interface TreatmentSheet {
   id: string;
   tooth: number;
   type: TreatmentSheetType;
+  date?: string;
   formData?:
     | ImplantPlacementFormData
     | ImplantProsthesisFormData
@@ -70,5 +85,6 @@ export interface SavedTreatmentRecord {
   formData?:
     | ImplantPlacementFormData
     | ImplantProsthesisFormData
+    | ImplantRemoveFormData
     | LaminateFormData;
 }

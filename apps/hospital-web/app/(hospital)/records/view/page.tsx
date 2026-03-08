@@ -12,6 +12,7 @@ import {
   type ImplantPlacementFormData,
   type ImplantProsthesisFormData,
   type LaminateFormData,
+  type ImplantRemoveFormData,
 } from '@/components/records/treatment-sheet-types';
 import { getAuthHeaders } from '@/lib/get-auth-headers';
 import { redirectIfUnauthorized } from '@/lib/get-auth-headers';
@@ -21,7 +22,7 @@ import {
   SESSION_KEY_RECORD_EDIT_PAYLOAD,
 } from '@/lib/records-session';
 import { decryptWithPin } from '@/lib/records-encrypt-client';
-import { BookSearch, SquarePen } from 'lucide-react';
+import { SquarePen } from 'lucide-react';
 import { ToothQuadrantCell } from '@/components/records/ToothQuadrantCell';
 import type { PreInfo } from '@/components/records/PreInfoModal';
 
@@ -125,13 +126,29 @@ function RecordViewContent() {
     tooth: s.tooth,
     type: s.type,
     formData: s.formData,
-    date: recordDate ?? new Date(),
+    date: s.date ? new Date(s.date) : (recordDate ?? new Date()),
   }));
 
   const sheetsForSelectedTooth = treatmentSheets.filter(
     (s) => s.tooth === selectedTeeth,
   );
   const savedTeeth = Array.from(new Set(treatmentSheets.map((s) => s.tooth)));
+
+  const implantRemovedTeeth = React.useMemo(() => {
+    const byTooth = new Map<number, SavedTreatmentRecord[]>();
+    for (const r of savedRecords) {
+      const list = byTooth.get(r.tooth) ?? [];
+      list.push(r);
+      byTooth.set(r.tooth, list);
+    }
+    const result: number[] = [];
+    for (const [tooth, records] of byTooth) {
+      if (records.length === 0) continue;
+      const latest = records[records.length - 1];
+      if (latest.type === 'implant_remove') result.push(tooth);
+    }
+    return result;
+  }, [savedRecords]);
 
   const handleOpenSavedRecord = useCallback(
     (record: SavedTreatmentRecord) => {
@@ -146,7 +163,7 @@ function RecordViewContent() {
     if (!preInfo || !treatmentSheets.length) return;
     sessionStorage.setItem(
       SESSION_KEY_RECORD_EDIT_PAYLOAD,
-      JSON.stringify({ preInfo, treatmentSheets }),
+      JSON.stringify({ preInfo, savedRecords }),
     );
     router.push('/records/create');
   };
@@ -392,6 +409,20 @@ function RecordViewContent() {
                           </div>
                         );
                       })()
+                    ) : record.type === 'implant_remove' && record.formData ? (
+                      (() => {
+                        const fd = record.formData as ImplantRemoveFormData;
+                        return (
+                          <div className="text-xs flex flex-col gap-0.5">
+                            <span className="font-medium text-sm mb-1">
+                              임플란트 제거
+                            </span>
+                            <p>치아번호: #{record.tooth}</p>
+                            {fd.method && <p>- 방식: {fd.method}</p>}
+                            {fd.comment && <p>- {fd.comment}</p>}
+                          </div>
+                        );
+                      })()
                     ) : (
                       <p className="text-muted-foreground">준비 중입니다</p>
                     )}
@@ -410,6 +441,7 @@ function RecordViewContent() {
             activeSheetId={activeSheetId}
             onActiveSheetChange={setActiveSheetId}
             savedTeeth={savedTeeth}
+            implantRemovedTeeth={implantRemovedTeeth}
             readOnly
           />
         </div>

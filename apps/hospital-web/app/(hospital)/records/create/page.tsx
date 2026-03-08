@@ -25,6 +25,7 @@ import {
   type ImplantPlacementFormData,
   type ImplantProsthesisFormData,
   type LaminateFormData,
+  type ImplantRemoveFormData,
 } from '@/components/records/treatment-sheet-types';
 import { getAuthHeaders, redirectIfUnauthorized } from '@/lib/get-auth-headers';
 import {
@@ -41,6 +42,7 @@ function generateSheetId() {
 }
 interface PatientCheckResult {
   exists: boolean;
+  latestRecordStatus?: string | null;
   patientGender?: string | null;
   patientAgeGroup?: string | null;
 }
@@ -64,6 +66,7 @@ function CreateContent() {
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentApproveNo, setPaymentApproveNo] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('CARD');
+  const [showPaymentOnRegister, setShowPaymentOnRegister] = useState(true);
   const [registerResult, setRegisterResult] = useState<
     | null
     | { status: 'signing' }
@@ -102,20 +105,48 @@ function CreateContent() {
     if (editPayloadRaw) {
       fromEditPayloadRef.current = true;
       try {
-        const { preInfo: editPreInfo, treatmentSheets: editSheets } =
-          JSON.parse(editPayloadRaw) as {
-            preInfo?: PreInfo;
-            treatmentSheets?: TreatmentSheet[];
-          };
+        const parsed = JSON.parse(editPayloadRaw) as {
+          preInfo?: PreInfo;
+          treatmentSheets?: TreatmentSheet[];
+          savedRecords?: Array<
+            Omit<SavedTreatmentRecord, 'date'> & { date: string }
+          >;
+        };
         sessionStorage.removeItem(SESSION_KEY_RECORD_EDIT_PAYLOAD);
+        const editPreInfo = parsed.preInfo;
         if (editPreInfo) setPreInfo(editPreInfo);
-        if (Array.isArray(editSheets) && editSheets.length > 0) {
+        const editSavedRecords = parsed.savedRecords;
+        const editSheets = parsed.treatmentSheets;
+        if (Array.isArray(editSavedRecords) && editSavedRecords.length > 0) {
+          const asSaved: SavedTreatmentRecord[] = editSavedRecords.map((r) => ({
+            id: r.id,
+            tooth: r.tooth,
+            type: r.type,
+            formData: r.formData,
+            date: new Date(r.date as string),
+          }));
+          setSavedRecords(asSaved);
+          const first = editSavedRecords[0];
+          setSelectedTeeth(first.tooth);
+          const sheetsForFirst = asSaved
+            .filter((r) => r.tooth === first.tooth)
+            .map((r) => ({
+              id: r.id,
+              tooth: r.tooth,
+              type: r.type,
+              formData: r.formData,
+            }));
+          setTreatmentSheets(sheetsForFirst);
+          setActiveSheetId(first.id);
+        } else if (Array.isArray(editSheets) && editSheets.length > 0) {
           const asSaved: SavedTreatmentRecord[] = editSheets.map((s) => ({
             id: s.id,
             tooth: s.tooth,
             type: s.type,
             formData: s.formData,
-            date: new Date(),
+            date: editPreInfo?.treatmentDate
+              ? new Date(editPreInfo.treatmentDate)
+              : new Date(),
           }));
           setSavedRecords(asSaved);
           const first = editSheets[0];
@@ -200,7 +231,9 @@ function CreateContent() {
       })
       .then((data: PatientCheckResult | null) => {
         if (cancelled) return;
-        if (fromEditPayloadRef.current) return; // view 편집으로 들어온 경우 모달 스킵
+        setShowPaymentOnRegister(
+          !data?.exists || data?.latestRecordStatus === 'DRAFT',
+        );
         if (data?.exists) {
           setModalMode('dateOnly');
           setExistingPatientGender(data.patientGender === 'F' ? 'F' : 'M');
@@ -210,7 +243,7 @@ function CreateContent() {
         setPreInfoModalOpen(true);
       })
       .catch(() => {
-        if (cancelled || fromEditPayloadRef.current) return;
+        if (cancelled) return;
         setPreInfoModalOpen(true);
         setModalMode('full');
       })
@@ -327,13 +360,17 @@ function CreateContent() {
 
   // 임시 저장: 기존 id면 갱신, 없으면 새 id로 추가
   const handleDraftSave = useCallback(() => {
-    const now = new Date();
     setSavedRecords((prev) => {
       const byId = new Map(prev.map((r) => [r.id, r]));
       for (const s of treatmentSheets) {
+        const existing = prev.find((r) => r.id === s.id);
         byId.set(s.id, {
           id: s.id,
-          date: now,
+          date: existing
+            ? existing.date
+            : preInfo?.treatmentDate
+              ? new Date(preInfo.treatmentDate)
+              : new Date(),
           tooth: s.tooth,
           type: s.type,
           formData: s.formData,
@@ -355,43 +392,68 @@ function CreateContent() {
     [savedRecords],
   );
 
+  // 최신 시트가 implant_remove 인 치아
+  const implantRemovedTeeth = React.useMemo(() => {
+    const byTooth = new Map<number, SavedTreatmentRecord[]>();
+    for (const r of savedRecords) {
+      const list = byTooth.get(r.tooth) ?? [];
+      list.push(r);
+      byTooth.set(r.tooth, list);
+    }
+    const result: number[] = [];
+    for (const [tooth, records] of byTooth) {
+      if (records.length === 0) continue;
+      const latest = records[records.length - 1];
+      if (latest.type === 'implant_remove') result.push(tooth);
+    }
+    return result;
+  }, [savedRecords]);
+
   const handleCancelConfirm = () => {
     setCancelConfirmOpen(false);
     router.push('/dashboard');
   };
 
   const handleRegisterConfirmClick = () => {
-    // TODO: 추후 draft - paid - onchained 순으로 변경되게 수정
     setRegisterConfirmOpen(false);
-    setPaymentConfirmOpen(true);
-  };
-
-  const handleRegisterConfirm = async () => {
-    // 결제 금액 검증
-    const parsedAmount = parseFloat(paymentAmount);
-    if (!paymentAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
-      alert('결제 금액을 올바르게 입력해주세요.');
+    if (showPaymentOnRegister) {
+      setPaymentConfirmOpen(true);
       return;
     }
+    doRegister({ skipPayment: true });
+  };
 
-    setPaymentConfirmOpen(false);
+  const doRegister = async (opts: { skipPayment: boolean }) => {
+    const { skipPayment } = opts;
+    if (!skipPayment) {
+      const parsedAmount = parseFloat(paymentAmount);
+      if (!paymentAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+        alert('결제 금액을 올바르게 입력해주세요.');
+        return;
+      }
+      setPaymentConfirmOpen(false);
+    }
     if (!preInfo) {
       alert('사전 정보를 입력해주세요.');
       return;
     }
-    // 등록 시 전체 진료 목록 사용 (savedRecords가 있으면 전체, 없으면 현재 치아 시트만)
     const sheetsToSend =
       savedRecords.length > 0
         ? savedRecords.map((r) => ({
             id: r.id,
             tooth: r.tooth,
             type: r.type,
+            date: r.date.toISOString(),
             formData: r.formData,
           }))
         : treatmentSheets.map((s) => ({
             id: s.id,
             tooth: s.tooth,
             type: s.type,
+            date: (preInfo?.treatmentDate
+              ? new Date(preInfo.treatmentDate)
+              : new Date()
+            ).toISOString(),
             formData: s.formData,
           }));
     if (sheetsToSend.length === 0) {
@@ -416,19 +478,23 @@ function CreateContent() {
         JSON.stringify(payload),
         pinCode,
       );
+      const body: Record<string, unknown> = {
+        patientId,
+        encryptedPayload,
+      };
+      if (!skipPayment) {
+        const parsedAmount = parseFloat(paymentAmount);
+        body.amount = parsedAmount;
+        body.approveNo = paymentApproveNo || undefined;
+        body.paymentMethod = paymentMethod || 'CARD';
+      }
       const res = await fetch('/api/records/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
         },
-        body: JSON.stringify({
-          patientId,
-          encryptedPayload,
-          amount: parsedAmount,
-          approveNo: paymentApproveNo || undefined,
-          paymentMethod: paymentMethod || 'CARD',
-        }),
+        body: JSON.stringify(body),
       });
       if (redirectIfUnauthorized(res)) {
         setRegisterResult(null);
@@ -462,6 +528,16 @@ function CreateContent() {
     } finally {
       setRegisterLoading(false);
     }
+  };
+
+  const handleRegisterConfirm = async () => {
+    // 결제 금액 검증
+    const parsedAmount = parseFloat(paymentAmount);
+    if (!paymentAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      alert('결제 금액을 올바르게 입력해주세요.');
+      return;
+    }
+    await doRegister({ skipPayment: false });
   };
 
   if (!patientId) {
@@ -721,6 +797,20 @@ function CreateContent() {
                           </div>
                         );
                       })()
+                    ) : record.type === 'implant_remove' && record.formData ? (
+                      (() => {
+                        const fd = record.formData as ImplantRemoveFormData;
+                        return (
+                          <div className="text-xs flex flex-col gap-0.5">
+                            <span className="font-medium text-sm mb-1">
+                              임플란트 제거
+                            </span>
+                            <p>치아번호: #{record.tooth}</p>
+                            {fd.method && <p>- 방식: {fd.method}</p>}
+                            {fd.comment && <p>- {fd.comment}</p>}
+                          </div>
+                        );
+                      })()
                     ) : (
                       <p className="text-muted-foreground">준비 중입니다</p>
                     )}
@@ -744,6 +834,7 @@ function CreateContent() {
             onActiveSheetChange={setActiveSheetId}
             onRemoveSheet={handleRemoveSheet}
             savedTeeth={savedTeeth}
+            implantRemovedTeeth={implantRemovedTeeth}
             implantItems={implantItems}
             onFixtureListChange={refetchImplantItems}
           />
@@ -761,7 +852,11 @@ function CreateContent() {
           isEditingPreInfo
             ? (preInfo ?? undefined)
             : modalMode === 'dateOnly'
-              ? { gender: existingPatientGender, birthDate: '', phm: [] }
+              ? (preInfo ?? {
+                  gender: existingPatientGender,
+                  birthDate: '',
+                  phm: [],
+                })
               : (preInfo ?? undefined)
         }
         onComplete={handlePreInfoComplete}

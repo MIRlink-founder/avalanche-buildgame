@@ -1,17 +1,18 @@
 'use client';
 
 import { ShieldCheck } from 'lucide-react';
-import type { TreatmentSheet } from '@/lib/record-types';
 import type {
   ImplantPlacementFormData,
   ImplantProsthesisFormData,
+  ImplantRemoveFormData,
   LaminateFormData,
+  TreatmentSheet,
 } from '@/lib/record-types';
 
 const TYPE_LABELS: Record<string, string> = {
   implant_placement: '임플란트 식립',
   implant_prosthesis: '임플란트 보철',
-  laminate: '라미네이트',
+  implant_remove: '임플란트 제거',
 };
 
 function Row({
@@ -132,6 +133,30 @@ function ImplantProsthesisCard({
   );
 }
 
+function ImplantRemoveCard({
+  tooth,
+  fd,
+}: {
+  tooth: number;
+  fd: ImplantRemoveFormData;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+        <span className="text-lg" aria-hidden>
+          🦷
+        </span>
+        {TYPE_LABELS.implant_remove}
+      </h3>
+      <div className="space-y-0">
+        <Row label="치아번호" value={`#${tooth}`} />
+        <Row label="방식" value={fd.method} />
+        <Row label="Comment" value={fd.comment} />
+      </div>
+    </div>
+  );
+}
+
 function LaminateCard({ tooth, fd }: { tooth: number; fd: LaminateFormData }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
@@ -184,6 +209,15 @@ export function RecordDetailCards({
               key={sheet.id}
               tooth={sheet.tooth}
               fd={sheet.formData as ImplantProsthesisFormData}
+            />
+          );
+        }
+        if (sheet.type === 'implant_remove' && sheet.formData) {
+          return (
+            <ImplantRemoveCard
+              key={sheet.id}
+              tooth={sheet.tooth}
+              fd={sheet.formData as ImplantRemoveFormData}
             />
           );
         }
