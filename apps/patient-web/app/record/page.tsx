@@ -163,11 +163,31 @@ export default function RecordPage() {
 
   const savedTeeth = Array.from(new Set(treatmentSheets.map((s) => s.tooth)));
 
-  /** 선택된 치아가 있으면 해당 치아 시트만, 없으면 전체 */
+  // 해당 치아의 마지막 시트가 임플란트 제거이면 제거된 치아로 표시
+  const implantRemovedTeeth = (() => {
+    const byTooth = new Map<number, TreatmentSheet[]>();
+    for (const s of treatmentSheets) {
+      const list = byTooth.get(s.tooth) ?? [];
+      list.push(s);
+      byTooth.set(s.tooth, list);
+    }
+    const result: number[] = [];
+    for (const [tooth, sheets] of byTooth) {
+      if (sheets.length === 0) continue;
+      const latest = sheets[sheets.length - 1];
+      if (latest.type === 'implant_remove') result.push(tooth);
+    }
+    return result;
+  })();
+
+  // 선택된 치아가 있으면 해당 치아 시트만, 없으면 전체
   const displaySheets =
     selectedTooth != null
-      ? treatmentSheets.filter((s) => s.tooth === selectedTooth)
-      : treatmentSheets;
+      ? treatmentSheets
+          .filter((s) => s.tooth === selectedTooth)
+          .slice()
+          .reverse()
+      : treatmentSheets.slice().reverse();
 
   if (patientId === null) {
     return (
@@ -245,6 +265,7 @@ export default function RecordPage() {
             savedTeeth={savedTeeth}
             selectedTooth={selectedTooth}
             onToothSelect={setSelectedTooth}
+            implantRemovedTeeth={implantRemovedTeeth}
           />
         </section>
 
