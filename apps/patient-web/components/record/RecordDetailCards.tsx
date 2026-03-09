@@ -13,6 +13,7 @@ const TYPE_LABELS: Record<string, string> = {
   implant_placement: '임플란트 식립',
   implant_prosthesis: '임플란트 보철',
   implant_remove: '임플란트 제거',
+  laminate: '라미네이트',
 };
 
 function Row({
@@ -144,7 +145,7 @@ function ImplantRemoveCard({
     <div className="rounded-lg border border-border bg-card p-4">
       <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
         <span className="text-lg" aria-hidden>
-          🦷
+          🗑️
         </span>
         {TYPE_LABELS.implant_remove}
       </h3>

@@ -4,6 +4,13 @@ export type TreatmentSheetType =
   | 'implant_remove'
   | 'laminate';
 
+// 치식도에서 치아 하나의 표시 상태
+export type ToothState =
+  | 'empty'
+  | 'selected'
+  | 'has_value'
+  | 'implant_removed';
+
 export interface ImplantPlacementFormData {
   fixture?: string;
   fixtureItemId?: number;

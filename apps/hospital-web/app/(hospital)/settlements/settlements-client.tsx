@@ -193,6 +193,7 @@ export function SettlementsClient() {
           },
         );
         setCurrentMonth(payload.currentMonth ?? null);
+        console.log(payload);
         setNextPaymentDate(payload.nextPaymentDate ?? null);
         setPaymentDayOfMonth(payload.paymentDayOfMonth ?? 25);
       } catch {
@@ -371,7 +372,7 @@ export function SettlementsClient() {
               ) : (
                 settlements.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="py-4 text-center whitespace-nowrap">
+                    <TableCell className="py-4 text-center whitespace-nowrap text-start">
                       {formatPeriodMonth(item.settlementPeriodStart)}
                     </TableCell>
                     <TableCell className="py-4">
@@ -387,7 +388,7 @@ export function SettlementsClient() {
                     <TableCell className="py-4 whitespace-nowrap">
                       {formatAmount(item.caseCount)}건
                     </TableCell>
-                    <TableCell className="py-4 text-right whitespace-nowrap font-semibold">
+                    <TableCell className="py-4 text-right whitespace-nowrap font-semibold text-start">
                       {formatAmount(Number(item.paybackAmount))} 원
                     </TableCell>
                     <TableCell className="py-4 whitespace-nowrap text-muted-foreground">

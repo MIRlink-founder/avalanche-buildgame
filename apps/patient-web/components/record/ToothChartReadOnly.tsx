@@ -1,146 +1,127 @@
 'use client';
 
-import {
-  QUADRANT_18_11,
-  QUADRANT_21_28,
-  QUADRANT_48_41,
-  QUADRANT_31_38,
-  VIEWBOX_18_11,
-  VIEWBOX_21_28,
-  VIEWBOX_48_41,
-  VIEWBOX_31_38,
-} from './frame-tooth-paths';
+import type { ToothState } from '@/lib/record-types';
+import { getToothImagePath } from './tooth-image-paths';
 
-type PathItem = { tooth: number; d: string; cx: number; cy: number };
+// 치식도 4줄 (hospital-web ToothChart과 동일)
+const TOOTH_ROWS: number[][] = [
+  [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28],
+  [55, 54, 53, 52, 51, 61, 62, 63, 64, 65],
+  [85, 84, 83, 82, 81, 71, 72, 73, 74, 75],
+  [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38],
+];
+
+const TOOTH_CELL_SIZE = 36;
 
 interface ToothChartReadOnlyProps {
   savedTeeth: number[];
   selectedTooth?: number | null;
   onToothSelect?: (tooth: number | null) => void;
-}
-
-function QuadrantSvg({
-  paths,
-  viewBox,
-  savedSet,
-  selectedTooth,
-  onToothSelect,
-}: {
-  paths: PathItem[];
-  viewBox: string;
-  savedSet: Set<number>;
-  selectedTooth: number | null;
-  onToothSelect: (tooth: number | null) => void;
-}) {
-  return (
-    <svg
-      viewBox={viewBox}
-      className="w-full min-w-0 flex-1 w-full h-auto"
-      aria-label="치식도 구역"
-    >
-      {paths.map(({ tooth, d, cx, cy }) => {
-        const hasSaved = savedSet.has(tooth);
-        const selected = selectedTooth === tooth;
-        const fill = selected
-          ? 'color-mix(in srgb, var(--primary) 50%, transparent)'
-          : hasSaved
-            ? 'color-mix(in srgb, hsl(0 84% 60%) 50%, transparent)'
-            : 'color-mix(in srgb, var(--muted-foreground) 20%, transparent)';
-        const stroke = selected
-          ? 'color-mix(in srgb, var(--primary) 50%, transparent)'
-          : hasSaved
-            ? 'hsl(0 84% 60%)'
-            : 'color-mix(in srgb, var(--muted-foreground) 20%, transparent)';
-        return (
-          <g key={tooth}>
-            <path
-              d={d}
-              fill={fill}
-              stroke={stroke}
-              strokeWidth={selected || hasSaved ? 2 : 1}
-              className="transition-colors cursor-pointer hover:opacity-90 outline-none focus:outline-none"
-              role="button"
-              tabIndex={0}
-              aria-pressed={selected}
-              aria-label={`치아 ${tooth}${selected ? ' 선택됨' : ''}`}
-              onClick={() => onToothSelect(selected ? null : tooth)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onToothSelect(selected ? null : tooth);
-                }
-              }}
-            />
-            <text
-              x={cx}
-              y={cy}
-              textAnchor="middle"
-              dominantBaseline="central"
-              className="fill-foreground text-[10px] font-medium pointer-events-none"
-            >
-              {tooth}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
+  implantRemovedTeeth?: number[];
 }
 
 export function ToothChartReadOnly({
   savedTeeth,
   selectedTooth = null,
   onToothSelect = () => {},
+  implantRemovedTeeth = [],
 }: ToothChartReadOnlyProps) {
   const savedSet = new Set(savedTeeth);
+  const implantRemovedSet = new Set(implantRemovedTeeth);
+
+  function getToothState(tooth: number): ToothState {
+    if (implantRemovedSet.has(tooth)) return 'implant_removed';
+    if (savedSet.has(tooth)) return 'has_value';
+    if (selectedTooth === tooth) return 'selected';
+    return 'empty';
+  }
+
   return (
     <div
-      className="flex flex-col gap-4 overflow-x-auto border rounded-lg p-8"
+      className="flex flex-col items-start overflow-x-auto border rounded-lg p-6"
       aria-label="시술 부위 치식도"
     >
-      {/* 상악: 18-11 | 21-28 */}
-      <div className="flex flex-col gap-1">
-        <p className="text-center font-medium text-muted-foreground">
-          상악 (Upper)
-        </p>
-        <div className="flex flex-col gap-2 w-full">
-          <QuadrantSvg
-            paths={QUADRANT_18_11}
-            viewBox={VIEWBOX_18_11}
-            savedSet={savedSet}
-            selectedTooth={selectedTooth}
-            onToothSelect={onToothSelect}
-          />
-          <QuadrantSvg
-            paths={QUADRANT_21_28}
-            viewBox={VIEWBOX_21_28}
-            savedSet={savedSet}
-            selectedTooth={selectedTooth}
-            onToothSelect={onToothSelect}
-          />
+      <div className="min-w-max flex flex-col items-center gap-2">
+      {TOOTH_ROWS.map((row, rowIndex) => (
+        <div
+          key={rowIndex}
+          className="flex justify-start gap-1"
+          role="row"
+          aria-label={
+            rowIndex === 0
+              ? '상악 영구치'
+              : rowIndex === 1
+                ? '상악 유치'
+                : rowIndex === 2
+                  ? '하악 유치'
+                  : '하악 영구치'
+          }
+        >
+          {row.map((tooth) => {
+            const state = getToothState(tooth);
+            const selected = state === 'selected';
+            const imageHref = getToothImagePath(tooth, state);
+            const label =
+              state === 'implant_removed'
+                ? `${tooth} Ext`
+                : state === 'has_value'
+                  ? `IMPL ${tooth}`
+                  : String(tooth);
+            const textColorClass =
+              state === 'empty'
+                ? 'text-muted-foreground'
+                : state === 'selected'
+                  ? 'text-primary'
+                  : state === 'has_value'
+                    ? 'text-white'
+                    : 'text-destructive';
+            return (
+              <button
+                key={tooth}
+                type="button"
+                className="flex flex-col items-center justify-center shrink-0 rounded transition-opacity hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                style={{
+                  width: TOOTH_CELL_SIZE,
+                  height: TOOTH_CELL_SIZE,
+                }}
+                aria-pressed={selected}
+                aria-label={`치아 ${tooth}`}
+                data-tooth={tooth}
+                onClick={() => onToothSelect(selected ? null : tooth)}
+              >
+                <span className="relative block w-full h-full">
+                  <img
+                    src={imageHref}
+                    alt=""
+                    width={TOOTH_CELL_SIZE}
+                    height={TOOTH_CELL_SIZE}
+                    className="object-contain w-full h-full pointer-events-none"
+                  />
+                  <span
+                    className={`absolute inset-0 flex flex-col justify-center text-sm font-medium leading-tight ${textColorClass}`}
+                  >
+                    {state === 'has_value' ? (
+                      <div
+                        className={`text-[10px] flex flex-col h-[70%] ${rowIndex < 2 ? '' : 'justify-end'}`}
+                      >
+                        <span>IMPL</span>
+                        <span>{tooth}</span>
+                      </div>
+                    ) : state === 'implant_removed' ? (
+                      <div className="text-[11px] flex flex-col">
+                        <span>{tooth}</span>
+                        <span>Ext</span>
+                      </div>
+                    ) : (
+                      label
+                    )}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </div>
-      {/* 하악: 48-41 | 31-38 */}
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-col gap-2 w-full">
-          <QuadrantSvg
-            paths={QUADRANT_48_41}
-            viewBox={VIEWBOX_48_41}
-            savedSet={savedSet}
-            selectedTooth={selectedTooth}
-            onToothSelect={onToothSelect}
-          />
-          <QuadrantSvg
-            paths={QUADRANT_31_38}
-            viewBox={VIEWBOX_31_38}
-            savedSet={savedSet}
-            selectedTooth={selectedTooth}
-            onToothSelect={onToothSelect}
-          />
-        </div>
-        <p className="text-center font-medium text-muted-foreground">
-          하악 (Lower)
-        </p>
+      ))}
       </div>
     </div>
   );
