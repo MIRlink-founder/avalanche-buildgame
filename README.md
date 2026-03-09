@@ -1,6 +1,10 @@
 # MI;Re 🦷🔗
 
-Avalanche 블록체인 기반 **임플란트 진료 기록 보존·연계 플랫폼**
+<p align="center" style="font-size: 1.2rem;">
+  Avalanche 블록체인 기반<br/> <strong style="font-size: 1.6rem;">임플란트 진료 기록 보존·연계 플랫폼</strong>
+</p>
+
+<img src="images/main.png" alt="메인" style="width: 100%; border-radius: 0.5rem; box-shadow: 0 2px 16px 0 #0002; margin-bottom: 1.25rem;" />
 
 ---
 
@@ -41,7 +45,7 @@ _비밀번호는 모두 `admin123!` 로 동일합니다._
 MI;Re(MirLink)는 환자 식별 정보(PII)를 철저히 분리하고, **구조화된 임상 데이터의 해시만 온체인에 기록**하여 개인정보 보호와 데이터 무결성을 동시에 보장하는 플랫폼입니다.
 
 - **MVP:** [진료 기록 작성 → 다단계 암호화 → DB 저장 및 온체인 이벤트 기록] End-to-End를 구현했습니다.
-- **제로 트러스트:** 환자의 물리적 동의(미르링크 카드 스캔) 없이는 병원·환자 모두 데이터에 접근할 수 없습니다.
+- **제로 트러스트:** 환자의 물리적 동의(MI;Re 카드 스캔) 없이는 병원·환자 모두 데이터에 접근할 수 없습니다.
 
 ---
 
@@ -102,7 +106,7 @@ mire-nx-workspace/
 
 ### 아키텍처
 
-<img src="images/architecture.png" alt="미르링크 시스템 아키텍처" style="width: 100%; border-radius: 0.5rem; box-shadow: 0 2px 16px 0 #0002; margin-bottom: 1.25rem;" />
+<img src="images/architecture.png" alt="시스템 아키텍처" style="width: 100%; border-radius: 0.5rem; box-shadow: 0 2px 16px 0 #0002; margin-bottom: 1.25rem;" />
 
 ---
 
