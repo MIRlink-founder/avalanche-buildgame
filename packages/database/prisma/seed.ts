@@ -136,6 +136,59 @@ async function main() {
     );
   }
 
+  // ── 정산 관련 더미값 ──
+  const mireHospitalId = hospitals[0]!.id;
+
+  // 2026년 1월·2월 지급 완료, 3월 지급 예정 (이번 달)
+  const settlementSeeds = [
+    {
+      hospitalId: mireHospitalId,
+      settlementPeriodStart: new Date(Date.UTC(2026, 0, 1)),
+      settlementPeriodEnd: new Date(Date.UTC(2026, 0, 31)),
+      totalVolume: 4_158_000,
+      caseCount: 42,
+      appliedRate: 5,
+      paybackAmount: 207_900,
+      status: 'SETTLED',
+      settledAt: new Date(Date.UTC(2026, 1, 25)),
+    },
+    {
+      hospitalId: mireHospitalId,
+      settlementPeriodStart: new Date(Date.UTC(2026, 1, 1)),
+      settlementPeriodEnd: new Date(Date.UTC(2026, 1, 28)),
+      totalVolume: 3_069_000,
+      caseCount: 31,
+      appliedRate: 5,
+      paybackAmount: 153_450,
+      status: 'PENDING',
+      settledAt: new Date(Date.UTC(2026, 2, 25)),
+    },
+    {
+      hospitalId: mireHospitalId,
+      settlementPeriodStart: new Date(Date.UTC(2026, 2, 1)),
+      settlementPeriodEnd: new Date(Date.UTC(2026, 2, 31)),
+      totalVolume: 2_079_000,
+      caseCount: 10,
+      appliedRate: 5,
+      paybackAmount: 103_950,
+      status: 'PENDING',
+      settledAt: new Date(Date.UTC(2026, 3, 25)),
+    },
+  ];
+
+  for (const s of settlementSeeds) {
+    const existing = await prisma.settlement.findFirst({
+      where: {
+        hospitalId: s.hospitalId,
+        settlementPeriodStart: s.settlementPeriodStart,
+      },
+    });
+    if (!existing) {
+      await prisma.settlement.create({ data: s });
+    }
+  }
+  console.log('✅ mire@example.com 정산 더미 생성 완료');
+
   // ── SystemConfig 초기값 ──
   const systemConfigSeeds = [
     {
