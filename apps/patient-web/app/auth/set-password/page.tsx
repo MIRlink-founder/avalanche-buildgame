@@ -231,7 +231,7 @@ export default function SetPasswordPage() {
           autoComplete="one-time-code"
           value={value}
           onChange={handleChange}
-          className="absolute h-0 w-0 opacity-0"
+          className="absolute -left-[9999px] top-0 h-0 w-0 opacity-0 outline-none caret-transparent"
           aria-label="6자리 비밀번호"
           disabled={submitting}
         />
