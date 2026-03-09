@@ -11,9 +11,9 @@ Avalanche 블록체인 기반 **임플란트 진료 기록 보존·연계 플랫
 - **Live Demo - Patient Portal:** [https://mire-nx-patient-web.vercel.app](https://mire-nx-patient-web.vercel.app)
 - **Smart Contract (Fuji Testnet):** [0x2A6bB4491a2eEA1415134D058426f3fD3DbD6475](https://testnet.snowtrace.io/address/0x2A6bB4491a2eEA1415134D058426f3fD3DbD6475) | [Snowtrace에서 보기](https://testnet.snowtrace.io/address/0x2A6bB4491a2eEA1415134D058426f3fD3DbD6475)
 
-#### 테스트용 더미 계정
+### 테스트용 더미 계정
 
-아래 계정으로 로그인해 데모를 체험하실 수 있습니다. **비밀번호는 모두 `admin123!` 로 동일합니다.**
+아래 계정으로 로그인해 데모를 체험하실 수 있습니다.
 
 | 구분                          | 이메일             |
 | ----------------------------- | ------------------ |
@@ -22,15 +22,13 @@ Avalanche 블록체인 기반 **임플란트 진료 기록 보존·연계 플랫
 | 더미 일반병원 (마스터 어드민) | prime@example.com  |
 | 더미 일반병원 (일반)          | prime2@example.com |
 
-#### 환자용 링크 형식
+_비밀번호는 모두 `admin123!` 로 동일합니다._
 
-환자 포털은 `?patientId=환자ID#PIN번호` 형식으로 접속합니다. 진료 기록 등록 시 사용한 환자 ID를 그대로 넣으시면 됩니다.
+### 환자용 링크 형식
+
+환자 포털은 `?patientId=환자ID#PIN번호` 형식으로 접속합니다. 진료 기록 등록 시 사용한 환자 ID를 그대로 입력합니다.
 
 - 예: `https://mire-nx-patient-web.vercel.app/?patientId=DUMMYID#123456`
-
-⚠️ 데모 환경에서 환자 기록 복호화·조회 시 테스트용 미르링크 카드 PIN이 필요할 수 있습니다.
-
-_데모 전용 계정이며, 평가 후 비활성화될 수 있습니다._
 
 ---
 
@@ -102,7 +100,7 @@ mire-nx-workspace/
 | Chain           | Avalanche C-Chain / Fuji Testnet, viem 2.x, wagmi 3.x                                                         |
 | 보안·암호화     | NextAuth v5, 오프체인 3단계 암호화(PIN → patientId → server salt). 온체인에는 해시·암호문만 기록, 평문 미저장 |
 
-### 아키텍처 다이어그램
+### 아키텍처
 
 <img src="images/architecture.png" alt="미르링크 시스템 아키텍처" style="width: 100%; border-radius: 0.5rem; box-shadow: 0 2px 16px 0 #0002; margin-bottom: 1.25rem;" />
 
